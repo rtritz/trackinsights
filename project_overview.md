@@ -18,9 +18,9 @@ track_app/
 │
 ├── frontend/               # Contains all user-facing assets — HTML, Tailwind CSS, JS, and images. Used by the front-end developer.
 │   ├── templates/          # Jinja2 HTML templates rendered by Flask.
-│   │   ├── base.html
-│   │   ├── home.html
-│   │   ├── athlete-search.html
+│   │   ├── base.html       # Contains template that other pages extend, for example header, footer, navigation, scripts, CSS)
+│   │   ├── home.html       # Home page
+│   │   ├── athlete-search.html # Athlete dashboard
 │   │   └── ...
 │   ├── static/             # Static files served to the browser.
 │   │   ├── css/
