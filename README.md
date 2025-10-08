@@ -12,14 +12,7 @@ Run locally
 
    pip install -r requirements.txt
 
-3. Initialize the database (if desired)
-
-   from app import app
-   from backend import db
-   with app.app_context():
-       db.create_all()
-
-4. Run
+3. Run
 
    python app.py
 
