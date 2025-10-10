@@ -8,3 +8,7 @@ def home():
     athletes = get_athletes(20)
     return render_template('home.html', athletes=athletes)
 
+@main_bp.route('/base')
+def base():
+    athletes = get_athletes(20)
+    return render_template('base.html', athletes=athletes)
