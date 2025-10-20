@@ -1,6 +1,12 @@
 from flask import jsonify, request
 from . import api_bp
-from ..queries import get_athletes, get_athlete_by_id, add_athlete, search_bar
+from ..queries import (
+    get_athletes,
+    get_athlete_by_id,
+    add_athlete,
+    search_bar,
+    get_athlete_dashboard_data,
+)
 
 
 @api_bp.route('/athletes')
@@ -34,7 +40,13 @@ def api_add_athlete():
     ln = data.get('last_name')
     if not fn or not ln:
         return jsonify({'error': 'first_name and last_name required'}), 400
-    a = add_athlete(fn, ln, school=data.get('school'))
+    a = add_athlete(
+        fn,
+        ln,
+        school=data.get('school'),
+        gender=data.get('gender'),
+        graduation_year=data.get('graduation_year'),
+    )
     return jsonify({'id': a.athlete_id}), 201
 
 
@@ -45,4 +57,12 @@ def api_search_bar():
         return jsonify([])
     results = search_bar(query)
     return jsonify(results)
+
+
+@api_bp.route('/athletes/<int:aid>/dashboard')
+def api_get_athlete_dashboard(aid):
+    data = get_athlete_dashboard_data(aid)
+    if not data:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(data)
 
