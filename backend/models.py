@@ -40,6 +40,7 @@ class Athlete(db.Model):
     last = db.Column(db.String)
     school_id = db.Column(db.Integer, db.ForeignKey("school.school_id"))
     gender = db.Column(db.String, db.ForeignKey("gender.gender"))
+    graduation_year = db.Column(db.Integer)
     results = db.relationship("AthleteResult", backref="athlete")
 
 class AthleteResult(db.Model):

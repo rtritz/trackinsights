@@ -1,5 +1,9 @@
-from .models import Athlete, School
-from sqlalchemy import or_, and_
+from functools import lru_cache
+
+from sqlalchemy import or_, func
+from sqlalchemy.orm import joinedload
+
+from .models import Athlete, School, AthleteResult, Meet
 from . import db
 
 
@@ -11,11 +15,34 @@ def get_athlete_by_id(aid):
     return Athlete.query.get(aid)
 
 
-def add_athlete(first_name, last_name, school=None):
-    a = Athlete(first_name=first_name, last_name=last_name, school=school)
-    db.session.add(a)
+def add_athlete(first_name, last_name, school=None, gender=None, graduation_year=None):
+    """Create a new athlete.
+
+    The ``school`` argument can be either a ``School`` instance or a school name.
+    When a string is provided the school will be looked up (or created) before
+    associating it with the new athlete.
+    """
+
+    school_obj = None
+    if isinstance(school, School):
+        school_obj = school
+    elif isinstance(school, str) and school.strip():
+        school_obj = School.query.filter_by(school_name=school.strip()).first()
+        if not school_obj:
+            school_obj = School(school_name=school.strip())
+            db.session.add(school_obj)
+            db.session.flush()
+
+    athlete = Athlete(
+        first=first_name,
+        last=last_name,
+        school=school_obj,
+        gender=gender,
+        graduation_year=graduation_year,
+    )
+    db.session.add(athlete)
     db.session.commit()
-    return a
+    return athlete
 
 def search_bar(query_text: str):
     """
@@ -81,6 +108,8 @@ def search_bar(query_text: str):
                 "id": athlete.athlete_id,
                 "name": athlete_name,
                 "school": athlete.school.school_name if athlete.school else None,
+                "gender": athlete.gender,
+                "classYear": athlete.graduation_year,
                 "score": score,
                 "priority": 2  # Athletes have lower priority
             })
@@ -207,4 +236,230 @@ def _calculate_combined_score(name: str, school: str, query_words: list) -> floa
     # Normalize by number of query words (not total text length)
     # This keeps scores comparable regardless of school name length
     return score / len(query_words)
+
+
+def get_athlete_dashboard_data(athlete_id: int):
+    """Aggregate the data needed to power the athlete dashboard."""
+
+    athlete = (
+        Athlete.query.options(joinedload(Athlete.school))
+        .filter_by(athlete_id=athlete_id)
+        .one_or_none()
+    )
+    if not athlete:
+        return None
+
+    badges = _compute_badges(athlete_id)
+    playoff_history = _build_playoff_history(athlete_id)
+
+    return {
+        "athlete": {
+            "id": athlete.athlete_id,
+            "first": athlete.first,
+            "last": athlete.last,
+            "full_name": f"{athlete.first} {athlete.last}".strip(),
+            "school": athlete.school.school_name if athlete.school else None,
+            "gender": athlete.gender,
+            "graduation_year": athlete.graduation_year,
+        },
+        "badges": badges,
+        "playoff_history": playoff_history,
+    }
+
+
+def _compute_badges(athlete_id: int):
+    stage_results = (
+        db.session.query(AthleteResult, Meet)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .filter(
+            AthleteResult.athlete_id == athlete_id,
+            Meet.meet_type.in_(("Sectional", "Regional", "State")),
+        )
+        .all()
+    )
+
+    sectional = [item for item in stage_results if item[1].meet_type == "Sectional"]
+    regional = [item for item in stage_results if item[1].meet_type == "Regional"]
+    state = [item for item in stage_results if item[1].meet_type == "State"]
+
+    return {
+        "sectional": _compute_stage_badge("Sectional", sectional, placer_threshold=8),
+        "regional": _compute_stage_badge("Regional", regional, placer_threshold=8),
+        "state": _compute_stage_badge("State", state, placer_threshold=9),
+    }
+
+
+def _compute_sectional_badge(results):
+    if not results:
+        return None
+
+    best_percentile = None
+
+    for res, _meet in results:
+        if res.place is None or res.place <= 0:
+            continue
+
+        field_size = _get_field_size(res.meet_id, res.event, res.result_type)
+        if not field_size:
+            continue
+
+        percentile = (res.place / field_size) * 100
+        best_percentile = percentile if best_percentile is None else min(best_percentile, percentile)
+
+    if best_percentile is None:
+        return None
+
+    return {
+        "stage": "Sectional",
+        "best_percentile": best_percentile,
+        "label": f"Top {_format_percentile(best_percentile)}% Sectional",
+    }
+
+
+def _compute_stage_badge(stage_name, results, placer_threshold):
+    if not results:
+        return None
+
+    qualifier_count = 0
+    placer_count = 0
+
+    for res, _meet in results:
+        qualifier_count += 1
+        if res.place is not None and res.place > 0 and res.place <= placer_threshold:
+            placer_count += 1
+
+    if placer_count:
+        count_prefix = f"{placer_count} x " if placer_count > 1 else ""
+        return {
+            "stage": stage_name,
+            "achievement": "Placer",
+            "count": placer_count,
+            "label": f"{count_prefix}{stage_name} Placer",
+        }
+
+    if qualifier_count:
+        count_prefix = f"{qualifier_count} x " if qualifier_count > 1 else ""
+        return {
+            "stage": stage_name,
+            "achievement": "Qualifier",
+            "count": qualifier_count,
+            "label": f"{count_prefix}{stage_name} Qualifier",
+        }
+
+    return None
+
+
+def _build_playoff_history(athlete_id: int):
+    results = (
+        db.session.query(AthleteResult, Meet)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .filter(
+            AthleteResult.athlete_id == athlete_id,
+            Meet.meet_type.in_(("Sectional", "Regional", "State")),
+        )
+        .all()
+    )
+
+    if not results:
+        return []
+
+    history = {}
+
+    for res, meet in results:
+        key = (meet.year, res.event)
+        entry = history.setdefault(
+            key,
+            {
+                "year": meet.year,
+                "event": res.event,
+                "Sectional": None,
+                "Regional": None,
+                "State": None,
+            },
+        )
+
+        candidate = {
+            "result": res.result,
+            "place": res.place,
+            "result_type": res.result_type,
+            "formatted": _format_stage_result(res.result, res.place),
+        }
+        entry[meet.meet_type] = _select_preferred_result(entry[meet.meet_type], candidate)
+
+    history_rows = []
+    for values in history.values():
+        history_rows.append(
+            {
+                "year": values["year"],
+                "event": values["event"],
+                "sectional": values["Sectional"]["formatted"] if values["Sectional"] else "–",
+                "regional": values["Regional"]["formatted"] if values["Regional"] else "–",
+                "state": values["State"]["formatted"] if values["State"] else "–",
+            }
+        )
+
+    history_rows.sort(key=lambda row: (-row["year"], row["event"]))
+    return history_rows
+
+
+def _select_preferred_result(existing, candidate):
+    if existing is None:
+        return candidate
+
+    result_type_order = {"Final": 2, "Prelim": 1}
+    existing_weight = result_type_order.get(existing.get("result_type"), 0)
+    candidate_weight = result_type_order.get(candidate.get("result_type"), 0)
+
+    if candidate_weight > existing_weight:
+        return candidate
+    if candidate_weight < existing_weight:
+        return existing
+
+    existing_place = existing.get("place")
+    candidate_place = candidate.get("place")
+
+    if candidate_place is not None and candidate_place > 0:
+        if existing_place is None or candidate_place < existing_place:
+            return candidate
+
+    return existing
+
+
+@lru_cache(maxsize=None)
+def _get_field_size(meet_id, event, result_type):
+    return (
+        db.session.query(func.max(AthleteResult.place))
+        .filter(
+            AthleteResult.meet_id == meet_id,
+            AthleteResult.event == event,
+            AthleteResult.result_type == result_type,
+            AthleteResult.place.isnot(None),
+        )
+        .scalar()
+    )
+
+
+def _format_percentile(value: float) -> str:
+    rounded = round(value, 1)
+    if rounded.is_integer():
+        return str(int(rounded))
+    return f"{rounded:.1f}"
+
+
+def _format_stage_result(result_value, place):
+    if place is None or place <= 0:
+        return result_value or "–"
+
+    place_str = _ordinal(place)
+    if result_value:
+        return f"{result_value} ({place_str})"
+    return place_str
+
+
+def _ordinal(value: int) -> str:
+    if 10 <= value % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(value % 10, "th")
+    return f"{value}{suffix}"
 
