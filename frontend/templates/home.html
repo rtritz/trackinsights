@@ -1,20 +1,6 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Track Insights</title>
-    <link href="../static/css/output.css" rel="stylesheet">
-    <!-- Impact font via Google Fonts -->
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Impact:wght@400&display=swap');
-      .font-impact {
-        font-family: 'Impact', Impact, Charcoal, sans-serif;
-        font-style: italic;
-      }
-    </style>
-  </head>
-  <body class="min-h-screen bg-base-200 text-base-content">
+{% extends 'base.html' %}
+
+{% block content %}
     <!-- DaisyUI Top Navbar -->
   <div class="navbar bg-none px-4 p-2 mt-2 fixed top-0 left-0 w-full z-50">
       
@@ -72,7 +58,7 @@
           <script>
             document.addEventListener('DOMContentLoaded', function() {
               const arrow = document.getElementById('scroll-arrow');
-              const nextSection = document.getElementById('image-section');
+              const nextSection = document.getElementById('search-section');
               if (arrow && nextSection) {
                 arrow.addEventListener('click', function() {
                   nextSection.scrollIntoView({ behavior: 'smooth' , block:"end"});
@@ -84,11 +70,31 @@
     </div>
 
     <!-- Full-screen image section below hero -->
-    <div class="w-full relative rounded-t-5xl">
-      <div id="image-section" class="w-full relative rounded-t-5xl">
-        <img src="https://images.unsplash.com/photo-1464983953574-0892a716854b?auto=format&fit=crop&w=1500&q=80" alt="Runner" style="height:110vh" class="object-cover w-full rounded-t-5xl" />
-      </div>
+    <div id="search-section" class="w-full h-screen bg-white relative rounded-t-5xl">
+      
+
+        <!-- Search box and results -->
+        <div class="flex flex-col items-center justify-center w-full max-w-2xl mx-auto mt-50 pt-8 p-6 bg-white/80 rounded-2xl shadow-lg">
+          <form id="searchForm" class="w-full flex flex-col sm:flex-row gap-4 items-center justify-center mb-4" onsubmit="return false;">
+            <input id="search-box" name="q" type="text" placeholder="Search athletes..." class="input input-bordered input-primary w-full sm:w-2/3" autocomplete="off" />
+          </form>
+          <script>
+            // Debounced live search every 100ms
+            (function() {
+              let debounceTimer;
+              const input = document.getElementById('search-box');
+              const form = document.getElementById('searchForm');
+              if (!input || !form) return;
+              input.addEventListener('input', function() {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                  form.dispatchEvent(new Event('submit', { cancelable: true }));
+                }, 100);
+              });
+            })();
+          </script>
+          <div id="results" class="w-full mt-2 text-base-content"></div>
+        </div>
     </div>
 
-  </body>
-</html>
+{% endblock %}
