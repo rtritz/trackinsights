@@ -1,0 +1,235 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard Test · Track Insights{% endblock %}
+
+{% block content %}
+<section class="dashboard-test">
+  <h1>Dashboard Playground</h1>
+  <p class="help-text">Use the search box to find an athlete, then load their dashboard data straight from the new API.</p>
+
+  <form id="dashboardSearchForm" class="search-form">
+    <label for="dashboardSearchInput">Search athletes or schools</label>
+    <div class="search-row">
+      <input id="dashboardSearchInput" name="q" type="text" placeholder="e.g. Jane Doe, Park Tudor" required>
+      <button type="submit">Search</button>
+    </div>
+  </form>
+
+  <div id="searchStatus" class="status"></div>
+  <div id="searchResults" class="results" aria-live="polite"></div>
+
+  <section id="dashboardOutput" class="dashboard-output" hidden>
+    <header class="dashboard-header">
+      <h2 id="athleteHeading"></h2>
+      <div class="identity">
+        <span><strong>School:</strong> <span id="athleteSchool">–</span></span>
+        <span><strong>Gender:</strong> <span id="athleteGender">–</span></span>
+        <span><strong>Class Year:</strong> <span id="athleteYear">–</span></span>
+      </div>
+    </header>
+
+    <section class="badges">
+      <h3>Badges</h3>
+      <div id="badgeList" class="badge-list">No playoff badges yet.</div>
+    </section>
+
+    <section class="history">
+      <h3>Playoff Result History</h3>
+      <table id="historyTable" class="history-table">
+        <thead>
+          <tr>
+            <th scope="col">Year</th>
+            <th scope="col">Event</th>
+            <th scope="col">Sectional</th>
+            <th scope="col">Regional</th>
+            <th scope="col">State</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div id="historyEmpty" class="empty-state" hidden>No playoff history recorded.</div>
+    </section>
+
+    <section class="raw-json">
+      <h3>Raw Response</h3>
+      <pre id="rawJson"></pre>
+    </section>
+  </section>
+</section>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('dashboardSearchForm');
+    const input = document.getElementById('dashboardSearchInput');
+    const status = document.getElementById('searchStatus');
+    const results = document.getElementById('searchResults');
+    const output = document.getElementById('dashboardOutput');
+    const heading = document.getElementById('athleteHeading');
+    const schoolSpan = document.getElementById('athleteSchool');
+    const genderSpan = document.getElementById('athleteGender');
+    const yearSpan = document.getElementById('athleteYear');
+    const badgeList = document.getElementById('badgeList');
+    const historyTableBody = document.querySelector('#historyTable tbody');
+    const historyEmpty = document.getElementById('historyEmpty');
+    const rawJson = document.getElementById('rawJson');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const query = input.value.trim();
+      if (!query) {
+        status.textContent = 'Enter a search term to continue.';
+        return;
+      }
+
+      status.textContent = 'Searching…';
+      results.innerHTML = '';
+
+      try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        if (!response.ok) throw new Error('Search failed');
+        const data = await response.json();
+        const athleteResults = data.filter(item => item.type === 'athlete');
+        const otherResults = data.filter(item => item.type !== 'athlete');
+
+        renderSearchResults(athleteResults, otherResults);
+        status.textContent = athleteResults.length
+          ? 'Select an athlete to load dashboard data.'
+          : 'No athlete matches found. Try refining your search.';
+      } catch (error) {
+        console.error(error);
+        status.textContent = 'Something went wrong while searching. Please try again.';
+      }
+    });
+
+    results.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-athlete-id]');
+      if (!button) return;
+
+      const athleteId = button.dataset.athleteId;
+      setLoadingState(true, `Loading dashboard for athlete #${athleteId}…`);
+
+      try {
+        const response = await fetch(`/api/athletes/${athleteId}/dashboard`);
+        if (!response.ok) throw new Error('Dashboard fetch failed');
+        const data = await response.json();
+        renderDashboard(data);
+        status.textContent = `Loaded dashboard for ${data.athlete.full_name}.`;
+      } catch (error) {
+        console.error(error);
+        status.textContent = 'Unable to load dashboard data for that athlete.';
+      } finally {
+        setLoadingState(false);
+      }
+    });
+
+    function renderSearchResults(athleteResults, otherResults) {
+      const fragments = [];
+
+      if (athleteResults.length) {
+        fragments.push('<h2>Matching athletes</h2>');
+        fragments.push('<div class="result-grid">');
+        for (const athlete of athleteResults) {
+          const subtitle = athlete.school ? ` — ${athlete.school}` : '';
+          fragments.push(`
+            <button type="button" class="result-card" data-athlete-id="${athlete.id}">
+              <span class="result-type">Athlete</span>
+              <span class="result-title">${escapeHtml(athlete.name)}</span>
+              ${athlete.gender ? `<span class="result-meta">${athlete.gender}${athlete.classYear ? ' · Class of ' + athlete.classYear : ''}</span>` : ''}
+              ${athlete.school ? `<span class="result-school">${escapeHtml(athlete.school)}</span>` : ''}
+            </button>
+          `);
+        }
+        fragments.push('</div>');
+      }
+
+      if (otherResults.length) {
+        fragments.push('<h2>Matching schools</h2>');
+        fragments.push('<div class="result-grid passive">');
+        for (const item of otherResults) {
+          fragments.push(`
+            <div class="result-card passive">
+              <span class="result-type">School</span>
+              <span class="result-title">${escapeHtml(item.name)}</span>
+            </div>
+          `);
+        }
+        fragments.push('</div>');
+      }
+
+      results.innerHTML = fragments.join('') || '<p>No results yet — try a search.</p>';
+    }
+
+    function renderDashboard(data) {
+      output.hidden = false;
+      heading.textContent = data.athlete.full_name || `${data.athlete.first} ${data.athlete.last}`;
+      schoolSpan.textContent = data.athlete.school || '—';
+      genderSpan.textContent = data.athlete.gender || '—';
+      yearSpan.textContent = data.athlete.graduation_year || '—';
+
+      renderBadges(data.badges);
+      renderHistory(data.playoff_history);
+      rawJson.textContent = JSON.stringify(data, null, 2);
+    }
+
+    function renderBadges(badges) {
+      const rendered = [];
+      for (const [stage, badge] of Object.entries(badges || {})) {
+        if (!badge) continue;
+        const details = [];
+        if (badge.best_percentile !== undefined) {
+          details.push(`Best Percentile: ${badge.best_percentile.toFixed ? badge.best_percentile.toFixed(1) : badge.best_percentile}%`);
+        }
+        if (badge.achievement) {
+          details.push(`${badge.count ? badge.count + ' × ' : ''}${badge.achievement}`);
+        }
+        rendered.push(`
+          <div class="badge-card">
+            <div class="badge-stage">${escapeHtml(badge.stage || stage)}</div>
+            <div class="badge-label">${escapeHtml(badge.label || '')}</div>
+            ${details.length ? `<div class="badge-details">${details.map(escapeHtml).join(' · ')}</div>` : ''}
+          </div>
+        `);
+      }
+
+      badgeList.innerHTML = rendered.join('') || 'No playoff badges yet.';
+    }
+
+    function renderHistory(rows) {
+      if (!rows || !rows.length) {
+        historyTableBody.innerHTML = '';
+        historyEmpty.hidden = false;
+        return;
+      }
+
+      historyEmpty.hidden = true;
+      historyTableBody.innerHTML = rows.map(row => `
+        <tr>
+          <td>${escapeHtml(row.year)}</td>
+          <td>${escapeHtml(row.event)}</td>
+          <td>${escapeHtml(row.sectional)}</td>
+          <td>${escapeHtml(row.regional)}</td>
+          <td>${escapeHtml(row.state)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function setLoadingState(isLoading, message) {
+      if (isLoading) {
+        status.textContent = message;
+        results.classList.add('is-loading');
+      } else {
+        results.classList.remove('is-loading');
+      }
+    }
+
+    function escapeHtml(value) {
+      if (value === undefined || value === null) return '';
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+  });
+</script>
+{% endblock %}
