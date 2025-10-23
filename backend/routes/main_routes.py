@@ -14,7 +14,8 @@ def search_page():
     return render_template('athlete-search.html')
 
 
-@main_bp.route('/dashboard-test')
-def dashboard_test_page():
-    return render_template('dashboard-test.html')
+@main_bp.route('/athlete-dashboard/<int:athlete_id>')
+def athlete_dashboard(athlete_id):
+    return render_template('athlete-dashboard.html', athlete_id=athlete_id)
+
 

@@ -17,8 +17,10 @@
   <body class="min-h-screen bg-base-200 text-base-content">
     {% block content %}{% endblock %}
 
-    <footer>
-        <p>© 2025 Track App</p>
+    <footer class="text-base-content py-1">
+        <div class="text-center">
+           © 2025 Track App
+        </div>
     </footer>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>

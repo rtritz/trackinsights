@@ -1,6 +1,77 @@
 {% extends 'base.html' %}
 
 {% block content %}
+    <!-- Loading screen overlay with animated text -->
+    <div id="loading-overlay" class="fixed inset-0 bg-white z-[9999] flex flex-col items-center justify-center">
+      <div class="text-center">
+        <div id="track-text" class="font-impact italic text-primary text-8xl md:text-9xl font-bold opacity-0" style="font-family: Impact, 'Arial Black', sans-serif;">
+          Track
+        </div>
+        <div id="insights-text" class="font-impact italic text-primary text-8xl md:text-9xl font-bold opacity-0" style="font-family: Impact, 'Arial Black', sans-serif;">
+          Insights
+        </div>
+      </div>
+    </div>
+
+    <style>
+      @keyframes floatIn {
+        from {
+          opacity: 0;
+          transform: translateY(50px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      
+      @keyframes slideOutRight {
+        from {
+          transform: translateX(0);
+          opacity: 1;
+        }
+        to {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+      }
+      
+      .float-in {
+        animation: floatIn 0.6s ease-out forwards;
+      }
+      
+      .slide-out {
+        animation: slideOutRight .8s ease-in-out forwards;
+      }
+    </style>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const overlay = document.getElementById('loading-overlay');
+        const trackText = document.getElementById('track-text');
+        const insightsText = document.getElementById('insights-text');
+        
+        // Animate "Track" first
+        setTimeout(() => {
+          trackText.classList.add('float-in');
+        }, 250);
+        
+        // Animate "Insights" after "Track"
+        setTimeout(() => {
+          insightsText.classList.add('float-in');
+        }, 500);
+        
+        // Slide everything out to the right
+        setTimeout(() => {
+          overlay.classList.add('slide-out');
+          // Remove from DOM after animation completes
+          setTimeout(() => {
+            overlay.remove();
+          }, 750);
+        }, 1500);
+      });
+    </script>
+
     <!-- DaisyUI Top Navbar -->
   <div class="navbar bg-none px-4 p-2 mt-2 fixed top-0 left-0 w-full z-50">
       
@@ -61,28 +132,31 @@
               const nextSection = document.getElementById('search-section');
               if (arrow && nextSection) {
                 arrow.addEventListener('click', function() {
-                  nextSection.scrollIntoView({ behavior: 'smooth' , block:"end"});
+                  nextSection.scrollIntoView({ behavior: 'smooth' , block:"nearest"});
                 });
               }
             });
           </script>
       </div>
     </div>
-
+    <div style="min-height: 10vh;" class="w-full bg-white relative rounded-t-full"></div>
     <!-- Full-screen image section below hero -->
-    <div id="search-section" class="w-full h-screen bg-white relative rounded-t-5xl">
+    <div id="search-section" style="min-height: 140vh;" class="w-full bg-white relative">
       
-
+        <div class="flex h-20"></div>
         <!-- Search box and results -->
-        <div class="flex flex-col items-center justify-center w-full max-w-2xl mx-auto mt-50 pt-8 p-6 bg-white/80 rounded-2xl shadow-lg">
+        <div class="flex flex-col items-center justify-center w-full max-w-2xl mx-auto pt-8 p-6 bg-white/80 rounded-2xl ">
+          <h2 class="font-impact italic text-primary text-3xl md:text-4xl font-bold mb-6" style="font-family: Impact, 'Arial Black', sans-serif;">
+            Search for your school or athlete
+          </h2>
           <form id="searchForm" class="w-full flex flex-col sm:flex-row gap-4 items-center justify-center mb-4" onsubmit="return false;">
-            <input id="search-box" name="q" type="text" placeholder="Search athletes..." class="input input-bordered input-primary w-full sm:w-2/3" autocomplete="off" />
+            <input id="searchInput" name="q" type="text" placeholder="Search..." class="input input-bordered input-primary w-full text-lg" autocomplete="off" />
           </form>
           <script>
             // Debounced live search every 100ms
             (function() {
               let debounceTimer;
-              const input = document.getElementById('search-box');
+              const input = document.getElementById('searchInput');
               const form = document.getElementById('searchForm');
               if (!input || !form) return;
               input.addEventListener('input', function() {
@@ -96,5 +170,4 @@
           <div id="results" class="w-full mt-2 text-base-content"></div>
         </div>
     </div>
-
 {% endblock %}
