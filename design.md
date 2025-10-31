@@ -4,6 +4,21 @@
 
 ---
 #### (1) Athlete Dashboard: Search - This screen is the starting point for finding an athlete. 
+
+#### Searching algorithm:
+
+The search algorithm checks each query word against the database of athletes and schools. It only returns athletes and schools with matches for each query word.
+
+Schools are always prioritized over athletes in search ordering. 
+
+Both athletes and schools are prioritized if the query words are in the same order as their entries.
+
+Incomplete matches are worth less points.
+
+School name matches are worth less than athlete name matches.
+
+Apart from these rules, results are ordered by percentage of words that match the query.
+
 ---
 **Search by athlete and/or school name:**  
 
@@ -31,21 +46,15 @@
 
 ### Achievements  
 
-⭐ **Top XX% Sectional** | 2 x 🏅 **Regional Qualifier** | 🏆 **State Qualifier** |🥇 **State Medalist**
+⭐ **Sectional Placer** | 2 x 🏅 **Regional Placer** | 🏆 **State Qualifier** 
 
 *Grey-out icons for acheivements not earned; illuminate ones acheived.  
-*Top XX% star colors: 0-50% is Green, 51-74% is Blue, 75%+ is Gold.  
+
+*For Sectionals, it will the highest between Participant and Placer; for Regionals and State, it will be the highest between Qualifer and Placer.
+
+*If the athlete earned a current badge more than once, we will indicate the times they earned the badge (i.e. 2 x).
+
 *Add hover tooltips that show which year/event earned qualifer, medalist, etc.
-
-<details id="badge-key">
-<summary>Click to view badge descriptions</summary>
-
-- ⭐ **Top XX%** = Top percentatage acheived at Sectionals. 
-- 🏅 **Regional Qualifier** = Advanced to Regionals in any event.  
-- 🏆 **State Qualifier** = Advanced to State in any event.  
-- 🥇 **State Medalist** = Finished top 9 at State meet in any event.  
-
-</details>
 
 ---
 
@@ -84,11 +93,11 @@
 
 ### How does your result compare?
 
-| Group         | Rank                                   | Percentile |
-|---------------|----------------------------------------|------------|
-| All Athletes  | [12 / 264](#)                          | Top 5%     |
-| Like Schools  | [4 / 60](#)                            | Top 7%     |
-| Grade Level   | [3 / 70](#)                            | Top 4%     |
+| Group         | Rank                                   
+|---------------|---------------
+| All Athletes  | [12 / 264](#)                         
+| Like Schools  | [4 / 60](#)                  
+| Grade Level   | [3 / 70](#)       
 
 <details id="group-key">
 <summary>Click to view group descriptions</summary>
