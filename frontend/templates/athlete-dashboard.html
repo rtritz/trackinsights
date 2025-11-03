@@ -2,23 +2,12 @@
 
 {% block content %}
     <!-- DaisyUI Top Navbar - consistent with home.html -->
-    <div class="navbar bg-none px-2 sm:px-4 p-2 mt-2 fixed top-0 left-0 w-full z-50 backdrop-blur-md bg-white/30">
-        <div class="navbar-start">
-            <a href="/#search-section" class="btn btn-ghost btn-sm sm:btn-md rounded-full">← Back</a>
-        </div>
-        <div class="navbar-center hidden lg:flex">
-            <div class="menu menu-horizontal">
-                <a href="/" class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">Home</a>
-                <button class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">Queries</button>
-                <button class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">About</button>
-                <button class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">Contact</button>
-            </div>
-        </div>
-        <div class="navbar-end"></div>
-    </div>
+    
 
+    
     <!-- Main Content -->
     <div class="min-h-screen bg-white pt-20 sm:pt-24 pb-24 sm:pb-32 px-2 sm:px-4">
+      
         <!-- Loading State -->
         <div id="loading-state" class="flex flex-col items-center justify-center min-h-[60vh]">
             <div class="loading loading-spinner loading-lg text-primary"></div>
@@ -40,6 +29,7 @@
 
         <!-- Dashboard Content -->
         <div id="dashboard-content" class="hidden max-w-6xl mx-auto">
+          <a href="/#search-section" class="btn btn-ghost btn-sm sm:btn-md rounded-full mb-4">← Back</a>
             <!-- Header Section -->
             <div class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 mb-6 sm:mb-8 shadow-lg">
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between">
