@@ -6,6 +6,7 @@ from ..queries import (
     add_athlete,
     search_bar,
     get_athlete_dashboard_data,
+    get_athlete_result_rankings,
 )
 
 
@@ -66,5 +67,21 @@ def api_get_athlete_dashboard(aid):
     data = get_athlete_dashboard_data(aid)
     if not data:
         return jsonify({'error': 'not found'}), 404
+    return jsonify(data)
+
+
+@api_bp.route('/athletes/<int:aid>/result-rankings')
+def api_get_result_rankings(aid):
+    meet_id = request.args.get('meet_id', type=int)
+    event = request.args.get('event')
+    result_type = request.args.get('result_type', default='Final')
+
+    if not meet_id or not event:
+        return jsonify({'error': 'meet_id and event are required'}), 400
+
+    data = get_athlete_result_rankings(aid, meet_id, event, result_type=result_type)
+    if not data:
+        return jsonify({'error': 'not found'}), 404
+
     return jsonify(data)
 
