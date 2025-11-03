@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <!-- DaisyUI Top Navbar - consistent with home.html -->
+    
+
+    
+    <!-- Main Content -->
+    <div class="min-h-screen bg-white pt-20 sm:pt-24 pb-24 sm:pb-32 px-2 sm:px-4">
+      
+        <!-- Loading State -->
+        <div id="loading-state" class="flex flex-col items-center justify-center min-h-[60vh]">
+            <div class="loading loading-spinner loading-lg text-primary"></div>
+            <p class="mt-4 text-lg text-gray-600">Loading athlete data...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-state" class="hidden">
+            <div class="flex flex-col items-center justify-center min-h-[60vh]">
+                <div class="text-center">
+                <h2 class="font-impact italic text-primary text-4xl md:text-5xl font-bold mb-4" style="font-family: Impact, 'Arial Black', sans-serif;">
+                    Athlete Not Found
+                </h2>
+                <p class="text-lg text-gray-600 mb-6">We couldn't find the athlete you're looking for.</p>
+                <a href="/" class="btn btn-primary rounded-full">Return Home</a>
+            </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div id="dashboard-content" class="hidden max-w-6xl mx-auto">
+          <a href="/#search-section" class="btn btn-ghost btn-sm sm:btn-md rounded-full mb-4">← Back</a>
+            <!-- Header Section -->
+            <div class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 mb-6 sm:mb-8 shadow-lg">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                    <div class="w-full">
+                        <h1 id="athlete-name" class="font-impact italic text-primary text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2 break-words" style="font-family: Impact, 'Arial Black', sans-serif;">
+                            Loading...
+                        </h1>
+                        <div class="flex flex-wrap gap-2 sm:gap-3 items-center">
+                            <span id="athlete-school" class="text-base sm:text-lg md:text-xl text-gray-700 font-semibold break-words"></span>
+                            <span id="athlete-gender" class="badge badge-md sm:badge-lg"></span>
+                            <span id="athlete-class" class="badge badge-md sm:badge-lg badge-outline"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Badges Section -->
+            <div class="mb-6 sm:mb-8">
+                <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6" style="font-family: Impact, 'Arial Black', sans-serif;">
+                    Achievements
+                </h2>
+                <div id="badges-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
+                    <!-- Badges will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Playoff History Section -->
+            <div class="mb-6 sm:mb-8">
+                <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6" style="font-family: Impact, 'Arial Black', sans-serif;">
+                    Playoff History
+                </h2>
+                <div id="playoff-history-container" class="space-y-4 overflow-x-auto">
+                    <!-- Playoff history will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // @ts-nocheck
+        document.addEventListener('DOMContentLoaded', async function() {
+            const athleteId = {{ athlete_id }};
+            const loadingState = document.getElementById('loading-state');
+            const errorState = document.getElementById('error-state');
+            const dashboardContent = document.getElementById('dashboard-content');
+
+            try {
+                // Fetch athlete dashboard data from API
+                const response = await fetch(`/api/athletes/${athleteId}/dashboard`);
+                
+                if (!response.ok) {
+                    throw new Error('Athlete not found');
+                }
+
+                const data = await response.json();
+                
+                // Hide loading, show content
+                loadingState.classList.add('hidden');
+                dashboardContent.classList.remove('hidden');
+
+                // Populate athlete info
+                document.getElementById('athlete-name').textContent = data.athlete.full_name;
+                document.getElementById('athlete-school').textContent = data.athlete.school || 'No school';
+                
+                // Set gender badge
+                const genderBadge = document.getElementById('athlete-gender');
+                if (data.athlete.gender) {
+                    const genderText = data.athlete.gender === 'M' ? 'Boys' : data.athlete.gender === 'F' ? 'Girls' : data.athlete.gender;
+                    const genderClass = data.athlete.gender === 'M' ? 'badge-info' : data.athlete.gender === 'F' ? 'badge-secondary' : 'badge-neutral';
+                    genderBadge.textContent = genderText;
+                    genderBadge.className = `badge badge-lg ${genderClass}`;
+                } else {
+                    genderBadge.classList.add('hidden');
+                }
+
+                // Set class year badge
+                const classBadge = document.getElementById('athlete-class');
+                if (data.athlete.graduation_year) {
+                    classBadge.textContent = `Class of ${data.athlete.graduation_year}`;
+                } else {
+                    classBadge.classList.add('hidden');
+                }
+
+                // Populate badges
+                const badgesContainer = document.getElementById('badges-container');
+                badgesContainer.innerHTML = '';
+                
+                const badgeStages = ['sectional', 'regional', 'state'];
+                badgeStages.forEach(stage => {
+                    const badge = data.badges[stage];
+                    const badgeCard = document.createElement('div');
+                    badgeCard.className = 'card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow';
+                    
+                    if (badge) {
+                        badgeCard.innerHTML = `
+                            <div class="card-body p-4 sm:p-6">
+                                <h3 class="card-title text-primary capitalize text-lg sm:text-xl break-words">${stage}</h3>
+                                <p class="text-xl sm:text-2xl font-bold break-words">${badge.label || badge.stage}</p>
+                                ${badge.best_percentile ? `<p class="text-xs sm:text-sm text-gray-600">Top ${badge.best_percentile.toFixed(1)}%</p>` : ''}
+                                ${badge.placer_count ? `<p class="text-xs sm:text-sm text-gray-600">${badge.placer_count} placements</p>` : ''}
+                            </div>
+                        `;
+                    } else {
+                        badgeCard.innerHTML = `
+                            <div class="card-body p-4 sm:p-6 opacity-50">
+                                <h3 class="card-title text-gray-500 capitalize text-lg sm:text-xl">${stage}</h3>
+                                <p class="text-gray-400">No data</p>
+                            </div>
+                        `;
+                    }
+                    
+                    badgesContainer.appendChild(badgeCard);
+                });
+
+                // Populate playoff history
+                const playoffContainer = document.getElementById('playoff-history-container');
+                playoffContainer.innerHTML = '';
+                
+                if (data.playoff_history && data.playoff_history.length > 0) {
+                    // Create table
+                    const table = document.createElement('div');
+                    table.className = 'overflow-x-auto -mx-2 sm:mx-0';
+                    table.innerHTML = `
+                        <table class="table table-compact sm:table-normal w-full min-w-full">
+                            <thead>
+                                <tr class="text-primary">
+                                    <th class="text-sm sm:text-base">Year</th>
+                                    <th class="text-sm sm:text-base">Event</th>
+                                    <th class="text-sm sm:text-base">Sectional</th>
+                                    <th class="text-sm sm:text-base">Regional</th>
+                                    <th class="text-sm sm:text-base">State</th>
+                                </tr>
+                            </thead>
+                            <tbody id="playoff-table-body">
+                            </tbody>
+                        </table>
+                    `;
+                    playoffContainer.appendChild(table);
+                    
+                    // Populate table rows
+                    const tbody = document.getElementById('playoff-table-body');
+                    data.playoff_history.forEach(row => {
+                        const tr = document.createElement('tr');
+                        tr.className = 'hover';
+                        tr.innerHTML = `
+                            <td class="font-semibold text-xs sm:text-sm whitespace-nowrap">${row.year || '–'}</td>
+                            <td class="text-xs sm:text-sm">${row.event || '–'}</td>
+                            <td class="text-xs sm:text-sm">${row.sectional || '–'}</td>
+                            <td class="text-xs sm:text-sm">${row.regional || '–'}</td>
+                            <td class="text-xs sm:text-sm">${row.state || '–'}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    playoffContainer.innerHTML = '<p class="text-gray-600 text-center py-8">No playoff history available</p>';
+                }
+
+            } catch (error) {
+                console.error('Error loading athlete data:', error);
+                loadingState.classList.add('hidden');
+                errorState.classList.remove('hidden');
+            }
+        });
+    </script>
+{% endblock %}
