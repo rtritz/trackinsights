@@ -29,8 +29,10 @@ def api_get_athlete(aid):
     return jsonify({
         'id': a.athlete_id, 
         'first_name': a.first, 
-        'last_name': a.last, 
+        'last_name': a.last,
+        'graduation_year':a.graduation_year,
         'school': a.school.school_name if a.school else None
+        
     })
 
 
