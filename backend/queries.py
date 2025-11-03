@@ -1,9 +1,9 @@
 from functools import lru_cache
 
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, and_
 from sqlalchemy.orm import joinedload
 
-from .models import Athlete, School, AthleteResult, Meet
+from .models import Athlete, School, AthleteResult, Meet, Event, SchoolEnrollment
 from . import db
 
 
@@ -251,6 +251,7 @@ def get_athlete_dashboard_data(athlete_id: int):
 
     badges = _compute_badges(athlete_id)
     playoff_history = _build_playoff_history(athlete_id)
+    personal_bests = get_athlete_personal_bests(athlete_id, athlete_obj=athlete)
 
     return {
         "athlete": {
@@ -264,6 +265,7 @@ def get_athlete_dashboard_data(athlete_id: int):
         },
         "badges": badges,
         "playoff_history": playoff_history,
+        "personal_bests": personal_bests,
     }
 
 
@@ -271,9 +273,12 @@ def _compute_badges(athlete_id: int):
     stage_results = (
         db.session.query(AthleteResult, Meet)
         .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .join(Event, AthleteResult.event == Event.event)
         .filter(
             AthleteResult.athlete_id == athlete_id,
             Meet.meet_type.in_(("Sectional", "Regional", "State")),
+            AthleteResult.result_type == "Final",
+            Event.event_type != "Relay",
         )
         .all()
     )
@@ -353,9 +358,12 @@ def _build_playoff_history(athlete_id: int):
     results = (
         db.session.query(AthleteResult, Meet)
         .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .join(Event, AthleteResult.event == Event.event)
         .filter(
             AthleteResult.athlete_id == athlete_id,
             Meet.meet_type.in_(("Sectional", "Regional", "State")),
+            AthleteResult.result_type == "Final",
+            Event.event_type != "Relay",
         )
         .all()
     )
@@ -400,6 +408,269 @@ def _build_playoff_history(athlete_id: int):
 
     history_rows.sort(key=lambda row: (-row["year"], row["event"]))
     return history_rows
+
+
+def get_athlete_personal_bests(athlete_id: int, min_year: int = 2022, athlete_obj=None):
+    """Return personal-best results for each individual event the athlete has contested."""
+
+    athlete = athlete_obj
+    if athlete is None:
+        athlete = (
+            Athlete.query.options(joinedload(Athlete.school))
+            .filter_by(athlete_id=athlete_id)
+            .one_or_none()
+        )
+
+    if not athlete:
+        return []
+
+    results = (
+        db.session.query(AthleteResult, Meet, Event)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .join(Event, AthleteResult.event == Event.event)
+        .filter(
+            AthleteResult.athlete_id == athlete_id,
+            #AthleteResult.result_type == "Final",
+            AthleteResult.result2.isnot(None),
+            Event.event_type != "Relay",
+            Meet.year.isnot(None),
+            Meet.year >= min_year,
+        )
+        .all()
+    )
+
+    if not results:
+        return []
+
+    grouped = {}
+    for result, meet, event in results:
+        bucket = grouped.setdefault(
+            event.event,
+            {
+                "event_type": event.event_type,
+                "items": [],
+            },
+        )
+        bucket["items"].append((result, meet))
+
+    personal_bests = []
+    for event_name, data in grouped.items():
+        selection = _select_best_result_entry(data["items"], data["event_type"])
+        if not selection:
+            continue
+
+        best_result, best_meet = selection
+        school_rank = None
+        if athlete.school_id is not None:
+            school_rank = _compute_rank_for_event(
+                event_name,
+                data["event_type"],
+                athlete.athlete_id,
+                min_year,
+                school_id=athlete.school_id,
+                gender=athlete.gender,
+            )
+
+        state_rank = _compute_rank_for_event(
+            event_name,
+            data["event_type"],
+            athlete.athlete_id,
+            min_year,
+            gender=athlete.gender,
+            school_id=None,
+        )
+
+        personal_bests.append(
+            {
+                "event": event_name,
+                "event_type": data["event_type"],
+                "result": best_result.result,
+                "result_value": best_result.result2,
+                "meet_type": best_meet.meet_type,
+                "year": best_meet.year,
+                "meet_id": best_meet.meet_id,
+                "result_type": best_result.result_type,
+                "school_rank": school_rank,
+                "state_rank": state_rank,
+            }
+        )
+
+    personal_bests.sort(key=lambda entry: entry["event"])
+    return personal_bests
+
+
+def get_athlete_result_rankings(athlete_id: int, meet_id: int, event_name: str, result_type: str = "Final"):
+    """Return ranking breakdown for a specific athlete result across multiple cohorts."""
+
+    base_row = (
+        db.session.query(AthleteResult, Athlete, Meet, Event, School)
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .join(Event, AthleteResult.event == Event.event)
+        .outerjoin(School, Athlete.school_id == School.school_id)
+        .filter(
+            AthleteResult.athlete_id == athlete_id,
+            AthleteResult.meet_id == meet_id,
+            AthleteResult.event == event_name,
+            AthleteResult.result_type == result_type,
+        )
+        .one_or_none()
+    )
+
+    if not base_row:
+        return None
+
+    athlete_result, athlete, meet, event, school = base_row
+
+    if athlete_result.result2 is None or meet.year is None or not meet.meet_type or not meet.gender:
+        return None
+
+    year = meet.year
+    gender = meet.gender
+    meet_type = meet.meet_type
+    event_type = event.event_type
+    result_grade = athlete_result.grade
+    year_key = str(year)
+
+    enrollment_value = None
+    if athlete.school_id is not None and year_key:
+        enrollment_record = (
+            SchoolEnrollment.query.filter_by(
+                school_id=athlete.school_id,
+                year=year_key,
+            ).one_or_none()
+        )
+        if enrollment_record:
+            enrollment_value = enrollment_record.enrollment
+
+    rows = (
+        db.session.query(
+            AthleteResult.athlete_id.label("athlete_id"),
+            AthleteResult.meet_id.label("meet_id"),
+            AthleteResult.result.label("result"),
+            AthleteResult.result2.label("result_value"),
+            AthleteResult.grade.label("grade"),
+            AthleteResult.place.label("place"),
+            Athlete.first.label("first"),
+            Athlete.last.label("last"),
+            Athlete.school_id.label("school_id"),
+            School.school_name.label("school_name"),
+            SchoolEnrollment.enrollment.label("enrollment"),
+            Meet.host.label("meet_host"),
+            Meet.meet_num.label("meet_num"),
+        )
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .outerjoin(School, Athlete.school_id == School.school_id)
+        .outerjoin(
+            SchoolEnrollment,
+            and_(
+                SchoolEnrollment.school_id == Athlete.school_id,
+                SchoolEnrollment.year == year_key,
+            ),
+        )
+        .filter(
+            AthleteResult.event == event_name,
+            AthleteResult.result_type == result_type,
+            AthleteResult.result2.isnot(None),
+            Meet.year == year,
+            Meet.meet_type == meet_type,
+            Meet.gender == gender,
+        )
+        .all()
+    )
+
+    entries = []
+    for row in rows:
+        if row.result_value is None:
+            continue
+        full_name = " ".join(filter(None, [row.first, row.last])).strip()
+        entries.append(
+            {
+                "athlete_id": row.athlete_id,
+                "meet_id": row.meet_id,
+                "result": row.result,
+                "result_value": row.result_value,
+                "grade": row.grade,
+                "place": row.place,
+                "full_name": full_name,
+                "school_id": row.school_id,
+                "school_name": row.school_name,
+                "enrollment": row.enrollment,
+                "meet_host": row.meet_host,
+                "meet_num": row.meet_num,
+            }
+        )
+
+    if not entries:
+        return None
+
+    target_key = {"athlete_id": athlete_id, "meet_id": meet_id}
+    lower_is_better = _is_lower_better(event_type)
+
+    overall_info = _compute_cohort_ranking(entries, target_key, lower_is_better)
+
+    like_info = None
+    if enrollment_value is not None:
+        lower_bound = int(round(enrollment_value * 0.75))
+        upper_bound = int(round(enrollment_value * 1.25))
+
+        like_info = _compute_cohort_ranking(
+            entries,
+            target_key,
+            lower_is_better,
+            filter_fn=lambda item: item["enrollment"] is not None
+            and lower_bound <= item["enrollment"] <= upper_bound,
+        )
+
+        if like_info:
+            like_info["criteria"] = {
+                "enrollment": enrollment_value,
+                "min_enrollment": lower_bound,
+                "max_enrollment": upper_bound,
+            }
+
+    grade_info = None
+    if result_grade:
+        grade_info = _compute_cohort_ranking(
+            entries,
+            target_key,
+            lower_is_better,
+            filter_fn=lambda item: item["grade"] == result_grade,
+        )
+        if grade_info:
+            grade_info["criteria"] = {"grade": result_grade}
+
+    return {
+        "context": {
+            "year": year,
+            "gender": gender,
+            "event": event_name,
+            "meet_type": meet_type,
+            "result_type": result_type,
+            "event_type": event_type,
+        },
+        "target_result": {
+            "athlete_id": athlete.athlete_id,
+            "athlete_name": " ".join(filter(None, [athlete.first, athlete.last])).strip(),
+            "result": athlete_result.result,
+            "result_value": athlete_result.result2,
+            "grade": athlete_result.grade,
+            "school_id": athlete.school_id,
+            "school_name": school.school_name if school else None,
+            "enrollment": enrollment_value,
+            "place": athlete_result.place,
+            "meet_id": meet.meet_id,
+            "meet_host": meet.host,
+            "meet_num": meet.meet_num,
+            "year": year,
+        },
+        "rankings": {
+            "overall": overall_info,
+            "like_schools": like_info,
+            "same_grade": grade_info,
+        },
+    }
 
 
 def _select_preferred_result(existing, candidate):
@@ -462,4 +733,160 @@ def _ordinal(value: int) -> str:
     else:
         suffix = {1: "st", 2: "nd", 3: "rd"}.get(value % 10, "th")
     return f"{value}{suffix}"
+
+
+def _select_best_result_entry(items, event_type):
+    if not items:
+        return None
+
+    valid = [item for item in items if item[0].result2 is not None]
+    if not valid:
+        return None
+
+    lower_is_better = _is_lower_better(event_type)
+    key_func = lambda pair: pair[0].result2
+    return min(valid, key=key_func) if lower_is_better else max(valid, key=key_func)
+
+
+def _compute_rank_for_event(event_name, event_type, athlete_id, min_year, school_id=None, gender=None):
+    aggregator = func.min if _is_lower_better(event_type) else func.max
+
+    query = (
+        db.session.query(
+            AthleteResult.athlete_id,
+            aggregator(AthleteResult.result2).label("best_value"),
+        )
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .join(Event, AthleteResult.event == Event.event)
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .filter(
+            AthleteResult.result2.isnot(None),
+            #AthleteResult.result_type == "Final",
+            Event.event == event_name,
+            Event.event_type != "Relay",
+            Meet.year.isnot(None),
+            Meet.year >= min_year,
+        )
+    )
+
+    if school_id is not None:
+        query = query.filter(Athlete.school_id == school_id)
+
+    if gender is not None:
+        query = query.filter(Athlete.gender == gender)
+
+    rows = query.group_by(AthleteResult.athlete_id).all()
+    if not rows:
+        return None
+
+    lower_is_better = _is_lower_better(event_type)
+    leaderboard = [
+        (row.athlete_id, row.best_value)
+        for row in rows
+        if row.best_value is not None
+    ]
+
+    if not leaderboard:
+        return None
+
+    leaderboard.sort(key=lambda item: item[1], reverse=not lower_is_better)
+
+    rank = None
+    for index, (ath_id, _value) in enumerate(leaderboard, start=1):
+        if ath_id == athlete_id:
+            rank = index
+            break
+
+    if rank is None:
+        return None
+
+    return {
+        "rank": rank,
+        "total": len(leaderboard),
+        "since_year": min_year,
+    }
+
+
+def _compute_cohort_ranking(entries, target_key, lower_is_better, filter_fn=None, limit=10):
+    filter_fn = filter_fn or (lambda _item: True)
+    filtered = [item for item in entries if filter_fn(item)]
+    if not filtered:
+        return None
+
+    sorted_entries = sorted(
+        filtered,
+        key=lambda item: (
+            item["result_value"],
+            item["athlete_id"],
+            item["meet_id"],
+        ),
+        reverse=not lower_is_better,
+    )
+
+    ranked_entries = []
+    target_rank = None
+    previous_value = None
+    current_rank = 0
+
+    for index, entry in enumerate(sorted_entries, start=1):
+        value = entry["result_value"]
+        if previous_value is None or value != previous_value:
+            current_rank = index
+            previous_value = value
+
+        enriched = dict(entry)
+        enriched["rank"] = current_rank
+        enriched["is_target"] = (
+            entry["athlete_id"] == target_key["athlete_id"]
+            and entry["meet_id"] == target_key["meet_id"]
+        )
+        ranked_entries.append(enriched)
+
+        if enriched["is_target"]:
+            target_rank = current_rank
+
+    if target_rank is None:
+        return None
+
+    return {
+        "rank": target_rank,
+        "total": len(ranked_entries),
+        "top_results": _summarize_leaderboard(ranked_entries, limit=limit),
+    }
+
+
+def _summarize_leaderboard(entries, limit=10):
+    trimmed = entries[:limit]
+    target_entry = next((entry for entry in entries if entry.get("is_target")), None)
+    if target_entry and target_entry not in trimmed:
+        trimmed = trimmed + [target_entry]
+
+    summary = []
+    seen = set()
+    for entry in trimmed:
+        key = (entry["athlete_id"], entry["meet_id"])
+        if key in seen:
+            continue
+        seen.add(key)
+        summary.append(
+            {
+                "athlete_id": entry["athlete_id"],
+                "name": entry["full_name"],
+                "school": entry["school_name"],
+                "result": entry["result"],
+                "result_value": entry["result_value"],
+                "grade": entry["grade"],
+                "rank": entry["rank"],
+                "is_target": entry.get("is_target", False),
+                "meet_id": entry["meet_id"],
+                "meet_host": entry["meet_host"],
+                "place": entry["place"],
+            }
+        )
+
+    return summary
+
+
+def _is_lower_better(event_type: str) -> bool:
+    return event_type != "Field"
 
