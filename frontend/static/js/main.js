@@ -1,4 +1,86 @@
 document.addEventListener('DOMContentLoaded', function () {
+  // Mobile menu toggle
+  const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+  const mobileMenu = document.getElementById('mobile-menu');
+  const hamburgerIcon = document.getElementById('hamburger-icon');
+  const closeIcon = document.getElementById('close-icon');
+  
+  if (mobileMenuBtn && mobileMenu) {
+    const menuLinks = mobileMenu.querySelectorAll('.menu-link');
+    
+    mobileMenuBtn.addEventListener('click', function() {
+      const isOpen = mobileMenu.classList.contains('menu-open');
+      
+      if (!isOpen) {
+        // Show menu - slide in from right
+        mobileMenu.classList.add('flex', 'menu-open');
+        mobileMenu.classList.remove('pointer-events-none');
+        mobileMenu.classList.add('menu-slide-in');
+        mobileMenu.classList.remove('menu-slide-out');
+        hamburgerIcon.classList.add('hidden');
+        closeIcon.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        
+        // Float in menu items with stagger (like Track/Insights)
+        menuLinks.forEach((link, index) => {
+          setTimeout(() => {
+            link.classList.add('menu-item-float-in');
+            link.classList.remove('menu-item-float-out');
+          }, 250 + (index * 100)); // Stagger by 100ms each
+        });
+      } else {
+        // Hide menu - float out items first
+        menuLinks.forEach((link, index) => {
+          setTimeout(() => {
+            link.classList.add('menu-item-float-out');
+            link.classList.remove('menu-item-float-in');
+          }, index * 50);
+        });
+        
+        // Then slide out menu
+        setTimeout(() => {
+          mobileMenu.classList.add('menu-slide-out');
+          mobileMenu.classList.remove('menu-slide-in');
+          hamburgerIcon.classList.remove('hidden');
+          closeIcon.classList.add('hidden');
+          
+          setTimeout(() => {
+            mobileMenu.classList.add('pointer-events-none');
+            mobileMenu.classList.remove('menu-open');
+            document.body.style.overflow = '';
+          }, 600);
+        }, 200);
+      }
+    });
+    
+    // Close menu when a link is clicked
+    menuLinks.forEach(link => {
+      link.addEventListener('click', function() {
+        // Float out items
+        menuLinks.forEach((l, index) => {
+          setTimeout(() => {
+            l.classList.add('menu-item-float-out');
+            l.classList.remove('menu-item-float-in');
+          }, index * 50);
+        });
+        
+        // Slide out menu
+        setTimeout(() => {
+          mobileMenu.classList.add('menu-slide-out');
+          mobileMenu.classList.remove('menu-slide-in');
+          hamburgerIcon.classList.remove('hidden');
+          closeIcon.classList.add('hidden');
+          
+          setTimeout(() => {
+            mobileMenu.classList.add('pointer-events-none');
+            mobileMenu.classList.remove('menu-open');
+            document.body.style.overflow = '';
+          }, 600);
+        }, 200);
+      });
+    });
+  }
+  
   const form = document.getElementById('searchForm');
   const searchInput = document.getElementById('searchInput') || document.getElementById('search-box');
   const resultsDiv = document.getElementById('results');
