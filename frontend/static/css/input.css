@@ -1,0 +1,24 @@
+/* npx @tailwindcss/cli -i ./frontend/static/css/input.css -o ./frontend/static/css/output.css --watch */
+
+/* npx shadcn@latest add https://reactbits.dev/r/SplitText-JS-TW */
+
+@import "tailwindcss";
+/* ./tailwindcss-windows-x64.exe -i ./frontend/static/css/input.css -o ./frontend/static/css/output.css --watch */
+@plugin "daisyui" {
+  themes: autumn --default, autumn --prefersdark;
+  root: ":root";
+  include: ;
+  exclude: ;
+  prefix: ;
+  logs: true;
+}
+
+@theme {
+  --radius-5xl: 3rem; 
+}
+
+/* 
+Websites I like:
+juice.agency
+
+*/

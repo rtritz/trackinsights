@@ -109,7 +109,7 @@ def search_bar(query_text: str):
                 "name": athlete_name,
                 "school": athlete.school.school_name if athlete.school else None,
                 "gender": athlete.gender,
-                "classYear": athlete.graduation_year,
+                "graduation_year": athlete.graduation_year,
                 "score": score,
                 "priority": 2  # Athletes have lower priority
             })
