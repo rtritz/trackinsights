@@ -113,7 +113,7 @@ document.addEventListener('DOMContentLoaded', function () {
           li.className = 'mb-2';
 
           const btn = document.createElement('button');
-          btn.className = 'btn btn-ghost m-2 p-2 px-4 bg-gray-100 rounded-full w-full text-left justify-between flex';
+          btn.className = 'btn btn-ghost p-2 px-4 bg-gray-100 rounded-full w-full text-left justify-between flex';
 
           if (item.type === 'school') {
             btn.innerHTML = `
