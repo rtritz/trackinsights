@@ -1,12 +1,185 @@
 {% extends 'base.html' %}
 
-{% block title %}Athlete Search - Track Insights{% endblock %}
+{% block title %}Search Test - Track Insights{% endblock %}
 
 {% block content %}
-  <h1>Athlete Search</h1>
-  <form id="searchForm">
-    <input type="text" name="q" placeholder="First or last name">
-    <button type="submit">Search</button>
-  </form>
-  <div id="results"></div>
+  <div style="max-width: 800px; margin: 0 auto; padding: 20px;">
+    <h1>Search Bar Test</h1>
+    <p style="color: #666; margin-bottom: 20px;">
+      Test the new search functionality that searches both schools and athletes.
+      Results are scored and sorted by relevance.
+    </p>
+    
+    <form id="searchForm" style="margin-bottom: 30px;">
+      <input 
+        type="text" 
+        name="q" 
+        id="searchInput"
+        placeholder="Search for schools or athletes..."
+        style="width: 70%; padding: 10px; font-size: 16px; border: 2px solid #ddd; border-radius: 4px;"
+        autocomplete="off"
+      >
+      <button 
+        type="submit"
+        style="padding: 10px 20px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;"
+      >Search</button>
+    </form>
+
+    <div id="searchStats" style="margin-bottom: 15px; color: #666; font-size: 14px;"></div>
+    <div id="results"></div>
+  </div>
+
+  <style>
+    .result-item {
+      padding: 15px;
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #f9f9f9;
+      transition: background 0.2s;
+    }
+    .result-item:hover {
+      background: #f0f0f0;
+    }
+    .result-school {
+      border-left: 4px solid #28a745;
+    }
+    .result-athlete {
+      border-left: 4px solid #007bff;
+    }
+    .result-type {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-right: 8px;
+    }
+    .type-school {
+      background: #28a745;
+      color: white;
+    }
+    .type-athlete {
+      background: #007bff;
+      color: white;
+    }
+    .result-name {
+      font-size: 18px;
+      font-weight: 500;
+      margin: 5px 0;
+    }
+    .result-meta {
+      color: #666;
+      font-size: 14px;
+    }
+    .no-results {
+      padding: 30px;
+      text-align: center;
+      color: #999;
+      font-style: italic;
+    }
+    .loading {
+      padding: 30px;
+      text-align: center;
+      color: #007bff;
+    }
+  </style>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const form = document.getElementById('searchForm');
+      const searchInput = document.getElementById('searchInput');
+      const resultsDiv = document.getElementById('results');
+      const statsDiv = document.getElementById('searchStats');
+      
+      if (!form) return;
+      
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const query = searchInput.value.trim();
+        
+        if (!query) {
+          resultsDiv.innerHTML = '<div class="no-results">Please enter a search query</div>';
+          statsDiv.innerHTML = '';
+          return;
+        }
+        
+        // Show loading state
+        resultsDiv.innerHTML = '<div class="loading">Searching...</div>';
+        statsDiv.innerHTML = '';
+        
+        try {
+          const startTime = performance.now();
+          const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+          const endTime = performance.now();
+          
+          if (!res.ok) {
+            throw new Error('Search request failed');
+          }
+          
+          const data = await res.json();
+          const searchTime = (endTime - startTime).toFixed(2);
+          
+          // Update stats
+          statsDiv.innerHTML = `Found ${data.length} result${data.length !== 1 ? 's' : ''} in ${searchTime}ms`;
+          
+          // Display results
+          if (data.length === 0) {
+            resultsDiv.innerHTML = '<div class="no-results">No results found for "' + escapeHtml(query) + '"</div>';
+          } else {
+            resultsDiv.innerHTML = data.map((item, index) => {
+              if (item.type === 'school') {
+                return `
+                  <div class="result-item result-school">
+                    <div>
+                      <span class="result-type type-school">SCHOOL</span>
+                      <span style="color: #999; font-size: 12px;">#${index + 1}</span>
+                    </div>
+                    <div class="result-name">${escapeHtml(item.name)}</div>
+                    <div class="result-meta">ID: ${item.id}</div>
+                  </div>
+                `;
+              } else if (item.type === 'athlete') {
+                return `
+                  <div class="result-item result-athlete">
+                    <div>
+                      <span class="result-type type-athlete">ATHLETE</span>
+                      <span style="color: #999; font-size: 12px;">#${index + 1}</span>
+                    </div>
+                    <div class="result-name">${escapeHtml(item.name)}</div>
+                    <div class="result-meta">
+                      ${item.school ? 'School: ' + escapeHtml(item.school) + ' • ' : ''}ID: ${item.id}
+                    </div>
+                  </div>
+                `;
+              }
+              return '';
+            }).join('');
+          }
+        } catch (error) {
+          console.error('Search error:', error);
+          resultsDiv.innerHTML = '<div class="no-results" style="color: #dc3545;">Error performing search. Please try again.</div>';
+          statsDiv.innerHTML = '';
+        }
+      });
+      
+      // Helper function to escape HTML
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+      
+      // Optional: Add real-time search as user types (debounced)
+      let debounceTimer;
+      searchInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          if (searchInput.value.trim().length >= 2) {
+            form.dispatchEvent(new Event('submit'));
+          }
+        }, 300);
+      });
+    });
+  </script>
 {% endblock %}
