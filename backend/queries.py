@@ -63,41 +63,62 @@ def search_bar(query_text: str):
     
     # Build SQL filters for performance - only fetch potential matches
     # Use OR to get all records that match ANY query word
-    school_filters = []
-    for word in query_words:
-        school_filters.append(School.school_name.ilike(f"%{word}%"))
-    
+    school_filters = [School.school_name.ilike(f"%{word}%") for word in query_words]
+
     # Get filtered schools (all that match - no limit)
-    schools = School.query.filter(or_(*school_filters)).all() if school_filters else []
+    schools_query = (
+        db.session.query(School.school_id, School.school_name)
+        .filter(or_(*school_filters))
+    ) if school_filters else None
+    schools = schools_query.all() if schools_query is not None else []
     
     # Build athlete filters - athlete matches ANY word in first, last, or school name
     athlete_filters = []
     for word in query_words:
-        athlete_filters.append(Athlete.first.ilike(f"%{word}%"))
-        athlete_filters.append(Athlete.last.ilike(f"%{word}%"))
-        athlete_filters.append(School.school_name.ilike(f"%{word}%"))
-    
+        like_pattern = f"%{word}%"
+        athlete_filters.extend([
+            Athlete.first.ilike(like_pattern),
+            Athlete.last.ilike(like_pattern),
+            School.school_name.ilike(like_pattern),
+        ])
+
     # Get filtered athletes (all that match - no limit)
-    athletes = Athlete.query.join(School).filter(or_(*athlete_filters)).all() if athlete_filters else []
+    if athlete_filters:
+        athletes_query = (
+            db.session.query(
+                Athlete.athlete_id,
+                Athlete.first,
+                Athlete.last,
+                Athlete.gender,
+                Athlete.graduation_year,
+                School.school_name.label("school_name"),
+            )
+            .join(School, Athlete.school_id == School.school_id, isouter=True)
+            .filter(or_(*athlete_filters))
+        )
+        athletes = athletes_query.all()
+    else:
+        athletes = []
     
     results = []
     
     # Score schools
-    for school in schools:
-        score = _calculate_score(school.school_name, query_words)
+    for school_id, school_name in schools:
+        score = _calculate_score(school_name, query_words)
         if score > -20:  # Only include if at least one match
             results.append({
                 "type": "school",
-                "id": school.school_id,
-                "name": school.school_name,
+                "id": school_id,
+                "name": school_name,
                 "score": score,
                 "priority": 1  # Schools have higher priority
             })
     
     # Score athletes
     for athlete in athletes:
-        athlete_name = f"{athlete.first} {athlete.last}"
-        school_name = athlete.school.school_name if athlete.school else ""
+        athlete_id = athlete.athlete_id
+        athlete_name = f"{athlete.first} {athlete.last}".strip()
+        school_name = getattr(athlete, "school_name", "") or ""
         
         # Calculate combined score: check if query words match across name + school
         score = _calculate_combined_score(athlete_name, school_name, query_words)
@@ -105,9 +126,9 @@ def search_bar(query_text: str):
         if score > -20:  # Only include if at least one match
             results.append({
                 "type": "athlete",
-                "id": athlete.athlete_id,
+                "id": athlete_id,
                 "name": athlete_name,
-                "school": athlete.school.school_name if athlete.school else None,
+                "school": school_name or None,
                 "gender": athlete.gender,
                 "graduation_year": athlete.graduation_year,
                 "score": score,
