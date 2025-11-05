@@ -156,6 +156,10 @@ def _calculate_score(text: str, query_words: list) -> float:
     - -999 for each query word that doesn't match
     - Final score divided by length of text
     """
+
+    #remove schools from search results
+    return -999
+
     text_lower = text.lower()
     text_words = text_lower.split()
     
