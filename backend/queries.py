@@ -3,7 +3,16 @@ from functools import lru_cache
 from sqlalchemy import or_, func, and_
 from sqlalchemy.orm import joinedload
 
-from .models import Athlete, School, AthleteResult, Meet, Event, SchoolEnrollment
+from .models import (
+    Athlete,
+    School,
+    AthleteResult,
+    RelayResult,
+    RelayAthlete,
+    Meet,
+    Event,
+    SchoolEnrollment,
+)
 from . import db
 
 
@@ -131,6 +140,7 @@ def search_bar(query_text: str):
                 "school": school_name or None,
                 "gender": athlete.gender,
                 "graduation_year": athlete.graduation_year,
+                "classYear": athlete.graduation_year,
                 "score": score,
                 "priority": 2  # Athletes have lower priority
             })
@@ -308,6 +318,13 @@ def _compute_badges(athlete_id: int):
         .all()
     )
 
+    relay_rows = _fetch_relay_rows_for_athlete(
+        athlete_id,
+        meet_types={"Sectional", "Regional", "State"},
+    )
+    for relay_result, meet, _event in relay_rows:
+        stage_results.append((relay_result, meet))
+
     sectional = [item for item in stage_results if item[1].meet_type == "Sectional"]
     regional = [item for item in stage_results if item[1].meet_type == "Regional"]
     state = [item for item in stage_results if item[1].meet_type == "State"]
@@ -329,7 +346,7 @@ def _compute_sectional_badge(results):
         if res.place is None or res.place <= 0:
             continue
 
-        field_size = _get_field_size(res.meet_id, res.event, res.result_type)
+        field_size = _get_field_size(res.meet_id, res.event, getattr(res, "result_type", "Final"))
         if not field_size:
             continue
 
@@ -393,6 +410,13 @@ def _build_playoff_history(athlete_id: int):
         .all()
     )
 
+    relay_rows = _fetch_relay_rows_for_athlete(
+        athlete_id,
+        meet_types={"Sectional", "Regional", "State"},
+    )
+    for relay_result, meet, _event in relay_rows:
+        results.append((relay_result, meet))
+
     if not results:
         return []
 
@@ -414,7 +438,7 @@ def _build_playoff_history(athlete_id: int):
         candidate = {
             "result": res.result,
             "place": res.place,
-            "result_type": res.result_type,
+            "result_type": getattr(res, "result_type", "Final"),
             "formatted": _format_stage_result(res.result, res.place),
         }
         entry[meet.meet_type] = _select_preferred_result(entry[meet.meet_type], candidate)
@@ -464,9 +488,6 @@ def get_athlete_personal_bests(athlete_id: int, min_year: int = 2022, athlete_ob
         .all()
     )
 
-    if not results:
-        return []
-
     grouped = {}
     for result, meet, event in results:
         bucket = grouped.setdefault(
@@ -478,6 +499,26 @@ def get_athlete_personal_bests(athlete_id: int, min_year: int = 2022, athlete_ob
         )
         bucket["items"].append((result, meet))
 
+    relay_entries = _fetch_relay_rows_for_athlete(
+        athlete_id,
+        min_year=min_year,
+    )
+
+    for relay_result, meet, event in relay_entries:
+        if meet.year is None or (min_year is not None and meet.year < min_year):
+            continue
+        bucket = grouped.setdefault(
+            event.event,
+            {
+                "event_type": event.event_type,
+                "items": [],
+            },
+        )
+        bucket["items"].append((relay_result, meet))
+
+    if not grouped:
+        return []
+
     personal_bests = []
     for event_name, data in grouped.items():
         selection = _select_best_result_entry(data["items"], data["event_type"])
@@ -486,24 +527,27 @@ def get_athlete_personal_bests(athlete_id: int, min_year: int = 2022, athlete_ob
 
         best_result, best_meet = selection
         school_rank = None
-        if athlete.school_id is not None:
-            school_rank = _compute_rank_for_event(
+        state_rank = None
+
+        if data["event_type"] != "Relay":
+            if athlete.school_id is not None:
+                school_rank = _compute_rank_for_event(
+                    event_name,
+                    data["event_type"],
+                    athlete.athlete_id,
+                    min_year,
+                    school_id=athlete.school_id,
+                    gender=athlete.gender,
+                )
+
+            state_rank = _compute_rank_for_event(
                 event_name,
                 data["event_type"],
                 athlete.athlete_id,
                 min_year,
-                school_id=athlete.school_id,
                 gender=athlete.gender,
+                school_id=None,
             )
-
-        state_rank = _compute_rank_for_event(
-            event_name,
-            data["event_type"],
-            athlete.athlete_id,
-            min_year,
-            gender=athlete.gender,
-            school_id=None,
-        )
 
         personal_bests.append(
             {
@@ -514,7 +558,7 @@ def get_athlete_personal_bests(athlete_id: int, min_year: int = 2022, athlete_ob
                 "meet_type": best_meet.meet_type,
                 "year": best_meet.year,
                 "meet_id": best_meet.meet_id,
-                "result_type": best_result.result_type,
+                "result_type": getattr(best_result, "result_type", "Final"),
                 "school_rank": school_rank,
                 "state_rank": state_rank,
             }
@@ -696,6 +740,27 @@ def get_athlete_result_rankings(athlete_id: int, meet_id: int, event_name: str, 
             "same_grade": grade_info,
         },
     }
+
+
+def _fetch_relay_rows_for_athlete(athlete_id, meet_types=None, min_year=None):
+    if athlete_id is None:
+        return []
+
+    query = (
+        db.session.query(RelayResult, Meet, Event)
+        .join(RelayAthlete, RelayAthlete.relay_id == RelayResult.relay_id)
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .join(Event, RelayResult.event == Event.event)
+        .filter(RelayAthlete.athlete_id == athlete_id)
+    )
+
+    if meet_types:
+        query = query.filter(Meet.meet_type.in_(tuple(meet_types)))
+
+    if min_year is not None:
+        query = query.filter(Meet.year.isnot(None), Meet.year >= min_year)
+
+    return query.all()
 
 
 def _select_preferred_result(existing, candidate):
