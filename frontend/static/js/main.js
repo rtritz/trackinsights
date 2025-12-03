@@ -106,11 +106,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     
     if (!query) {
-      resultsDiv.innerHTML = '<div class="no-results">Please enter a search query</div>';
+      resultsDiv.innerHTML = '';
+      resultsDiv.classList.remove('open');
       return;
     }
     
     resultsDiv.innerHTML = '<div class="loading">Searching...</div>';
+    resultsDiv.classList.add('open');
     
     // Create new abort controller for this request
     abortController = new AbortController();
@@ -123,6 +125,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const data = await res.json();
       if (data.length === 0) {
         resultsDiv.innerHTML = '<div class="no-results">No results found for "' + escapeHtml(query) + '"</div>';
+        resultsDiv.classList.add('open');
       } else {
         // Clear previous results
         resultsDiv.innerHTML = '';
@@ -182,6 +185,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         resultsDiv.appendChild(ul);
+        resultsDiv.classList.add('open');
       }
     } catch (error) {
       // Don't show error if request was aborted (user is typing)
@@ -189,6 +193,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
       }
       resultsDiv.innerHTML = '<div class="no-results" style="color: #dc3545;">Error performing search. Please try again.</div>';
+      resultsDiv.classList.add('open');
     }
   }
   
@@ -212,6 +217,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Don't search if empty
     if (!query) {
       resultsDiv.innerHTML = '';
+      resultsDiv.classList.remove('open');
       return;
     }
     
