@@ -1,0 +1,330 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<!-- DaisyUI Top Navbar -->
+<!-- <div class="navbar bg-none px-4 p-2 mt-2 fixed top-0 left-0 w-full z-50">
+      
+      <div class="navbar-start">
+      </div>
+      <div class="navbar-center lg:flex">
+        <div class="menu menu-horizontal">
+          <button class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">Home</button>
+          <button class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">Queries</button>
+          <button class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">About</button>
+          <button class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">Contact</button>
+        </div>
+      </div>
+      <div class="navbar-end">
+        </div>
+    </div> -->
+<div class=" navbar bg-none px-2 sm:px-4 p-2 fixed top-3 left-0 w-full z-50">
+  <!-- White parallelogram background for entire navbar - always visible -->
+  <div class="navbar-bg-parallelogram"></div>
+
+  <div class="navbar-start ml-2 sm:ml-10">
+    <a href="/"
+      class="text-primary italic text-3xl sm:text-4xl lg:text-5xl hover:brightness-150 transition-all duration-300 ease-in-out"
+      style="font-family: Impact, 'Arial Black', sans-serif;">Track Insights</a>
+  </div>
+  <div class="navbar-center hidden lg:flex">
+
+  </div>
+  <div class="navbar-end mr-2 sm:mr-7">
+    <!-- Hamburger menu button for mobile -->
+    <button id="mobile-menu-btn" class="btn btn-ghost btn-circle lg:hidden z-50">
+      <svg id="hamburger-icon" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+        stroke="#8c0327">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+      <svg id="close-icon" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 hidden" fill="none" viewBox="0 0 24 24"
+        stroke="white">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+
+    <!-- Full-screen mobile menu overlay -->
+    <div id="mobile-menu"
+      class="fixed inset-0 bg-primary z-40 lg:hidden flex-col items-center justify-center opacity-0 pointer-events-none"
+      style="transform: translateX(100%);">
+      <nav class="flex flex-col items-center gap-8">
+        <a href="/" class="font-oswald-italic-bold text-4xl text-white hover:scale-110 transition-transform menu-link"
+          style="opacity: 0; transform: translateY(50px);">Home</a>
+        <a href="/" class="font-oswald-italic-bold text-4xl text-gray-400 transition-transform menu-link"
+          style="opacity: 0; transform: translateY(50px);">Queries</a>
+        <a href="/" class="font-oswald-italic-bold text-4xl text-gray-400 transition-transform menu-link"
+          style="opacity: 0; transform: translateY(50px);">About</a>
+        <a href="/" class="font-oswald-italic-bold text-4xl text-gray-400 transition-transform menu-link"
+          style="opacity: 0; transform: translateY(50px);">Contact</a>
+      </nav>
+    </div>
+
+    <!-- Desktop parallelogram menu -->
+    <div class="menu menu-horizontal parallelogram-nav z-55 rounded-2xl hidden lg:flex">
+      <div class="flex">
+        <a href="/"
+          class="font-oswald-italic-bold text-2xl backdrop-blur-none rounded-full mx-2 inline-flex items-center justify-center px-0 py-1 w-20">Home</a>
+        <p href="/"
+          class="font-oswald-italic-bold text-2xl backdrop-blur-none rounded-full mx-2 inline-flex items-center justify-center px-0 py-1 w-20 text-gray-400">
+          Queries</p>
+        <p href="/"
+          class="font-oswald-italic-bold text-2xl backdrop-blur-none rounded-full mx-2 inline-flex items-center justify-center px-0 py-1 w-20 text-gray-400">
+          About</p>
+        <p href="/"
+          class="font-oswald-italic-bold text-2xl backdrop-blur-none rounded-full mx-2 inline-flex items-center justify-center px-0 py-1 w-20 text-gray-400">
+          Contact</p>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* White parallelogram background for entire navbar */
+    .navbar-bg-parallelogram {
+      position: absolute;
+      top: 0;
+      left: 0.5rem;
+      right: 0.5rem;
+      width: calc(100% - 1rem);
+      height: 100%;
+      background-color: rgb(255, 255, 255, 0.6);
+      backdrop-filter: blur(10px);
+      transform: skewX(-15deg);
+      transform-origin: center;
+      z-index: -1;
+      border: 0px solid rgba(255, 255, 255, 0.3);
+      border-radius: 1rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    @media (min-width: 1024px) {
+      .navbar-bg-parallelogram {
+        left: 2rem;
+        right: 2rem;
+        width: calc(100% - 4rem);
+      }
+    }
+
+    .parallelogram-nav {
+      background-color: #8c0327;
+      /* Track red color */
+      transform: skewX(-15deg);
+      padding: 0.75rem 1.5rem;
+      position: relative;
+      transition: background-color 0.3s ease;
+    }
+
+    .parallelogram-nav:hover {
+      background-color: #a50430;
+      /* Lighter red on hover */
+    }
+
+    /* White text on red background */
+    .parallelogram-nav a {
+      color: white;
+      transition: transform 0.2s ease;
+    }
+
+    .parallelogram-nav a:hover {
+      transform: skewX(10deg) scale(1.05);
+    }
+
+    .parallelogram-nav>* {
+      transform: skewX(15deg);
+      /* Counter-skew the children */
+      display: inline-block;
+      position: relative;
+      z-index: 1;
+    }
+  </style>
+</div>
+
+<!-- Z is less than 10 -->
+<div class="w-full h-screen sticky top-0">
+  <div style="isolation:isolate"
+    class="w-full h-screen flex items-center justify-center bg-transparent relative overflow-hidden">
+    <!-- Background image slideshow -->
+    <div id="bg-slideshow" class="absolute top-0 left-0 w-full h-full">
+      <img id="bg-image-1"
+        class="absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out"
+        style="opacity: 1; object-position: top;" />
+      <img id="bg-image-2"
+        class="absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out"
+        style="opacity: 0; object-position: top;" />
+    </div>
+
+    <script>
+      (function () {
+        // Define all background images
+
+        //lengths were 82 and 52
+        const boysImages = Array.from({ length: 82 }, (_, i) => `../static/images/background_images_boys/bg_${i + 1}.jpg`);
+        const girlsImages = Array.from({ length: 52 }, (_, i) => `../static/images/background_images_girls/bg_${i + 1}.jpg`);
+        const allImages = [...boysImages, ...girlsImages];
+
+        // Shuffle array
+        function shuffle(array) {
+          const shuffled = [...array];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          return shuffled;
+        }
+
+        const shuffledImages = shuffle(allImages);
+        let currentIndex = 0;
+        let currentImageElement = 1; // Toggle between 1 and 2
+
+        const img1 = document.getElementById('bg-image-1');
+        const img2 = document.getElementById('bg-image-2');
+
+        // Set first image
+        img1.src = shuffledImages[0];
+
+        // Preload next image
+        function preloadNext() {
+          const nextIndex = (currentIndex + 1) % shuffledImages.length;
+          const img = new Image();
+          img.src = shuffledImages[nextIndex];
+        }
+
+        // Transition to next image
+        function nextImage() {
+          currentIndex = (currentIndex + 1) % shuffledImages.length;
+
+          if (currentImageElement === 1) {
+            // Preload the image first to avoid gaps
+            const tempImg = new Image();
+            tempImg.onload = function () {
+              // Load the new image into img2 (underneath)
+              img2.src = shuffledImages[currentIndex];
+              img2.style.opacity = '1';
+              img2.style.zIndex = '0';
+
+              // Fade out img1 (on top) to reveal img2
+              img1.style.zIndex = '1';
+              img1.style.opacity = '0';
+            };
+            tempImg.src = shuffledImages[currentIndex];
+            currentImageElement = 2;
+          } else {
+            // Preload the image first to avoid gaps
+            const tempImg = new Image();
+            tempImg.onload = function () {
+              // Load the new image into img1 (underneath)
+              img1.src = shuffledImages[currentIndex];
+              img1.style.opacity = '1';
+              img1.style.zIndex = '0';
+
+              // Fade out img2 (on top) to reveal img1
+              img2.style.zIndex = '1';
+              img2.style.opacity = '0';
+            };
+            tempImg.src = shuffledImages[currentIndex];
+            currentImageElement = 1;
+          }
+
+          preloadNext();
+        }
+
+        // Change image every 5 seconds
+        setInterval(nextImage, 7500);
+        preloadNext();
+      })();
+    </script>
+
+    <div id="search-section" class="absolute inset-x-0 bottom-20 px-4 sm:px-6 lg:px-8 z-30">
+      <form id="searchForm" class="w-full flex flex-col sm:flex-row gap-4 items-center justify-center mb-4"
+          onsubmit="return false;">
+          <input id="searchInput" name="q" type="text" placeholder="Search for student name"
+            class="input input-bordered input-primary w-full text-lg" autocomplete="off" />
+        </form>
+      <!-- <div
+        class="glass bg-white/80 backdrop-blur-xl border border-white/40 shadow-2xl rounded-3xl w-full max-w-3xl mx-auto p-6 sm:p-8 flex flex-col items-center">
+        <h2 class="font-impact italic text-primary text-3xl md:text-4xl font-bold mb-6"
+          style="font-family: Impact, 'Arial Black', sans-serif;">
+          
+        </h2>
+        <form id="searchForm" class="w-full flex flex-col sm:flex-row gap-4 items-center justify-center mb-4"
+          onsubmit="return false;">
+          <input id="searchInput" name="q" type="text" placeholder="Search for student name"
+            class="input input-bordered input-primary w-full text-lg" autocomplete="off" />
+        </form>
+        <div id="results" class="w-full mt-2 max-h-[40vh] overflow-y-auto text-base-content"></div>
+      </div> -->
+    </div>
+
+    <!-- <div class="w-full flex justify-center items-center z-2 relative" style="pointer-events: none;"> -->
+    <!-- <div class="w-screen absolute left-1/2 -translate-x-1/2 top-1/2 z-30 pointer-events-none">
+            <span class="block text-center font-impact italic text-primary text-[12vw] sm:text-[14vw] md:text-[16vw] lg:text-[18vw] xl:text-[20vw] font-bold drop-shadow-lg select-none" style="line-height:1.1;">Track</span>
+          </div>
+          <div class="w-screen absolute left-1/2 -translate-x-1/2 top-1/2 z-30 pointer-events-none">
+            <span class="block text-center font-impact italic text-primary text-[12vw] sm:text-[14vw] md:text-[16vw] lg:text-[18vw] xl:text-[20vw] font-bold drop-shadow-lg select-none" style="line-height:1.1;">Insights</span>
+          </div> -->
+    <!-- <div class="w-screen absolute left-1/2 -translate-x-1/2 top-1/2 pointer-events-none"> -->
+    <!-- <img src="../static/images/Track_Insights_Text.png" alt="Track Insights"
+      style="height:60vh; width:80vw; mix-blend-mode:lighten;"
+      class="filter drop-shadow-2xl brightness-50 absolute  left-1/2 top-1/2 -translate-x-[52%] -translate-y-[58%] lg:-translate-y-[60%] select-none z-2 "
+      style="pointer-events: none;" />
+      <img src="../static/images/Track_Insights_Text.png" alt="Track Insights"
+      style="height:60vh; width:80vw; opacity:80%"
+      class=" drop-shadow-2xl absolute left-1/2 top-1/2 -translate-x-[52%] -translate-y-[58%] lg:-translate-y-[60%] select-none z-2 "
+      style="pointer-events: none;" /> -->
+
+
+    <!-- </div>   -->
+  </div>
+  <!-- <img src="../static/images/Track_Insights_Text.png" alt="Track Insights" style="height:60vh; width:80vw;"
+    class="isolate brightness-100 opacity-50 absolute left-1/2 top-1/2 -translate-x-[52%] -translate-y-[58%] lg:-translate-y-[60%] select-none z-2"
+    style="pointer-events: none;" /> -->
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const nextSection = document.getElementById('search-section');
+      const searchInput = document.getElementById('searchInput');
+
+      if (!nextSection) return;
+
+      // Auto-scroll to search section when user scrolls
+      let hasScrolledToSearch = false;
+      let scrollTimeout;
+
+      window.addEventListener('scroll', function () {
+        if (hasScrolledToSearch) return;
+
+        // If user has scrolled down at all (more than 20px)
+        if (window.scrollY > 20) {
+          hasScrolledToSearch = true;
+
+          // Clear any existing timeout
+          clearTimeout(scrollTimeout);
+
+          // Smooth scroll to search section
+          nextSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (searchInput) {
+            scrollTimeout = setTimeout(() => searchInput.focus(), 400);
+          }
+        }
+      });
+    });
+  </script>
+</div>
+</div>
+<div id="search-section-anchor" class="w-full bg-white"></div>
+
+<script>
+  // Debounced live search every 100ms
+  (function () {
+    let debounceTimer;
+    const input = document.getElementById('searchInput');
+    const form = document.getElementById('searchForm');
+    if (!input || !form) return;
+    input.addEventListener('input', function () {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        form.dispatchEvent(new Event('submit', { cancelable: true }));
+      }, 100);
+    });
+  })();
+</script>
+{% endblock %}
