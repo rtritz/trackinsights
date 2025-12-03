@@ -42,6 +42,7 @@ class Athlete(db.Model):
     gender = db.Column(db.String, db.ForeignKey("gender.gender"))
     graduation_year = db.Column(db.Integer)
     results = db.relationship("AthleteResult", backref="athlete")
+    relay_entries = db.relationship("RelayAthlete", backref="athlete")
 
 class AthleteResult(db.Model):
     __tablename__ = "athlete_result"
@@ -56,13 +57,20 @@ class AthleteResult(db.Model):
 
 class RelayResult(db.Model):
     __tablename__ = "relay_result"
-    school_id = db.Column(db.Integer, db.ForeignKey("school.school_id"), primary_key=True)
-    meet_id = db.Column(db.Integer, db.ForeignKey("meet.meet_id"), primary_key=True)
-    event = db.Column(db.String, db.ForeignKey("event.event"), primary_key=True)
+    relay_id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(db.Integer, db.ForeignKey("school.school_id"))
+    meet_id = db.Column(db.Integer, db.ForeignKey("meet.meet_id"))
+    event = db.Column(db.String, db.ForeignKey("event.event"))
     result = db.Column(db.String)
     result2 = db.Column(db.Float)
     place = db.Column(db.Integer)
     athlete_names = db.Column(db.String)
+    athletes = db.relationship("RelayAthlete", backref="relay")
+
+class RelayAthlete(db.Model):
+    __tablename__ = "relay_athlete"
+    relay_id = db.Column(db.Integer, db.ForeignKey("relay_result.relay_id"), primary_key=True)
+    athlete_id = db.Column(db.Integer, db.ForeignKey("athlete.athlete_id"), primary_key=True)
 
 class Event(db.Model):
     __tablename__ = "event"
