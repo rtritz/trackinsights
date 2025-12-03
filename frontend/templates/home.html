@@ -2,65 +2,33 @@
 
 {% block content %}
 
-<style>
-  /* Hide the site navbar on home page only */
-  #site-navbar {
-    display: none !important;
-  }
-</style>
 
-<!-- DaisyUI Top Navbar -->
-<!-- <div class="navbar bg-none px-4 p-2 mt-2 fixed top-0 left-0 w-full z-50">
-      
-      <d    @keyframes heat-pulse-twist {
-      0%, 100% {
-        transform: translate(-50%, -50%) scale(1) rotate(0deg);
-        opacity: 1;
-      }
-      50% {
-        transform: translate(-50%, -50%) scale(1.08) rotate(8deg);
-        opacity: 0.9;
-      }
-    }navbar-start">
-      </div>
-      <div class="navbar-center lg:flex">
-        <div class="menu menu-horizontal">
-          <button class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">Home</button>
-          <button class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">Queries</button>
-          <button class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">About</button>
-          <button class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">Contact</button>
-        </div>
-      </div>
-      <div class="navbar-end">
-        </div>
-    </div> -->
+
 
 <!-- Z is less than 10 -->
 <div class="w-full h-screen sticky top-0">
-  <div data-hero-stage style="isolation:isolate" class="hero-stage w-full h-screen flex items-center justify-center bg-transparent relative overflow-hidden">
-    <!-- Drum-style vertical slideshow background -->
-    <div id="drum-background" class="absolute top-0 left-0 w-full h-full">
-      <div class="drum-sheen drum-sheen-left"></div>
-      <div class="drum-sheen drum-sheen-right"></div>
-      <div class="drum-columns">
-        <div class="drum-column" data-speed="45" data-delay="0">
-          <div class="drum-track"></div>
-        </div>
-        <div class="drum-column" data-speed="38" data-delay="-8">
-          <div class="drum-track"></div>
-        </div>
-        <div class="drum-column" data-speed="42" data-delay="-4">
-          <div class="drum-track"></div>
-        </div>
-      </div>
+  <div style="isolation:isolate"
+    class="w-full h-screen flex items-center justify-center bg-transparent relative overflow-hidden">
+    <!-- Background image slideshow -->
+    <div id="bg-slideshow" class="absolute top-0 left-0 w-full h-full">
+      <img id="bg-image-1"
+        class="absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out"
+        style="opacity: 1; object-position: top;" />
+      <img id="bg-image-2"
+        class="absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out"
+        style="opacity: 0; object-position: top;" />
     </div>
 
     <script>
       (function () {
+        // Define all background images
+
+        //lengths were 82 and 52
         const boysImages = Array.from({ length: 82 }, (_, i) => `../static/images/background_images_boys/bg_${i + 1}.jpg`);
         const girlsImages = Array.from({ length: 52 }, (_, i) => `../static/images/background_images_girls/bg_${i + 1}.jpg`);
         const allImages = [...boysImages, ...girlsImages];
 
+        // Shuffle array
         function shuffle(array) {
           const shuffled = [...array];
           for (let i = shuffled.length - 1; i > 0; i--) {
@@ -71,292 +39,191 @@
         }
 
         const shuffledImages = shuffle(allImages);
-        let cursor = 0;
+        let currentIndex = 0;
+        let currentImageElement = 1; // Toggle between 1 and 2
 
+        const img1 = document.getElementById('bg-image-1');
+        const img2 = document.getElementById('bg-image-2');
+
+        // Set first image
+        img1.src = shuffledImages[0];
+
+        // Preload next image
+        function preloadNext() {
+          const nextIndex = (currentIndex + 1) % shuffledImages.length;
+          const img = new Image();
+          img.src = shuffledImages[nextIndex];
+        }
+
+        // Transition to next image
         function nextImage() {
-          const src = shuffledImages[cursor];
-          cursor = (cursor + 1) % shuffledImages.length;
-          return src;
-        }
+          currentIndex = (currentIndex + 1) % shuffledImages.length;
 
-        function randomBetween(min, max) {
-          return Math.random() * (max - min) + min;
-        }
+          if (currentImageElement === 1) {
+            // Preload the image first to avoid gaps
+            const tempImg = new Image();
+            tempImg.onload = function () {
+              // Load the new image into img2 (underneath)
+              img2.src = shuffledImages[currentIndex];
+              img2.style.opacity = '1';
+              img2.style.zIndex = '0';
 
-        const columns = Array.from(document.querySelectorAll('#drum-background .drum-column'));
-        if (!columns.length) return;
-
-        const FRAMES_PER_LOOP = 5;
-
-        function refreshFrame(frame, immediate = false, preset) {
-          const settings = {
-            src: preset?.src || nextImage(),
-          };
-
-          frame.style.backgroundImage = `url(${settings.src})`;
-          frame.dataset.src = settings.src;
-
-          if (immediate) {
-            requestAnimationFrame(() => frame.classList.add('visible'));
+              // Fade out img1 (on top) to reveal img2
+              img1.style.zIndex = '1';
+              img1.style.opacity = '0';
+            };
+            tempImg.src = shuffledImages[currentIndex];
+            currentImageElement = 2;
           } else {
-            frame.classList.remove('visible');
-            void frame.offsetWidth;
-            frame.classList.add('visible');
+            // Preload the image first to avoid gaps
+            const tempImg = new Image();
+            tempImg.onload = function () {
+              // Load the new image into img1 (underneath)
+              img1.src = shuffledImages[currentIndex];
+              img1.style.opacity = '1';
+              img1.style.zIndex = '0';
+
+              // Fade out img2 (on top) to reveal img1
+              img2.style.zIndex = '1';
+              img2.style.opacity = '0';
+            };
+            tempImg.src = shuffledImages[currentIndex];
+            currentImageElement = 1;
           }
 
-          return settings;
+          preloadNext();
         }
 
-        function createFrame(track, index, preset) {
-          const frame = document.createElement('div');
-          frame.className = 'drum-frame';
-          frame.style.setProperty('--frame-index', index);
-          track.appendChild(frame);
-          const settings = refreshFrame(frame, true, preset);
-          return { frame, settings };
-        }
-
-        columns.forEach((column, colIdx) => {
-          const track = column.querySelector('.drum-track');
-          const delay = Number(column.dataset.delay || '0');
-          const baseFrames = [];
-
-          for (let i = 0; i < FRAMES_PER_LOOP; i++) {
-            const created = createFrame(track, i);
-            baseFrames.push(created);
-          }
-
-          const framePairs = baseFrames.map(({ frame, settings }, idx) => {
-            const clone = createFrame(track, FRAMES_PER_LOOP + idx, settings);
-            return [frame, clone.frame];
-          });
-
-          const duration = Number(column.dataset.speed || '42');
-          track.style.setProperty('--scroll-duration', `${duration}s`);
-          track.style.setProperty('--scroll-delay', `${delay}s`);
-
-          setInterval(() => {
-            const pair = framePairs[Math.floor(Math.random() * framePairs.length)];
-            const settings = refreshFrame(pair[0], false);
-            refreshFrame(pair[1], false, settings);
-          }, 6500 + Math.random() * 2000);
-        });
+        // Change image every 5 seconds
+        setInterval(nextImage, 7500);
+        preloadNext();
       })();
     </script>
 
-    <!-- <div class="w-full flex justify-center items-center z-2 relative" style="pointer-events: none;"> -->
-    <!-- <div class="w-screen absolute left-1/2 -translate-x-1/2 top-1/2 z-30 pointer-events-none">
-            <span class="block text-center font-impact italic text-primary text-[12vw] sm:text-[14vw] md:text-[16vw] lg:text-[18vw] xl:text-[20vw] font-bold drop-shadow-lg select-none" style="line-height:1.1;">Track</span>
-          </div>
-          <div class="w-screen absolute left-1/2 -translate-x-1/2 top-1/2 z-30 pointer-events-none">
-            <span class="block text-center font-impact italic text-primary text-[12vw] sm:text-[14vw] md:text-[16vw] lg:text-[18vw] xl:text-[20vw] font-bold drop-shadow-lg select-none" style="line-height:1.1;">Insights</span>
-          </div> -->
-    <!-- <div class="w-screen absolute left-1/2 -translate-x-1/2 top-1/2 pointer-events-none"> -->
-    <!-- Marquee rows -->
-    <div aria-hidden="true" class="absolute left-0 w-full overflow-hidden pointer-events-auto z-30" style="top: 6%;">
-      <div class="marquee marquee-right" style="--marquee-duration: 32s;">
-        <div class="marquee-track">
-          <!-- repeated content inserted by JS -->
-        </div>
-      </div>
+    <div class="hero-title" tabindex="0">
+      <span class="hero-title__text">
+        Track Insights
+      </span>
+      <!-- <span class="hero-title__hint">Press to search for your athlete</span> -->
     </div>
-
-    <nav class="hero-dots" aria-label="Primary">
-      <a href="/" class="hero-dot-link">Home</a>
-      <span class="dot-sep">·</span>
-      <a href="#search-section" class="hero-dot-link">Queries</a>
-      <span class="dot-sep">·</span>
-      <a href="/about" class="hero-dot-link">About</a>
-      <span class="dot-sep">·</span>
-      <a href="/contact" class="hero-dot-link">Contact</a>
-    </nav>
-
-    <div aria-hidden="true" class="absolute left-0 w-full overflow-hidden pointer-events-auto z-30" style="bottom: 6%;">
-      <div class="marquee marquee-left" style="--marquee-duration: 38s;">
-        <div class="marquee-track">
-          <!-- repeated content inserted by JS -->
-        </div>
-      </div>
-    </div>
-    
-
-    <!-- </div>   -->
   </div>
   <!-- <img src="../static/images/Track_Insights_Text.png" alt="Track Insights" style="height:60vh; width:80vw;"
       class="isolate brightness-100 opacity-50 absolute left-1/2 top-1/2 -translate-x-[52%] -translate-y-[58%] lg:-translate-y-[60%] select-none z-2"
       style="pointer-events: none;" /> -->
-  
+
   <!-- See more text hint -->
-  <div class="absolute bottom-8 left-1/2 -translate-x-1/2 z-3 pointer-events-none" style="isolation: isolate;">
+  <!-- <div class="absolute bottom-8 left-1/2 -translate-x-1/2 z-3 pointer-events-none" style="isolation: isolate;">
     <p class="text-white text-xl font-semibold tracking-widest uppercase animate-fade-bounce">
       See More
     </p>
-  </div>
+  </div> -->
 
   <!-- Bottom 20% clickable zone with custom cursor -->
-  <div id="scroll-zone" class="cursor-none absolute bottom-0 left-0 w-full h-[20%] z-4" style="pointer-events: auto; transition: opacity 0.3s ease;"></div>
-  
-  <div id="cursor-distortion" class="cursor-distortion pointer-events-none"></div>
+  <div id="scroll-zone" class="cursor-none absolute bottom-0 left-0 w-full h-[20%] z-4"
+    style="pointer-events: auto; transition: opacity 0.3s ease;"></div>
 
   <!-- Custom cursor follower -->
-  <div id="custom-cursor" class="fixed pointer-events-none z-50 opacity-0 transition-opacity duration-300" style="transform: translate(-50%, -50%);">
+  <div id="custom-cursor" class="fixed pointer-events-none z-50 opacity-0 transition-opacity duration-300"
+    style="transform: translate(-50%, -50%);">
     <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
       <!-- Circle background -->
-      <circle cx="32" cy="32" r="30" fill="none" stroke="#8c0327" stroke-width="3" opacity="0.8"/>
+      <circle cx="32" cy="32" r="30" fill="none" stroke="#8c0327" stroke-width="3" opacity="0.8" />
       <!-- Down arrow -->
-      <path d="M 32 20 L 32 42 M 22 34 L 32 44 L 42 34" stroke="#8c0327" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <path d="M 32 20 L 32 42 M 22 34 L 32 44 L 42 34" stroke="#8c0327" stroke-width="3" stroke-linecap="round"
+        stroke-linejoin="round" fill="none" />
     </svg>
   </div>
-  
+
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
-
-    .hero-stage {
-      cursor: none;
-    }
-
-    .cursor-distortion {
-      position: fixed;
-      left: 0;
-      top: 0;
-      width: 0;
-      height: 0;
-      pointer-events: none;
-      z-index: 40;
-    }
-
-    .cursor-distortion::before,
-    .cursor-distortion::after {
-      content: "";
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.2s ease;
-    }
-
-    .cursor-distortion.active::before,
-    .cursor-distortion.active::after {
-      opacity: 1;
-    }
-
-    /* Inner hot core - red center */
-    .cursor-distortion::before {
-      width: var(--heat-size-inner, 100px);
-      height: var(--heat-size-inner, 100px);
-      background: radial-gradient(
-        circle at center,
-        rgba(255, 0, 0, 0.95) 0%,
-        rgba(255, 50, 0, 0.85) 15%,
-        rgba(255, 100, 0, 0.75) 30%,
-        rgba(255, 150, 0, 0.6) 45%,
-        rgba(255, 200, 0, 0.45) 60%,
-        rgba(255, 255, 0, 0.3) 75%,
-        transparent 100%
-      );
-      filter: blur(var(--heat-blur-inner, 6px));
-      mix-blend-mode: screen;
-      box-shadow: 
-        0 0 40px rgba(255, 0, 0, 0.7),
-        0 0 80px rgba(255, 100, 0, 0.5);
-    }
-
-    /* Outer heat distortion - cyan edges with pixelation and twist */
-    .cursor-distortion::after {
-      width: var(--heat-size-outer, 250px);
-      height: var(--heat-size-outer, 250px);
-      background: radial-gradient(
-        circle at center,
-        rgba(255, 200, 0, 0.5) 0%,
-        rgba(200, 255, 0, 0.4) 15%,
-        rgba(100, 255, 100, 0.35) 30%,
-        rgba(0, 255, 200, 0.3) 50%,
-        rgba(0, 200, 255, 0.25) 65%,
-        rgba(0, 150, 255, 0.18) 80%,
-        rgba(0, 100, 200, 0.1) 90%,
-        transparent 100%
-      );
-      filter: blur(var(--heat-blur-outer, 15px)) contrast(120%);
-      backdrop-filter: 
-        blur(var(--heat-backdrop-blur, 16px))
-        url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"><filter id="pixelate"><feGaussianBlur stdDeviation="0.5"/><feComponentTransfer><feFuncA type="discrete" tableValues="0 1"/></feComponentTransfer></filter></svg>#pixelate')
-        saturate(150%) 
-        hue-rotate(var(--heat-hue, 0deg));
-      -webkit-backdrop-filter: 
-        blur(var(--heat-backdrop-blur, 16px))
-        saturate(150%);
-      mix-blend-mode: screen;
-      animation: heat-pulse-twist 3s ease-in-out infinite;
-      transform: translate(-50%, -50%) rotate(var(--heat-twist, 0deg));
-    }
-
-    @keyframes heat-pulse {
-      0%, 100% {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 1;
-      }
-      50% {
-        transform: translate(-50%, -50%) scale(1.05);
-        opacity: 0.85;
-      }
-    }
-
-    .hero-dots {
-      position: absolute;
-      bottom: clamp(18%, 18vh, 20%);
-      left: clamp(2.5rem, 7vw, 6.5rem);
-      display: flex;
-      align-items: center;
-      gap: clamp(0.55rem, 1vw, 1.05rem);
-      font-size: clamp(0.72rem, 0.78vw, 1rem);
-      text-transform: uppercase;
-      letter-spacing: clamp(0.28rem, 0.5vw, 0.65rem);
-      color: rgba(255, 255, 255, 0.72);
-      z-index: 60;
-      pointer-events: auto;
-      mix-blend-mode: screen;
-    }
-
-    .hero-dot-link {
+    .hero-title {
       position: relative;
-      color: inherit;
-      text-decoration: none;
-      padding-bottom: 0.1rem;
-      transition: color 0.25s ease, letter-spacing 0.25s ease, opacity 0.25s ease;
-      opacity: 0.78;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(2rem, 5vw, 4rem) clamp(3rem, 8vw, 6rem);
+      text-transform: uppercase;
+      letter-spacing: clamp(0.3rem, 1vw, 1.4rem);
+      font-family: Impact, 'Arial Black', sans-serif;
+      font-size: clamp(3.5rem, 8vw, 8rem);
+      color: rgba(255, 255, 255, 0.92);
+      text-align: center;
+      cursor: pointer;
+      border-radius: clamp(1.5rem, 4vw, 3.5rem);
+      transition: transform 450ms cubic-bezier(0.19, 1, 0.22, 1),
+        letter-spacing 450ms cubic-bezier(0.19, 1, 0.22, 1),
+        color 300ms ease;
+      isolation: isolate;
     }
 
-    .hero-dot-link::after {
-      content: "";
+    .hero-title::before {
+      content: '';
       position: absolute;
-      left: 0;
-      right: 0;
-      bottom: -0.35rem;
-      height: 1px;
-      background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0));
+      inset: clamp(-2.5rem, -3vw, -1.5rem);
+      border-radius: inherit;
+      background: rgba(6, 6, 12, 0.4);
+      backdrop-filter: blur(0px);
+      -webkit-backdrop-filter: blur(0px);
       opacity: 0;
-      transition: opacity 0.25s ease;
+      transform: scale(0.94);
+      transition: opacity 350ms ease, transform 450ms cubic-bezier(0.19, 1, 0.22, 1),
+        backdrop-filter 350ms ease, -webkit-backdrop-filter 350ms ease;
+      z-index: -1;
     }
 
-    .hero-dot-link:hover,
-    .hero-dot-link:focus-visible {
-      color: rgba(255, 255, 255, 0.95);
+    .hero-title__text {
+      display: block;
+      line-height: 0.85;
+      filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.45));
+      transition: filter 350ms ease;
+    }
+
+    .hero-title__hint {
+      margin-top: clamp(0.5rem, 1.2vw, 1rem);
+      font-size: clamp(0.75rem, 1.4vw, 1.2rem);
+      letter-spacing: 0.45em;
+      color: rgba(255, 255, 255, 0.65);
+      font-family: 'Poppins', 'Segoe UI', sans-serif;
+      text-transform: uppercase;
+      transition: opacity 250ms ease, transform 300ms ease;
+    }
+
+    .hero-title:hover,
+    .hero-title:focus-visible {
+      transform: translateY(-6px) scale(1.02);
+      letter-spacing: clamp(0.35rem, 1.1vw, 1.5rem);
+      color: #fff9ec;
+    }
+
+    .hero-title:hover::before,
+    .hero-title:focus-visible::before {
       opacity: 1;
-      letter-spacing: clamp(0.32rem, 0.56vw, 0.74rem);
+      transform: scale(1.02);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
     }
 
-    .hero-dot-link:hover::after,
-    .hero-dot-link:focus-visible::after {
-      opacity: 0.7;
+    .hero-title:hover .hero-title__text,
+    .hero-title:focus-visible .hero-title__text {
+      filter: drop-shadow(0 22px 38px rgba(0, 0, 0, 0.55));
     }
 
-    .dot-sep {
-      font-size: 1.15rem;
-      opacity: 0.35;
-      transform: translateY(-1px);
+    .hero-title:hover .hero-title__hint,
+    .hero-title:focus-visible .hero-title__hint {
+      opacity: 0.85;
+      transform: translateY(-2px);
+    }
+
+    @media (max-width: 640px) {
+      .hero-title {
+        padding: clamp(1.5rem, 6vw, 3rem) clamp(1.75rem, 7vw, 3.5rem);
+        letter-spacing: clamp(0.2rem, 1.5vw, 0.8rem);
+      }
+
+      .hero-title::before {
+        inset: clamp(-1.75rem, -4vw, -1rem);
+      }
     }
 
     /* Hide default cursor in scroll zone */
@@ -366,9 +233,12 @@
 
     /* Gentle bounce animation for "See More" text */
     @keyframes fade-bounce {
-      0%, 100% {
+
+      0%,
+      100% {
         transform: translateY(0px);
       }
+
       50% {
         transform: translateY(-5px);
       }
@@ -380,9 +250,12 @@
 
     /* Pulse animation for custom cursor */
     @keyframes pulse-cursor {
-      0%, 100% {
+
+      0%,
+      100% {
         transform: translate(-50%, -50%) scale(1);
       }
+
       50% {
         transform: translate(-50%, -50%) scale(1.1);
       }
@@ -391,519 +264,8 @@
     #custom-cursor.active {
       animation: pulse-cursor 1.5s ease-in-out infinite;
     }
-
-    #drum-background {
-      position: absolute;
-      inset: 0;
-      background: #000;
-      overflow: hidden;
-      pointer-events: none;
-    }
-
-    .drum-columns {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: clamp(3.5rem, 8vw, 9rem);
-      padding: 0 clamp(4rem, 12vw, 16rem);
-      background: 
-        linear-gradient(90deg, 
-          rgba(0,0,0,1) 0%, 
-          rgba(0,0,0,0.95) 8%, 
-          rgba(0,0,0,0.3) 20%, 
-          rgba(0,0,0,0.3) 80%, 
-          rgba(0,0,0,0.95) 92%, 
-          rgba(0,0,0,1) 100%);
-    }
-
-    .drum-column {
-      position: relative;
-      flex: 1;
-      height: 100%;
-      overflow: hidden;
-      background: rgba(8, 8, 8, 0.6);
-      mask-image: linear-gradient(to bottom, 
-        transparent 0%, 
-        rgba(0,0,0,0.6) 8%, 
-        rgba(0,0,0,1) 15%, 
-        rgba(0,0,0,1) 85%, 
-        rgba(0,0,0,0.6) 92%, 
-        transparent 100%);
-      -webkit-mask-image: linear-gradient(to bottom, 
-        transparent 0%, 
-        rgba(0,0,0,0.6) 8%, 
-        rgba(0,0,0,1) 15%, 
-        rgba(0,0,0,1) 85%, 
-        rgba(0,0,0,0.6) 92%, 
-        transparent 100%);
-      box-shadow: 
-        inset 0 0 80px rgba(0,0,0,0.9),
-        0 0 120px rgba(0,0,0,0.8);
-    }
-
-    .drum-column::before,
-    .drum-column::after {
-      content: "";
-      position: absolute;
-      left: 0;
-      right: 0;
-      height: 25%;
-      background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.08), transparent 75%);
-      filter: blur(24px);
-      mix-blend-mode: screen;
-      opacity: 0.4;
-      pointer-events: none;
-      z-index: 10;
-    }
-
-    .drum-column::before {
-      top: 0;
-    }
-
-    .drum-column::after {
-      bottom: 0;
-    }
-
-    .drum-track {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      gap: clamp(3.5rem, 6vh, 5.5rem);
-      padding: 0;
-      animation: drum-scroll var(--scroll-duration, 40s) linear infinite;
-      animation-delay: var(--scroll-delay, 0s);
-      will-change: transform;
-    }
-
-    .drum-frame {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 3/4;
-      overflow: hidden;
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      opacity: 0;
-      transition: opacity 2s ease;
-      filter: saturate(1.15) contrast(1.08) brightness(0.85);
-      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.8);
-      border-radius: 12% 12% 12% 12% / 8% 8% 8% 8%;
-      clip-path: ellipse(90% 85% at 50% 50%);
-    }
-
-    .drum-frame.visible {
-      opacity: 1;
-    }
-
-    .drum-frame::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, 
-        rgba(0, 0, 0, 0.4) 0%, 
-        rgba(0, 0, 0, 0.1) 50%, 
-        rgba(0, 0, 0, 0.5) 100%);
-      mix-blend-mode: multiply;
-      pointer-events: none;
-    }
-
-    .drum-sheen {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: clamp(6rem, 10vw, 12rem);
-      background: linear-gradient(90deg, 
-        rgba(0,0,0,1), 
-        rgba(255, 255, 255, 0.05) 50%, 
-        rgba(0,0,0,1));
-      filter: blur(40px);
-      opacity: 0.6;
-      pointer-events: none;
-      z-index: 5;
-    }
-
-    .drum-sheen-left {
-      left: 0;
-    }
-
-    .drum-sheen-right {
-      right: 0;
-    }
-
-    .drum-glow {
-      display: none;
-    }
-
-    .drum-glow-top,
-    .drum-glow-bottom {
-      display: none;
-    }
-
-    @keyframes drum-scroll {
-      from {
-        transform: translateY(0);
-      }
-      to {
-        transform: translateY(-50%);
-      }
-    }
-
-    @media (max-width: 768px) {
-      #drum-background {
-        inset: 0;
-      }
-
-      .drum-columns {
-        gap: clamp(2rem, 6vw, 3rem);
-        padding: 0 clamp(2rem, 8vw, 4rem);
-      }
-
-      .drum-track {
-        gap: clamp(2.5rem, 5vh, 3.5rem);
-      }
-
-      .marquee-item {
-        font-size: clamp(12vw, 14vw, 16vw);
-        letter-spacing: 0.2rem;
-      }
-
-      .hero-dots {
-        bottom: 20%;
-        left: clamp(1.5rem, 6vw, 2.5rem);
-        font-size: 0.65rem;
-        letter-spacing: 0.22rem;
-        gap: 0.5rem;
-      }
-
-      .dot-sep {
-        font-size: 0.95rem;
-      }
-    }
-
-    @media (pointer: coarse) {
-      .hero-stage {
-        cursor: auto;
-      }
-
-      #cursor-distortion {
-        display: none !important;
-      }
-    }
-
-    /* Marquee styles */
-    .marquee {
-      width: 100%;
-      display: block;
-      overflow: hidden;
-    }
-
-    .marquee-track {
-      display: inline-flex;
-      gap: clamp(2.4rem, 4vw, 4.8rem);
-      align-items: center;
-      will-change: transform;
-    }
-
-    .marquee-item {
-      font-family: 'Bebas Neue', 'Oswald', 'Impact', 'Arial Black', sans-serif;
-      font-weight: 600;
-      font-size: clamp(5vw, 4.5vw + 1.5rem, 8vw);
-      letter-spacing: clamp(0.35rem, 0.7vw, 0.9rem);
-      white-space: nowrap;
-      background: linear-gradient(165deg, 
-        rgba(255, 255, 255, 0.95) 0%,
-        rgba(255, 255, 255, 0.88) 25%,
-        rgba(220, 240, 255, 0.65) 50%,
-        rgba(180, 210, 240, 0.45) 75%,
-        rgba(160, 195, 230, 0.35) 100%);
-      background-clip: text;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      filter: 
-        drop-shadow(0 2px 4px rgba(255, 255, 255, 0.4))
-        drop-shadow(0 8px 24px rgba(0, 0, 0, 0.3))
-        drop-shadow(0 0 20px rgba(255, 255, 255, 0.15));
-      pointer-events: auto;
-      display: inline-block;
-      line-height: 1;
-      padding: 0;
-      position: relative;
-      text-shadow: 
-        0 1px 2px rgba(255, 255, 255, 0.5),
-        0 -1px 2px rgba(255, 255, 255, 0.3),
-        0 4px 12px rgba(0, 0, 0, 0.2);
-    }
-
-    .mi-letter {
-      display: inline-block;
-      transition: filter 220ms ease, opacity 220ms ease;
-    }
-
-    .mi-letter:hover {
-      opacity: 0.5;
-      filter: blur(8px);
-      cursor: pointer;
-    }
-
-    .marquee-right .marquee-track {
-      animation: marquee-right var(--marquee-duration, 24s) linear infinite;
-      animation-delay: var(--marquee-delay, 1s);
-      animation-fill-mode: both;
-      transform: translateX(var(--marquee-start, 0%));
-    }
-
-    .marquee-left .marquee-track {
-      animation: marquee-left var(--marquee-duration, 24s) linear infinite;
-      animation-delay: var(--marquee-delay, 1.4s);
-      animation-fill-mode: both;
-      transform: translateX(var(--marquee-start, -50%));
-    }
-
-    @keyframes marquee-right {
-      0% { transform: translateX(var(--marquee-start, 0%)); }
-      100% { transform: translateX(var(--marquee-end, -50%)); }
-    }
-
-    @keyframes marquee-left {
-      0% { transform: translateX(var(--marquee-start, -50%)); }
-      100% { transform: translateX(var(--marquee-end, 0%)); }
-    }
   </style>
-  
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      const scrollZone = document.getElementById('scroll-zone');
-      const nextSection = document.getElementById('search-section');
-      const customCursor = document.getElementById('custom-cursor');
-      const heroStage = document.querySelector('[data-hero-stage]');
-      const distortion = document.getElementById('cursor-distortion');
-      const pointerFine = window.matchMedia('(pointer: fine)').matches;
 
-      let lastCursorX = null;
-      let lastCursorY = null;
-      let lastCursorStamp = null;
-
-      // Track cursor position and show/hide custom cursor
-      let isInZone = false;
-
-        if (heroStage && distortion && pointerFine) {
-          let rafId = null;
-
-          const updateCursor = (x, y, velocity = 0) => {
-            distortion.style.left = `${x}px`;
-            distortion.style.top = `${y}px`;
-
-            // Heat intensity based on velocity
-            const intensity = Math.min(velocity * 80, 1);
-            
-            // Inner core size and blur - gets hotter/bigger with movement
-            const innerSize = 100 + intensity * 120;
-            const innerBlur = 6 + intensity * 14;
-            distortion.style.setProperty('--heat-size-inner', `${innerSize}px`);
-            distortion.style.setProperty('--heat-blur-inner', `${innerBlur}px`);
-            
-            // Outer halo size and blur with pixelation effect
-            const outerSize = 250 + intensity * 180;
-            const outerBlur = 15 + intensity * 25;
-            const backdropBlur = 16 + intensity * 24;
-            distortion.style.setProperty('--heat-size-outer', `${outerSize}px`);
-            distortion.style.setProperty('--heat-blur-outer', `${outerBlur}px`);
-            distortion.style.setProperty('--heat-backdrop-blur', `${backdropBlur}px`);
-            
-            // Twist distortion based on velocity
-            const twistAngle = intensity * 25;
-            distortion.style.setProperty('--heat-twist', `${twistAngle}deg`);
-            
-            // Hue rotation for color shifting effect
-            const hueShift = intensity * 30;
-            distortion.style.setProperty('--heat-hue', `${hueShift}deg`);
-          };
-
-          const activateDistortion = (evt) => {
-            distortion.classList.add('active');
-            if (evt) {
-              updateCursor(evt.clientX, evt.clientY, 0);
-            }
-          };
-
-          const deactivateDistortion = () => {
-            distortion.classList.remove('active');
-            if (rafId) {
-              cancelAnimationFrame(rafId);
-              rafId = null;
-            }
-          };
-
-          let lastX = null;
-          let lastY = null;
-          let lastTime = null;
-
-          heroStage.addEventListener('mouseenter', activateDistortion);
-          heroStage.addEventListener('mouseleave', deactivateDistortion);
-          heroStage.addEventListener('mousemove', (evt) => {
-            const now = performance.now();
-            let velocity = 0;
-
-            if (lastX !== null && lastY !== null && lastTime !== null) {
-              const dx = evt.clientX - lastX;
-              const dy = evt.clientY - lastY;
-              const distance = Math.hypot(dx, dy);
-              const dt = Math.max(now - lastTime, 16);
-              velocity = distance / dt;
-            }
-
-            lastX = evt.clientX;
-            lastY = evt.clientY;
-            lastTime = now;
-
-            // Use RAF for smooth updates
-            if (rafId) cancelAnimationFrame(rafId);
-            rafId = requestAnimationFrame(() => {
-              updateCursor(evt.clientX, evt.clientY, velocity);
-            });
-          });
-        } else if (distortion) {
-          distortion.style.display = 'none';
-        }      scrollZone.addEventListener('mouseenter', function() {
-        isInZone = true;
-        customCursor.classList.add('active');
-        customCursor.style.opacity = '1';
-      });
-      
-      scrollZone.addEventListener('mouseleave', function() {
-        isInZone = false;
-        customCursor.classList.remove('active');
-        customCursor.style.opacity = '0';
-      });
-      
-      scrollZone.addEventListener('mousemove', function(e) {
-        if (isInZone) {
-          customCursor.style.left = e.clientX + 'px';
-          customCursor.style.top = e.clientY + 'px';
-        }
-      });
-
-
-      if (scrollZone && nextSection) {
-        scrollZone.addEventListener('click', function () {
-          nextSection.scrollIntoView({ behavior: 'smooth', block: "start" });
-        });
-      }
-
-      // Auto-scroll to search section when user scrolls
-      let hasScrolledToSearch = false;
-      let scrollTimeout;
-
-      window.addEventListener('scroll', function () {
-        if (hasScrolledToSearch) return;
-
-        // If user has scrolled down at all (more than 20px)
-        if (window.scrollY > 20) {
-          hasScrolledToSearch = true;
-
-          // Clear any existing timeout
-          clearTimeout(scrollTimeout);
-
-          // Smooth scroll to search section
-          nextSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      });
-    });
-  </script>
-
-    <script>
-      // Populate marquee tracks and split text into per-letter spans for hover effect
-      (function() {
-        const ROW_REPEAT = 7;
-        const ROWS = [
-          {
-            selector: '.marquee-right .marquee-track',
-            text: 'TRACK',
-            start: '42%',
-            end: '-62%',
-            delay: 1200,
-          },
-          {
-            selector: '.marquee-left .marquee-track',
-            text: 'INSIGHTS',
-            start: '-95%',
-            end: '12%',
-            delay: 1700,
-          },
-        ];
-
-        function createItem(text) {
-          const wrap = document.createElement('div');
-          wrap.className = 'marquee-item';
-          for (const ch of text + ' ') {
-            const span = document.createElement('span');
-            span.className = 'mi-letter';
-            span.textContent = ch;
-            wrap.appendChild(span);
-          }
-          return wrap;
-        }
-
-        function populateRow({ selector, text, start, end, delay }) {
-          const trackEl = document.querySelector(selector);
-          if (!trackEl) return;
-          trackEl.innerHTML = '';
-          for (let i = 0; i < ROW_REPEAT; i++) {
-            trackEl.appendChild(createItem(text));
-          }
-          for (let i = 0; i < ROW_REPEAT; i++) {
-            trackEl.appendChild(createItem(text));
-          }
-          trackEl.style.setProperty('--marquee-start', start);
-          trackEl.style.setProperty('--marquee-end', end);
-          trackEl.style.setProperty('--marquee-delay', `${delay}ms`);
-        }
-
-        document.addEventListener('DOMContentLoaded', function () {
-          try {
-            ROWS.forEach(populateRow);
-          } catch (err) {
-            console.error('marquee init failed', err);
-          }
-        });
-      })();
-    </script>
 </div>
-</div>
-<div style="min-height: 10vh;" class="w-full bg-white relative rounded-t-full"></div>
-
-<div id="search-section" style="min-height: 100vh;" class="w-full bg-white relative">
-
-  <div class="flex h-20"></div>
-  <!-- Search box and results -->
-  <div class="flex flex-col items-center justify-center w-full max-w-2xl mx-auto pt-16 p-6 bg-white/80 rounded-2xl ">
-    <h2 class="font-impact italic text-primary text-3xl md:text-4xl font-bold mb-6"
-      style="font-family: Impact, 'Arial Black', sans-serif;">
-      Search for your school or athlete
-    </h2>
-    <form id="searchForm" class="w-full flex flex-col sm:flex-row gap-4 items-center justify-center mb-4"
-      onsubmit="return false;">
-      <input id="searchInput" name="q" type="text" placeholder="Search..."
-        class="input input-bordered input-primary w-full text-lg" autocomplete="off" />
-    </form>
-    <script>
-      // Debounced live search every 100ms
-      (function () {
-        let debounceTimer;
-        const input = document.getElementById('searchInput');
-        const form = document.getElementById('searchForm');
-        if (!input || !form) return;
-        input.addEventListener('input', function () {
-          clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => {
-            form.dispatchEvent(new Event('submit', { cancelable: true }));
-          }, 100);
-        });
-      })();
-    </script>
-    <div id="results" class="w-full mt-2 text-base-content"></div>
-  </div>
 </div>
 {% endblock %}
