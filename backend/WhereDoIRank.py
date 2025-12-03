@@ -1,6 +1,20 @@
-# import pandas as pd
-from util.db_util import Database
-from util.conversion_util import Conversion
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover - type checkers only
+    import pandas as pd  # type: ignore[import]
+else:  # pragma: no cover - runtime import occurs lazily in get_pandas
+    pd = None  # type: ignore[assignment]
+
+def get_pandas():
+    global pd  # type: ignore[assignment]
+    if pd is None:
+        import pandas  # type: ignore[import]
+
+        pd = pandas
+    return pd
+
+from backend.util.db_util import Database
+from backend.util.conversion_util import Conversion
 
 # function that figures out which place a performance mark would be in a particular meet
 def get_place(df, event, result, track_field):
@@ -22,7 +36,7 @@ def get_place(df, event, result, track_field):
         return str(len(df) + 1)
 
 
-db = Database("db/Track.db")
+db = Database("data/Track.db")
 conv = Conversion()
 
 gender = input("Enter gender (e.g. Girls or Boys): ")
@@ -53,6 +67,7 @@ elif(event_type == "Field"):
     performance = float(conv.distance_to_inches(temp))
 
 # pull all athletes from database and filter out according to desired selections and all placed athletes (no dqs, dnfs, etc)
-athletes = db.get_all_athlete_results()
+pandas = get_pandas()
+athletes = pandas.DataFrame(db.get_all_athlete_results())
 athletes = athletes[(athletes["event"] == selected_event) & (athletes["meet_type"] == "Sectional") & (athletes["year"] == year) & (athletes["result_type"] == "Final") & (athletes["gender"] == gender)]
 athletes = athletes[athletes['place'].notna()]
