@@ -1,316 +1,769 @@
 <!doctype html>
 <html lang="en" data-theme="autumn">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Track Insights</title>
-    <!-- <link href="../static/css/output.css" rel="stylesheet"> -->
-    <link href="{{ url_for('static', filename='css/output.css') }}" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-    <link href="https://cdn.jsdelivr.net/combine/npm/daisyui@5/theme/autumn.css" rel="stylesheet" type="text/css" />
 
-    <!-- Impact font via Google Fonts -->
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Impact:wght@400&display=swap');
-      @import url('https://fonts.googleapis.com/css2?family=Racing+Sans+One&display=swap');
-      @import url('https://fonts.googleapis.com/css2?family=Contrail+One&family=Racing+Sans+One&display=swap');
-      @import url('https://fonts.googleapis.com/css2?family=Contrail+One&family=Racing+Sans+One&family=Staatliches&display=swap');
-      .font-impact {
-        font-family: 'Impact', Impact, Charcoal, sans-serif;
-        font-style: italic;
-      }
-      .racing-sans-one-regular {
-        font-family: "Racing Sans One", sans-serif;
-        font-weight: 400;
-        font-style: normal;
-      }
-      .contrail-one-regular {
-        font-family: "Contrail One", sans-serif;
-        font-weight: 400;
-        font-style: normal;
-      }
-      .staatliches-regular {
-        font-family: "Staatliches", sans-serif;
-        font-weight: 400;
-        font-style: normal;
-      }
-      
-      .font-oswald-italic-bold {
-        font-family: "Oswald", sans-serif;
-        font-optical-sizing: auto;
-        font-weight: 900;
-        font-style: italic;
-      }
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Track Insights</title>
+  <!-- <link href="../static/css/output.css" rel="stylesheet"> -->
+  <link href="{{ url_for('static', filename='css/output.css') }}" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+  <link href="https://cdn.jsdelivr.net/combine/npm/daisyui@5/theme/autumn.css" rel="stylesheet" type="text/css" />
 
+  <!-- Impact font via Google Fonts -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Impact:wght@400&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Racing+Sans+One&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Contrail+One&family=Racing+Sans+One&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Contrail+One&family=Racing+Sans+One&family=Staatliches&display=swap');
 
-    </style>
-  </head>
-  <body class="min-h-screen bg-base-200 text-base-content">
+    .font-impact {
+      font-family: 'Impact', Impact, Charcoal, sans-serif;
+      font-style: italic;
+    }
 
-    <div id="loading-overlay" class="fixed inset-0 bg-white z-[9999] flex flex-col items-center justify-center">
-      <div class="text-center">
-        <div id="track-text" class="font-impact italic text-primary text-8xl md:text-9xl font-bold opacity-0" style="font-family: Impact, 'Arial Black', sans-serif;">
-          Track
-        </div>
-        <div id="insights-text" class="font-impact italic text-primary text-8xl md:text-9xl font-bold opacity-0" style="font-family: Impact, 'Arial Black', sans-serif;">
-          Insights
-        </div>
+    .racing-sans-one-regular {
+      font-family: "Racing Sans One", sans-serif;
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    .contrail-one-regular {
+      font-family: "Contrail One", sans-serif;
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    .staatliches-regular {
+      font-family: "Staatliches", sans-serif;
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    .font-oswald-italic-bold {
+      font-family: "Oswald", sans-serif;
+      font-optical-sizing: auto;
+      font-weight: 900;
+      font-style: italic;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen bg-base-200 text-base-content">
+
+  <div id="loading-overlay" class="fixed inset-0 bg-white z-[9999] flex flex-col items-center justify-center">
+    <div class="text-center">
+      <div id="track-text" class="font-impact italic text-primary text-8xl md:text-9xl font-bold opacity-0"
+        style="font-family: Impact, 'Arial Black', sans-serif;">
+        Track
+      </div>
+      <div id="insights-text" class="font-impact italic text-primary text-8xl md:text-9xl font-bold opacity-0"
+        style="font-family: Impact, 'Arial Black', sans-serif;">
+        Insights
       </div>
     </div>
+  </div>
 
-    <style>
-      @keyframes floatIn {
-        from {
-          opacity: 0;
-          transform: translateY(50px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+  <style>
+    @keyframes floatIn {
+      from {
+        opacity: 0;
+        transform: translateY(50px);
       }
-      
-      @keyframes slideOutRight {
-        from {
-          transform: translateX(0);
-          opacity: 1;
-        }
-        to {
-          transform: translateX(100%);
-          opacity: 0;
-        }
-      }
-      
-      .float-in {
-        animation: floatIn 0.2s ease-out forwards;
-      }
-      
-      .slide-out {
-        animation: slideOutRight .6s ease-in-out forwards;
-      }
-      
-      @keyframes menuSlideIn {
-        from {
-          transform: translateX(100%);
-          opacity: 0;
-        }
-        to {
-          transform: translateX(0);
-          opacity: 1;
-        }
-      }
-      
-      @keyframes menuSlideOut {
-        from {
-          transform: translateX(0);
-          opacity: 1;
-        }
-        to {
-          transform: translateX(100%);
-          opacity: 0;
-        }
-      }
-      
-      @keyframes menuItemFloatIn {
-        from {
-          opacity: 0;
-          transform: translateY(50px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-      
-      @keyframes menuItemFloatOut {
-        from {
-          opacity: 1;
-          transform: translateY(0);
-        }
-        to {
-          opacity: 0;
-          transform: translateY(50px);
-        }
-      }
-      
-      .menu-slide-in {
-        animation: menuSlideIn 0.6s ease-in-out forwards;
-      }
-      
-      .menu-slide-out {
-        animation: menuSlideOut 0.6s ease-in-out forwards;
-      }
-      
-      .menu-item-float-in {
-        animation: menuItemFloatIn 0.2s ease-out forwards;
-      }
-      
-      .menu-item-float-out {
-        animation: menuItemFloatOut 0.2s ease-out forwards;
-      }
-    </style>
 
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        const overlay = document.getElementById('loading-overlay');
-        const trackText = document.getElementById('track-text');
-        const insightsText = document.getElementById('insights-text');
-        
-        // Animate "Track" first
-        setTimeout(() => {
-          trackText.classList.add('float-in');
-        }, 250);
-        
-        // Animate "Insights" after "Track"
-        setTimeout(() => {
-          insightsText.classList.add('float-in');
-        }, 500);
-        
-        // Slide everything out to the right
-        setTimeout(() => {
-          overlay.classList.add('slide-out');
-          // Remove from DOM after animation completes
-          setTimeout(() => {
-            overlay.remove();
-          }, 600);
-        }, 2000);
-      });
-    </script>
-    
-    <div class="navbar bg-none px-2 sm:px-4 p-2 fixed top-3 left-0 w-full z-50" id="site-navbar">
-        <!-- White parallelogram background for entire navbar - always visible -->
-        <div class="navbar-bg-parallelogram"></div>
-        
-        <div class="navbar-start ml-2 sm:ml-10">
-            <a href="/" class="text-primary italic text-3xl sm:text-4xl lg:text-5xl hover:brightness-150 transition-all duration-300 ease-in-out" style="font-family: Impact, 'Arial Black', sans-serif;">Track Insights</a>
-        </div>
-        <div class="navbar-center hidden lg:flex">
-            
-        </div>
-        <div class="navbar-end mr-2 sm:mr-7">
-          <!-- Hamburger menu button for mobile -->
-          <button id="mobile-menu-btn" class="btn btn-ghost btn-circle lg:hidden z-50">
-            <svg id="hamburger-icon" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="#8c0327">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-            <svg id="close-icon" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 hidden" fill="none" viewBox="0 0 24 24" stroke="white">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes slideOutRight {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+
+      to {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+    }
+
+    .float-in {
+      animation: floatIn 0.2s ease-out forwards;
+    }
+
+    .slide-out {
+      animation: slideOutRight .6s ease-in-out forwards;
+    }
+
+    @keyframes menuSlideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes menuSlideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+
+      to {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+    }
+
+    @keyframes menuItemFloatIn {
+      from {
+        opacity: 0;
+        transform: translateY(50px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes menuItemFloatOut {
+      from {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      to {
+        opacity: 0;
+        transform: translateY(50px);
+      }
+    }
+  </style>
+
+  
+  <nav class="navbar fixed top-3 right-6 md:top-4 md:right-10 z-50 bg-transparent" aria-label="Primary">
+    <div class="navbar-start w-[1%]"></div>
+    <div class="navbar-center w-[1%]"></div>
+  <div class="navbar-end w-[98%] gap-2 sm:gap-3 relative overflow-visible">
+      <a href="{{ url_for('main.home') }}" aria-label="Home" class="nav-pill">
+        <span class="nav-pill__icon-bubble" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="nav-pill__icon" aria-hidden="true"
+            focusable="false">
+            <path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-6v-6h-4v6H4a1 1 0 0 1-1-1z" fill="none" stroke="currentColor"
+              stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+        <span class="nav-pill__label">Home</span>
+      </a>
+      <div id="search-pill" class="search-pill" data-open="false" role="button" tabindex="0" aria-expanded="false"
+        aria-controls="results">
+        <span class="search-pill__icon-bubble" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round" class="search-pill__icon">
+            <circle cx="11" cy="11" r="6" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </span>
+        <div class="search-pill__content">
+          <form id="searchForm" class="search-pill__form" role="search" onsubmit="return false;" novalidate>
+            <label for="searchInput" class="sr-only">Search for your school or athlete</label>
+            <input id="searchInput" name="q" type="text" placeholder="Search for your school or athlete"
+              autocomplete="off" class="search-pill__input" />
+          </form>
+          <button type="button" id="search-close" class="search-pill__close" aria-label="Close search">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
-          
-          <!-- Full-screen mobile menu overlay -->
-          <div id="mobile-menu" class="fixed inset-0 bg-primary z-40 lg:hidden flex-col items-center justify-center opacity-0 pointer-events-none" style="transform: translateX(100%);">
-            <nav class="flex flex-col items-center gap-8">
-              <a href="/" class="font-oswald-italic-bold text-4xl text-white hover:scale-110 transition-transform menu-link" style="opacity: 0; transform: translateY(50px);">Home</a>
-              <a href="/" class="font-oswald-italic-bold text-4xl text-gray-400 transition-transform menu-link" style="opacity: 0; transform: translateY(50px);">Queries</a>
-              <a href="/" class="font-oswald-italic-bold text-4xl text-gray-400 transition-transform menu-link" style="opacity: 0; transform: translateY(50px);">About</a>
-              <a href="/" class="font-oswald-italic-bold text-4xl text-gray-400 transition-transform menu-link" style="opacity: 0; transform: translateY(50px);">Contact</a>
-            </nav>
-          </div>
-          
-          <!-- Desktop parallelogram menu -->
-          <div class="menu menu-horizontal parallelogram-nav z-55 rounded-2xl hidden lg:flex">
-              <div class="flex">
-                <a href="/" class="font-oswald-italic-bold text-2xl backdrop-blur-none rounded-full mx-2 inline-flex items-center justify-center px-0 py-1 w-20">Home</a>
-                <p href="/" class="font-oswald-italic-bold text-2xl backdrop-blur-none rounded-full mx-2 inline-flex items-center justify-center px-0 py-1 w-20 text-gray-400">Queries</p>
-                <p href="/" class="font-oswald-italic-bold text-2xl backdrop-blur-none rounded-full mx-2 inline-flex items-center justify-center px-0 py-1 w-20 text-gray-400">About</p>
-                <p href="/" class="font-oswald-italic-bold text-2xl backdrop-blur-none rounded-full mx-2 inline-flex items-center justify-center px-0 py-1 w-20 text-gray-400">Contact</p>
-              </div>
-            </div>
         </div>
-        
-        <style>
-          /* White parallelogram background for entire navbar */
-          .navbar-bg-parallelogram {
-            position: absolute;
-            top: 0;
-            left: 0.5rem;
-            right: 0.5rem;
-            width: calc(100% - 1rem);
-            height: 100%;
-            background-color: rgb(255, 255, 255, 0.6); 
-            backdrop-filter: blur(10px);
-            transform: skewX(-15deg);
-            transform-origin: center;
-            z-index: -1;
-            border: 0px solid rgba(255, 255, 255, 0.3);
-            border-radius: 1rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      </div>
+      <button type="button" id="queries-toggle" aria-label="Queries" class="nav-pill">
+        <span class="nav-pill__icon-bubble" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" class="nav-pill__icon" fill="currentColor"
+            aria-hidden="true" focusable="false">
+            <path
+              d="m665.216 768 110.848 192h-73.856L591.36 768H433.024L322.176 960H248.32l110.848-192H160a32 32 0 0 1-32-32V192H64a32 32 0 0 1 0-64h896a32 32 0 1 1 0 64h-64v544a32 32 0 0 1-32 32H665.216zM832 192H192v512h640V192zM352 448a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0v-64a32 32 0 0 1 32-32zm160-64a32 32 0 0 1 32 32v128a32 32 0 0 1-64 0V416a32 32 0 0 1 32-32zm160-64a32 32 0 0 1 32 32v192a32 32 0 1 1-64 0V352a32 32 0 0 1 32-32z" />
+          </svg>
+        </span>
+        <span class="nav-pill__label">Queries</span>
+      </button>
+      <a href="{{ url_for('main.about') }}" id="about-toggle" aria-label="About" class="nav-pill">
+        <span class="nav-pill__icon-bubble" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="nav-pill__icon" aria-hidden="true"
+            focusable="false">
+            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <rect x="11.1" y="10.4" width="1.8" height="6.1" rx="0.9" fill="currentColor" />
+            <circle cx="12" cy="7.3" r="1.2" fill="currentColor" />
+          </svg>
+        </span>
+        <span class="nav-pill__label">About</span>
+      </a>
+      <div id="results" class="search-results-panel text-base-content"></div>
+    </div>
+  </nav>
+  
+
+  <style>
+    .search-pill {
+      --pill-closed-size: 5rem;
+      position: relative;
+      display: flex;
+      align-items: center;
+      background: #ffffff;
+      color: var(--primary-color);
+      border: 2px solid var(--primary-color);
+      border-radius: 999px;
+      width: var(--pill-closed-size);
+      height: var(--pill-closed-size);
+      padding: 0;
+      box-shadow: 0 4px 12px rgba(17, 24, 39, 0.16);
+      cursor: pointer;
+      overflow: hidden;
+      transition: width 340ms cubic-bezier(0.22, 1, 0.36, 1), height 220ms ease, padding 220ms ease, box-shadow 240ms ease;
+    }
+
+    .search-pill[data-open="true"],
+    .search-pill.open {
+      width: 80%;
+      height: auto;
+      padding: 0.45rem 0.55rem 0.45rem 0.7rem;
+      box-shadow: 0 20px 48px rgba(17, 24, 39, 0.24);
+      cursor: text;
+    }
+
+    .search-pill__icon-bubble {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: calc(var(--pill-closed-size) - 0.4rem);
+      height: calc(var(--pill-closed-size) - 0.4rem);
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      color: currentColor;
+      transition: width 220ms ease, height 220ms ease, margin 220ms ease;
+    }
+
+    .search-pill[data-open="true"] .search-pill__icon-bubble,
+    .search-pill.open .search-pill__icon-bubble {
+      position: static;
+      transform: none;
+      width: 2.5rem;
+      height: 2.5rem;
+      margin-right: 0.6rem;
+    }
+
+    .search-pill__icon {
+      width: 2.1rem;
+      height: 2.1rem;
+      /* transition: transform 220ms ease; */
+    }
+
+    .search-pill[data-open="true"] .search-pill__icon,
+    .search-pill.open .search-pill__icon {
+      width: 2.2rem;
+      height: 2.2rem;
+    }
+
+    .search-pill__content {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      width: 100%;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(0.4rem);
+      transition: opacity 160ms ease;
+    }
+
+    .search-pill[data-open="true"] .search-pill__content,
+    .search-pill.open .search-pill__content {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+
+    .search-pill__form {
+      flex: 1 1 auto;
+      display: flex;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .search-pill__input {
+      flex: 1 1 auto;
+      min-width: 0;
+      border: none;
+      background: transparent;
+      color: inherit;
+      font-size: clamp(0.95rem, 1.3vw, 1.05rem);
+      padding: 0.35rem 0.4rem;
+    }
+
+    .search-pill__input::placeholder {
+      color: rgba(140, 3, 39, 0.55);
+    }
+
+    .search-pill__input:focus-visible {
+      outline: none;
+    }
+
+    .search-pill__close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.1rem;
+      height: 2.1rem;
+      border-radius: 999px;
+      background: transparent;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.85);
+      transition: background 160ms ease, color 160ms ease,  opacity 160ms ease;
+    }
+
+    .search-pill[data-open="true"] .search-pill__close,
+    .search-pill.open .search-pill__close {
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1);
+    }
+
+    .search-pill__close:hover,
+    .search-pill__close:focus-visible {
+      background: rgba(140, 3, 39, 0.12);
+      outline: none;
+    }
+
+    .nav-pill {
+      --nav-pill-size: 3.2rem;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: var(--nav-pill-size);
+      height: var(--nav-pill-size);
+      border-radius: 999px;
+      border: 2px solid var(--primary-color);
+      background: #ffffff;
+      color: var(--primary-color);
+      padding: 0;
+      cursor: pointer;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(17, 24, 39, 0.16);
+      flex-shrink: 0;
+      flex-grow: 0;
+      transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1), padding 200ms ease, box-shadow 220ms ease,  color 180ms ease;
+    }
+
+    .nav-pill:hover,
+    .nav-pill:focus-visible,
+    .nav-pill.is-active {
+      width: calc(var(--nav-pill-size) + 5.35rem);
+      justify-content: flex-start;
+      padding: 0 0.65rem 0 0.55rem;
+      box-shadow: 0 20px 48px rgba(17, 24, 39, 0.24), 0 0 0 3px rgba(140, 3, 39, 0.2);
+      outline: none;
+    }
+
+    .nav-pill__icon-bubble {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: calc(var(--nav-pill-size) - 0.4rem);
+      height: calc(var(--nav-pill-size) - 0.4rem);
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      transition: width 200ms ease, height 200ms ease,  margin 200ms ease;
+    }
+
+    .nav-pill:hover .nav-pill__icon-bubble,
+    .nav-pill:focus-visible .nav-pill__icon-bubble,
+    .nav-pill.is-active .nav-pill__icon-bubble {
+      position: static;
+      transform: none;
+      width: 2.4rem;
+      height: 2.4rem;
+      margin-right: 0.55rem;
+    }
+
+    .nav-pill__icon {
+      width: 2rem;
+      height: 2rem;
+      /* transition: transform 200ms ease; */
+    }
+
+    .nav-pill:hover .nav-pill__icon,
+    .nav-pill:focus-visible .nav-pill__icon,
+    .nav-pill.is-active .nav-pill__icon {
+      transform: translateX(0.04rem);
+    }
+
+    .nav-pill__label {
+      font-size: clamp(0.9rem, 1.2vw, 1.05rem);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      opacity: 0;
+      transform: translateX(-0.35rem);
+      transition: opacity 160ms ease;
+      pointer-events: none;
+    }
+
+    .nav-pill:hover .nav-pill__label,
+    .nav-pill:focus-visible .nav-pill__label,
+    .nav-pill.is-active .nav-pill__label {
+      opacity: 1;
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+
+    @media (min-width: 768px) {
+      .search-pill {
+        --pill-closed-size: 3.4rem;
+      }
+
+      .nav-pill {
+        --nav-pill-size: 3.4rem;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .search-pill {
+        --pill-closed-size: 3rem;
+      }
+
+      .search-pill[data-open="true"],
+      .search-pill.open {
+        width: min(92vw, 100%);
+      }
+
+      .nav-pill {
+        --nav-pill-size: 3rem;
+      }
+
+      .nav-pill:hover,
+      .nav-pill:focus-visible,
+      .nav-pill.is-active {
+        width: calc(var(--nav-pill-size) + 4.6rem);
+      }
+    }
+
+    .search-results-panel {
+      position: absolute;
+      top: calc(100% + clamp(0.75rem, 2vw, 1.25rem));
+      left: var(--results-left, 0);
+      right: auto;
+      width: var(--results-width, min(85vw, 960px));
+      max-height: min(70vh, 540px);
+      overflow-y: auto;
+      background: rgba(255, 255, 255, 0.98);
+      border: 2px solid var(--primary-color);
+      border-radius: 1.5rem;
+      box-shadow: 0 24px 52px rgba(17, 24, 39, 0.25);
+      padding: clamp(1.15rem, 2.4vw, 1.75rem);
+      opacity: 0;
+      transform-origin: top left;
+      transform: translateY(-0.4rem) scale(0.99);
+      pointer-events: none;
+      transition: opacity 200ms ease;
+      z-index: 55;
+    }
+
+    .search-results-panel.open {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+
+    .search-results-panel ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .search-results-panel .no-results,
+    .search-results-panel .loading {
+      font-size: 0.95rem;
+      color: rgba(75, 85, 99, 0.92);
+    }
+
+    @media (max-width: 640px) {
+      .search-results-panel {
+        width: var(--results-width, min(94vw, 92vw));
+        right: auto;
+        border-radius: 1.5rem;
+      }
+    }
+  </style>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const overlay = document.getElementById('loading-overlay');
+      const trackText = document.getElementById('track-text');
+      const insightsText = document.getElementById('insights-text');
+
+      // Animate "Track" first
+      setTimeout(() => {
+        trackText.classList.add('float-in');
+      }, 250);
+
+      // Animate "Insights" after "Track"
+      setTimeout(() => {
+        insightsText.classList.add('float-in');
+      }, 500);
+
+      // Slide everything out to the right
+      setTimeout(() => {
+        overlay.classList.add('slide-out');
+        // Remove from DOM after animation completes
+        setTimeout(() => {
+          overlay.remove();
+        }, 600);
+      }, 2000);
+    });
+  </script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const scrollZone = document.getElementById('scroll-zone');
+      const customCursor = document.getElementById('custom-cursor');
+      const heroTitle = document.querySelector('.hero-title');
+      const searchPill = document.getElementById('search-pill');
+      const searchInput = document.getElementById('searchInput');
+      const searchClose = document.getElementById('search-close');
+      const searchForm = document.getElementById('searchForm');
+      const resultsPanel = document.getElementById('results');
+      const queriesButton = document.getElementById('queries-toggle');
+      const aboutButton = document.getElementById('about-toggle');
+      const navbarEnd = document.querySelector('.navbar-end');
+      let isInZone = false;
+      let isSearchOpen = false;
+      let resultsPanelTimeoutId = null;
+
+      const adjustResultsPanelBounds = () => {
+        if (!resultsPanel || !searchPill || !aboutButton || !navbarEnd) return;
+
+        const searchRect = searchPill.getBoundingClientRect();
+        const aboutRect = aboutButton.getBoundingClientRect();
+        const navbarRect = navbarEnd.getBoundingClientRect();
+
+        const leftOffset = Math.max(0, searchRect.left - navbarRect.left);
+        const width = Math.max(aboutRect.right - searchRect.left, 280);
+
+        resultsPanel.style.setProperty('--results-left', `${leftOffset}px`);
+        resultsPanel.style.setProperty('--results-width', `${width}px`);
+      };
+
+      const scheduleResultsPanelUpdate = () => {
+        adjustResultsPanelBounds();
+        requestAnimationFrame(adjustResultsPanelBounds);
+
+        if (resultsPanelTimeoutId !== null) {
+          clearTimeout(resultsPanelTimeoutId);
+        }
+
+        resultsPanelTimeoutId = setTimeout(() => {
+          adjustResultsPanelBounds();
+          resultsPanelTimeoutId = null;
+        }, 380);
+      };
+
+      const setExpanded = (value) => {
+        const expanded = value ? 'true' : 'false';
+        if (searchPill) {
+          searchPill.setAttribute('data-open', expanded);
+          searchPill.setAttribute('aria-expanded', expanded);
+          searchPill.classList.toggle('open', value);
+        }
+      };
+
+      const openSearch = () => {
+        if (!searchPill || isSearchOpen) return;
+        isSearchOpen = true;
+        setExpanded(true);
+        scheduleResultsPanelUpdate();
+        if (customCursor) {
+          customCursor.classList.remove('active');
+          customCursor.style.opacity = '0';
+        }
+        window.setTimeout(() => {
+          if (searchInput) {
+            searchInput.focus({ preventScroll: true });
+            searchInput.select();
           }
-          
-          @media (min-width: 1024px) {
-            .navbar-bg-parallelogram {
-              left: 2rem;
-              right: 2rem;
-              width: calc(100% - 4rem);
+        }, 180);
+      };
+
+      const closeSearch = () => {
+        if (!searchPill || !isSearchOpen) return;
+        isSearchOpen = false;
+        setExpanded(false);
+        if (resultsPanel) {
+          resultsPanel.classList.remove('open');
+        }
+        if (searchInput) {
+          searchInput.blur();
+        }
+      };
+
+      if (searchPill) {
+        searchPill.addEventListener('click', (event) => {
+          if (event.target.closest('#search-close')) {
+            return;
+          }
+          if (!isSearchOpen) {
+            openSearch();
+          }
+        });
+
+        searchPill.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            if (!isSearchOpen) {
+              event.preventDefault();
+              openSearch();
             }
           }
-          
-          .parallelogram-nav {
-            background-color: #8c0327; /* Track red color */
-            transform: skewX(-15deg);
-            padding: 0.75rem 1.5rem;
-            position: relative;
-            transition: background-color 0.3s ease;
-          }
-          
-          .parallelogram-nav:hover {
-            background-color: #a50430; /* Lighter red on hover */
-          }
-          
-          /* White text on red background */
-          .parallelogram-nav a {
-            color: white;
-            transition: transform 0.2s ease;
-          }
-          
-          .parallelogram-nav a:hover {
-            transform: skewX(10deg) scale(1.05);
-          }
-          
-          .parallelogram-nav > * {
-            transform: skewX(15deg); /* Counter-skew the children */
-            display: inline-block;
-            position: relative;
-            z-index: 1;
-          }
-        </style>
-    </div>
+        });
+      }
 
-    {% block content %}{% endblock %}
+      if (searchClose) {
+        searchClose.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          closeSearch();
+        });
+      }
 
-    <footer class="footer sm:footer-horizontal bg-base-100 text-black items-center p-4 relative">
-      <aside class="grid-flow-col items-center">
-        <svg
-          width="36"
-          height="36"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-          fill-rule="evenodd"
-          clip-rule="evenodd"
-          class="fill-current">
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && isSearchOpen) {
+          event.preventDefault();
+          closeSearch();
+        }
+      });
+
+      document.addEventListener('click', (event) => {
+        if (!isSearchOpen || !searchPill) return;
+        if (
+          searchPill.contains(event.target) ||
+          (resultsPanel && resultsPanel.contains(event.target)) ||
+          (queriesButton && queriesButton.contains(event.target)) ||
+          (aboutButton && aboutButton.contains(event.target))
+        ) {
+          return;
+        }
+        closeSearch();
+      });
+
+      if (heroTitle) {
+        heroTitle.addEventListener('click', openSearch);
+        heroTitle.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openSearch();
+          }
+        });
+      }
+
+      if (scrollZone) {
+        scrollZone.addEventListener('click', openSearch);
+
+        scrollZone.addEventListener('mouseenter', function () {
+          isInZone = true;
+          if (customCursor && !isSearchOpen) {
+            customCursor.classList.add('active');
+            customCursor.style.opacity = '1';
+          }
+        });
+
+        scrollZone.addEventListener('mouseleave', function () {
+          isInZone = false;
+          if (customCursor) {
+            customCursor.classList.remove('active');
+            customCursor.style.opacity = '0';
+          }
+        });
+
+        scrollZone.addEventListener('mousemove', function (e) {
+          if (isInZone && customCursor) {
+            customCursor.style.left = e.clientX + 'px';
+            customCursor.style.top = e.clientY + 'px';
+          }
+        });
+      }
+
+      if (searchForm) {
+        searchForm.addEventListener('submit', () => {
+          if (resultsPanel && searchInput && searchInput.value.trim()) {
+            resultsPanel.classList.add('open');
+          }
+        });
+      }
+
+      if (searchInput) {
+        searchInput.addEventListener('input', () => {
+          if (!isSearchOpen) {
+            openSearch();
+          }
+          if (!searchInput.value.trim() && resultsPanel) {
+            resultsPanel.classList.remove('open');
+          }
+        });
+      }
+
+      window.addEventListener('resize', scheduleResultsPanelUpdate);
+
+      scheduleResultsPanelUpdate();
+      setExpanded(false);
+    });
+  </script>
+
+  {% block content %}{% endblock %}
+
+  <footer class="hidden footer sm:footer-horizontal bg-base-100 text-black items-center p-4 relative">
+    <aside class="grid-flow-col items-center">
+      <svg width="36" height="36" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill-rule="evenodd"
+        clip-rule="evenodd" class="fill-current">
+        <path
+          d="M22.672 15.226l-2.432.811.841 2.515c.33 1.019-.209 2.127-1.23 2.456-1.15.325-2.148-.321-2.463-1.226l-.84-2.518-5.013 1.677.84 2.517c.391 1.203-.434 2.542-1.831 2.542-.88 0-1.601-.564-1.86-1.314l-.842-2.516-2.431.809c-1.135.328-2.145-.317-2.463-1.229-.329-1.018.211-2.127 1.231-2.456l2.432-.809-1.621-4.823-2.432.808c-1.355.384-2.558-.59-2.558-1.839 0-.817.509-1.582 1.327-1.846l2.433-.809-.842-2.515c-.33-1.02.211-2.129 1.232-2.458 1.02-.329 2.13.209 2.461 1.229l.842 2.515 5.011-1.677-.839-2.517c-.403-1.238.484-2.553 1.843-2.553.819 0 1.585.509 1.85 1.326l.841 2.517 2.431-.81c1.02-.33 2.131.211 2.461 1.229.332 1.018-.21 2.126-1.23 2.456l-2.433.809 1.622 4.823 2.433-.809c1.242-.401 2.557.484 2.557 1.838 0 .819-.51 1.583-1.328 1.847m-8.992-6.428l-5.01 1.675 1.619 4.828 5.011-1.674-1.62-4.829z">
+        </path>
+      </svg>
+      <p>Copyright © 2025 - All right reserved</p>
+    </aside>
+    <nav class="grid-flow-col gap-4 md:place-self-center md:justify-self-end">
+      <a href="https://www.instagram.com/trackinsights/" target="_blank" rel="noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="fill-current">
           <path
-            d="M22.672 15.226l-2.432.811.841 2.515c.33 1.019-.209 2.127-1.23 2.456-1.15.325-2.148-.321-2.463-1.226l-.84-2.518-5.013 1.677.84 2.517c.391 1.203-.434 2.542-1.831 2.542-.88 0-1.601-.564-1.86-1.314l-.842-2.516-2.431.809c-1.135.328-2.145-.317-2.463-1.229-.329-1.018.211-2.127 1.231-2.456l2.432-.809-1.621-4.823-2.432.808c-1.355.384-2.558-.59-2.558-1.839 0-.817.509-1.582 1.327-1.846l2.433-.809-.842-2.515c-.33-1.02.211-2.129 1.232-2.458 1.02-.329 2.13.209 2.461 1.229l.842 2.515 5.011-1.677-.839-2.517c-.403-1.238.484-2.553 1.843-2.553.819 0 1.585.509 1.85 1.326l.841 2.517 2.431-.81c1.02-.33 2.131.211 2.461 1.229.332 1.018-.21 2.126-1.23 2.456l-2.433.809 1.622 4.823 2.433-.809c1.242-.401 2.557.484 2.557 1.838 0 .819-.51 1.583-1.328 1.847m-8.992-6.428l-5.01 1.675 1.619 4.828 5.011-1.674-1.62-4.829z"></path>
+            d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z">
+          </path>
         </svg>
-        <p>Copyright © 2025 - All right reserved</p>
-      </aside>
-      <nav class="grid-flow-col gap-4 md:place-self-center md:justify-self-end">
-        <a href="https://www.instagram.com/trackinsights/" target="_blank" rel="noopener noreferrer">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            class="fill-current">
-            <path
-              d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z"></path>
-          </svg>
-        </a>
-      </nav>
-    </footer>
-    
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-  </body>
+      </a>
+    </nav>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+
 </html>
