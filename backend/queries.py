@@ -3,7 +3,15 @@ from functools import lru_cache
 from sqlalchemy import or_, func, and_
 from sqlalchemy.orm import joinedload
 
-from .models import Athlete, School, AthleteResult, Meet, Event, SchoolEnrollment
+from .models import (
+    Athlete,
+    School,
+    AthleteResult,
+    RelayResult,
+    Meet,
+    Event,
+    SchoolEnrollment,
+)
 from . import db
 
 
@@ -63,41 +71,62 @@ def search_bar(query_text: str):
     
     # Build SQL filters for performance - only fetch potential matches
     # Use OR to get all records that match ANY query word
-    school_filters = []
-    for word in query_words:
-        school_filters.append(School.school_name.ilike(f"%{word}%"))
-    
+    school_filters = [School.school_name.ilike(f"%{word}%") for word in query_words]
+
     # Get filtered schools (all that match - no limit)
-    schools = School.query.filter(or_(*school_filters)).all() if school_filters else []
+    schools_query = (
+        db.session.query(School.school_id, School.school_name)
+        .filter(or_(*school_filters))
+    ) if school_filters else None
+    schools = schools_query.all() if schools_query is not None else []
     
     # Build athlete filters - athlete matches ANY word in first, last, or school name
     athlete_filters = []
     for word in query_words:
-        athlete_filters.append(Athlete.first.ilike(f"%{word}%"))
-        athlete_filters.append(Athlete.last.ilike(f"%{word}%"))
-        athlete_filters.append(School.school_name.ilike(f"%{word}%"))
-    
+        like_pattern = f"%{word}%"
+        athlete_filters.extend([
+            Athlete.first.ilike(like_pattern),
+            Athlete.last.ilike(like_pattern),
+            School.school_name.ilike(like_pattern),
+        ])
+
     # Get filtered athletes (all that match - no limit)
-    athletes = Athlete.query.join(School).filter(or_(*athlete_filters)).all() if athlete_filters else []
+    if athlete_filters:
+        athletes_query = (
+            db.session.query(
+                Athlete.athlete_id,
+                Athlete.first,
+                Athlete.last,
+                Athlete.gender,
+                Athlete.graduation_year,
+                School.school_name.label("school_name"),
+            )
+            .join(School, Athlete.school_id == School.school_id, isouter=True)
+            .filter(or_(*athlete_filters))
+        )
+        athletes = athletes_query.all()
+    else:
+        athletes = []
     
     results = []
     
     # Score schools
-    for school in schools:
-        score = _calculate_score(school.school_name, query_words)
+    for school_id, school_name in schools:
+        score = _calculate_score(school_name, query_words)
         if score > -20:  # Only include if at least one match
             results.append({
                 "type": "school",
-                "id": school.school_id,
-                "name": school.school_name,
+                "id": school_id,
+                "name": school_name,
                 "score": score,
                 "priority": 1  # Schools have higher priority
             })
     
     # Score athletes
     for athlete in athletes:
-        athlete_name = f"{athlete.first} {athlete.last}"
-        school_name = athlete.school.school_name if athlete.school else ""
+        athlete_id = athlete.athlete_id
+        athlete_name = f"{athlete.first} {athlete.last}".strip()
+        school_name = getattr(athlete, "school_name", "") or ""
         
         # Calculate combined score: check if query words match across name + school
         score = _calculate_combined_score(athlete_name, school_name, query_words)
@@ -105,11 +134,12 @@ def search_bar(query_text: str):
         if score > -20:  # Only include if at least one match
             results.append({
                 "type": "athlete",
-                "id": athlete.athlete_id,
+                "id": athlete_id,
                 "name": athlete_name,
-                "school": athlete.school.school_name if athlete.school else None,
+                "school": school_name or None,
                 "gender": athlete.gender,
                 "graduation_year": athlete.graduation_year,
+                "classYear": athlete.graduation_year,
                 "score": score,
                 "priority": 2  # Athletes have lower priority
             })
@@ -135,6 +165,10 @@ def _calculate_score(text: str, query_words: list) -> float:
     - -999 for each query word that doesn't match
     - Final score divided by length of text
     """
+
+    #remove schools from search results
+    return -999
+
     text_lower = text.lower()
     text_words = text_lower.split()
     
@@ -283,6 +317,13 @@ def _compute_badges(athlete_id: int):
         .all()
     )
 
+    relay_rows = _fetch_relay_rows_for_athlete(
+        athlete_id,
+        meet_types={"Sectional", "Regional", "State"},
+    )
+    for relay_result, meet, _event in relay_rows:
+        stage_results.append((relay_result, meet))
+
     sectional = [item for item in stage_results if item[1].meet_type == "Sectional"]
     regional = [item for item in stage_results if item[1].meet_type == "Regional"]
     state = [item for item in stage_results if item[1].meet_type == "State"]
@@ -304,7 +345,7 @@ def _compute_sectional_badge(results):
         if res.place is None or res.place <= 0:
             continue
 
-        field_size = _get_field_size(res.meet_id, res.event, res.result_type)
+        field_size = _get_field_size(res.meet_id, res.event, getattr(res, "result_type", "Final"))
         if not field_size:
             continue
 
@@ -368,6 +409,13 @@ def _build_playoff_history(athlete_id: int):
         .all()
     )
 
+    relay_rows = _fetch_relay_rows_for_athlete(
+        athlete_id,
+        meet_types={"Sectional", "Regional", "State"},
+    )
+    for relay_result, meet, _event in relay_rows:
+        results.append((relay_result, meet))
+
     if not results:
         return []
 
@@ -389,8 +437,13 @@ def _build_playoff_history(athlete_id: int):
         candidate = {
             "result": res.result,
             "place": res.place,
-            "result_type": res.result_type,
+            "result_type": getattr(res, "result_type", "Final"),
             "formatted": _format_stage_result(res.result, res.place),
+            "meet_id": getattr(res, "meet_id", None),
+            "result_value": getattr(res, "result2", None),
+            "grade": getattr(res, "grade", None),
+            "event": res.event,
+            "source": res.__class__.__name__,
         }
         entry[meet.meet_type] = _select_preferred_result(entry[meet.meet_type], candidate)
 
@@ -400,14 +453,35 @@ def _build_playoff_history(athlete_id: int):
             {
                 "year": values["year"],
                 "event": values["event"],
-                "sectional": values["Sectional"]["formatted"] if values["Sectional"] else "–",
-                "regional": values["Regional"]["formatted"] if values["Regional"] else "–",
-                "state": values["State"]["formatted"] if values["State"] else "–",
+                "sectional": _serialize_history_stage(values["Sectional"], "Sectional", values["event"]),
+                "regional": _serialize_history_stage(values["Regional"], "Regional", values["event"]),
+                "state": _serialize_history_stage(values["State"], "State", values["event"]),
             }
         )
 
     history_rows.sort(key=lambda row: (-row["year"], row["event"]))
     return history_rows
+
+
+def _serialize_history_stage(stage_entry, meet_type, event_name):
+    if not stage_entry:
+        return None
+
+    is_relay = stage_entry.get("source") == "RelayResult"
+    meet_id = stage_entry.get("meet_id")
+    result_type = stage_entry.get("result_type")
+
+    return {
+        "text": stage_entry.get("formatted") or "–",
+        "result": stage_entry.get("result"),
+        "result_value": stage_entry.get("result_value"),
+        "place": stage_entry.get("place"),
+        "result_type": result_type,
+        "meet_id": meet_id,
+        "event": event_name,
+        "meet_type": meet_type,
+        "has_detail": bool(meet_id and not is_relay and result_type),
+    }
 
 
 def get_athlete_personal_bests(athlete_id: int, min_year: int = 2022, athlete_obj=None):
@@ -439,9 +513,6 @@ def get_athlete_personal_bests(athlete_id: int, min_year: int = 2022, athlete_ob
         .all()
     )
 
-    if not results:
-        return []
-
     grouped = {}
     for result, meet, event in results:
         bucket = grouped.setdefault(
@@ -453,6 +524,26 @@ def get_athlete_personal_bests(athlete_id: int, min_year: int = 2022, athlete_ob
         )
         bucket["items"].append((result, meet))
 
+    relay_entries = _fetch_relay_rows_for_athlete(
+        athlete_id,
+        min_year=min_year,
+    )
+
+    for relay_result, meet, event in relay_entries:
+        if meet.year is None or (min_year is not None and meet.year < min_year):
+            continue
+        bucket = grouped.setdefault(
+            event.event,
+            {
+                "event_type": event.event_type,
+                "items": [],
+            },
+        )
+        bucket["items"].append((relay_result, meet))
+
+    if not grouped:
+        return []
+
     personal_bests = []
     for event_name, data in grouped.items():
         selection = _select_best_result_entry(data["items"], data["event_type"])
@@ -461,24 +552,27 @@ def get_athlete_personal_bests(athlete_id: int, min_year: int = 2022, athlete_ob
 
         best_result, best_meet = selection
         school_rank = None
-        if athlete.school_id is not None:
-            school_rank = _compute_rank_for_event(
+        state_rank = None
+
+        if data["event_type"] != "Relay":
+            if athlete.school_id is not None:
+                school_rank = _compute_rank_for_event(
+                    event_name,
+                    data["event_type"],
+                    athlete.athlete_id,
+                    min_year,
+                    school_id=athlete.school_id,
+                    gender=athlete.gender,
+                )
+
+            state_rank = _compute_rank_for_event(
                 event_name,
                 data["event_type"],
                 athlete.athlete_id,
                 min_year,
-                school_id=athlete.school_id,
                 gender=athlete.gender,
+                school_id=None,
             )
-
-        state_rank = _compute_rank_for_event(
-            event_name,
-            data["event_type"],
-            athlete.athlete_id,
-            min_year,
-            gender=athlete.gender,
-            school_id=None,
-        )
 
         personal_bests.append(
             {
@@ -489,7 +583,7 @@ def get_athlete_personal_bests(athlete_id: int, min_year: int = 2022, athlete_ob
                 "meet_type": best_meet.meet_type,
                 "year": best_meet.year,
                 "meet_id": best_meet.meet_id,
-                "result_type": best_result.result_type,
+                "result_type": getattr(best_result, "result_type", "Final"),
                 "school_rank": school_rank,
                 "state_rank": state_rank,
             }
@@ -530,10 +624,10 @@ def get_athlete_result_rankings(athlete_id: int, meet_id: int, event_name: str, 
     meet_type = meet.meet_type
     event_type = event.event_type
     result_grade = athlete_result.grade
-    year_key = str(year)
+    year_key = year
 
     enrollment_value = None
-    if athlete.school_id is not None and year_key:
+    if athlete.school_id is not None and year_key is not None:
         enrollment_record = (
             SchoolEnrollment.query.filter_by(
                 school_id=athlete.school_id,
@@ -671,6 +765,16 @@ def get_athlete_result_rankings(athlete_id: int, meet_id: int, event_name: str, 
             "same_grade": grade_info,
         },
     }
+
+
+def _fetch_relay_rows_for_athlete(athlete_id, meet_types=None, min_year=None):
+    if athlete_id is None:
+        return []
+
+    # The production Track.db dataset does not provide a reliable
+    # athlete-to-relay mapping, so skip relay aggregation when the
+    # necessary columns are unavailable.
+    return []
 
 
 def _select_preferred_result(existing, candidate):

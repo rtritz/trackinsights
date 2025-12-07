@@ -85,20 +85,47 @@ document.addEventListener('DOMContentLoaded', function () {
   const searchInput = document.getElementById('searchInput') || document.getElementById('search-box');
   const resultsDiv = document.getElementById('results');
   if (!form || !searchInput || !resultsDiv) return;
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const query = searchInput.value.trim();
+  
+  // Track ongoing search request to cancel if needed
+  let abortController = null;
+  
+  // Debounce timer
+  let searchTimeout = null;
+  
+  // Perform search function
+  async function performSearch(query) {
+    // Cancel any ongoing request
+    if (abortController) {
+      abortController.abort();
+    }
+    
+    // Clear any pending search
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+      searchTimeout = null;
+    }
+    
     if (!query) {
-      resultsDiv.innerHTML = '<div class="no-results">Please enter a search query</div>';
+      resultsDiv.innerHTML = '';
+      resultsDiv.classList.remove('open');
       return;
     }
+    
     resultsDiv.innerHTML = '<div class="loading">Searching...</div>';
+    resultsDiv.classList.add('open');
+    
+    // Create new abort controller for this request
+    abortController = new AbortController();
+    
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+        signal: abortController.signal
+      });
       if (!res.ok) throw new Error('Search request failed');
       const data = await res.json();
       if (data.length === 0) {
         resultsDiv.innerHTML = '<div class="no-results">No results found for "' + escapeHtml(query) + '"</div>';
+        resultsDiv.classList.add('open');
       } else {
         // Clear previous results
         resultsDiv.innerHTML = '';
@@ -158,10 +185,46 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         resultsDiv.appendChild(ul);
+        resultsDiv.classList.add('open');
       }
     } catch (error) {
+      // Don't show error if request was aborted (user is typing)
+      if (error.name === 'AbortError') {
+        return;
+      }
       resultsDiv.innerHTML = '<div class="no-results" style="color: #dc3545;">Error performing search. Please try again.</div>';
+      resultsDiv.classList.add('open');
     }
+  }
+  
+  // Form submit handler
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    // Get the CURRENT value at submit time
+    const query = searchInput.value.trim();
+    await performSearch(query);
+  });
+  
+  // Optional: Add live search as user types (debounced)
+  searchInput.addEventListener('input', function() {
+    const query = this.value.trim();
+    
+    // Clear existing timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    // Don't search if empty
+    if (!query) {
+      resultsDiv.innerHTML = '';
+      resultsDiv.classList.remove('open');
+      return;
+    }
+    
+    // Debounce: wait 500ms after user stops typing
+    searchTimeout = setTimeout(() => {
+      performSearch(query);
+    }, 500);
   });
 
   // Helper function to escape HTML
