@@ -78,9 +78,23 @@ def test_dashboard_endpoint(client):
     assert len(playoff_history) == 3
     row_400 = next(item for item in playoff_history if item['event'] == '400m')
     assert row_400['year'] == 2024
-    assert '2nd' in row_400['sectional'] or '1st' in row_400['sectional']
-    assert '6th' in row_400['regional']
-    assert '10th' in row_400['state']
+
+    sectional_entry = row_400['sectional']
+    assert sectional_entry is not None
+    assert sectional_entry['has_detail']
+    assert sectional_entry['meet_type'] == 'Sectional'
+    assert sectional_entry['event'] == '400m'
+    assert '2nd' in sectional_entry['text'] or '1st' in sectional_entry['text']
+
+    regional_entry = row_400['regional']
+    assert regional_entry is not None
+    assert regional_entry['has_detail']
+    assert '6th' in regional_entry['text']
+
+    state_entry = row_400['state']
+    assert state_entry is not None
+    assert state_entry['has_detail']
+    assert '10th' in state_entry['text']
 
     personal_bests = data['personal_bests']
     assert len(personal_bests) == 3
@@ -199,7 +213,7 @@ def seed_dashboard_data():
         SchoolEnrollment,
     )
 
-    target_year = '2024'
+    target_year = 2024
 
     def ensure_school(name, enrollment):
         school_obj = School.query.filter_by(school_name=name).first()
