@@ -1,0 +1,328 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="min-h-screen bg-white pt-20 sm:pt-24 pb-24 sm:pb-32 px-2 sm:px-4">
+  <div class="max-w-5xl mx-auto">
+    <a href="{{ url_for('main.athlete_dashboard', athlete_id=athlete_id) }}" class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-6 transition-colors">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+      </svg>
+      Back to Athlete Dashboard
+    </a>
+
+    <div id="detail-root"
+         class="hidden"
+         data-athlete-id="{{ athlete_id }}"
+         data-meet-id="{{ meet_id }}"
+         data-event-name="{{ event_name }}"
+         data-result-type="{{ result_type }}"></div>
+
+    <div id="loading-state" class="flex flex-col items-center justify-center min-h-[50vh]">
+      <div class="loading loading-spinner loading-lg text-primary"></div>
+      <p class="mt-4 text-lg text-gray-600">Crunching the numbers...</p>
+    </div>
+
+    <div id="error-state" class="hidden">
+      <div class="flex flex-col items-center justify-center min-h-[50vh] text-center">
+        <h2 class="font-impact italic text-primary text-4xl md:text-5xl font-bold mb-4" style="font-family: Impact, 'Arial Black', sans-serif;">
+          Result Not Available
+        </h2>
+        <p class="text-lg text-gray-600 mb-6">We couldn't generate rankings for this performance.</p>
+        <a href="{{ url_for('main.athlete_dashboard', athlete_id=athlete_id) }}" class="btn btn-primary rounded-full">Return to Dashboard</a>
+      </div>
+    </div>
+
+    <div id="detail-content" class="hidden space-y-8">
+      <div class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-lg">
+        <h1 id="result-title" class="font-impact italic text-primary text-3xl sm:text-4xl font-bold mb-2" style="font-family: Impact, 'Arial Black', sans-serif;"></h1>
+        <p id="result-subtitle" class="text-lg sm:text-xl text-gray-700 mb-3"></p>
+        <div class="flex flex-wrap gap-2 text-sm sm:text-base text-gray-600" id="result-tags"></div>
+      </div>
+
+      <div id="rankings-container" class="grid gap-6 md:gap-8"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // @ts-nocheck
+  document.addEventListener('DOMContentLoaded', async () => {
+    const detailRoot = document.getElementById('detail-root');
+    const loadingState = document.getElementById('loading-state');
+    const errorState = document.getElementById('error-state');
+    const detailContent = document.getElementById('detail-content');
+    const rankingsContainer = document.getElementById('rankings-container');
+
+    const athleteId = Number(detailRoot?.dataset?.athleteId);
+    const meetId = Number(detailRoot?.dataset?.meetId);
+    const eventName = detailRoot?.dataset?.eventName || '';
+    const resultType = detailRoot?.dataset?.resultType || 'Final';
+
+    if (!Number.isFinite(athleteId) || !Number.isFinite(meetId) || !eventName) {
+      console.error('Missing identifiers for result detail view.');
+      loadingState.classList.add('hidden');
+      errorState.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams({
+        meet_id: meetId,
+        event: eventName,
+        result_type: resultType,
+      });
+
+      const response = await fetch(`/api/athletes/${athleteId}/result-rankings?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error('Ranking data not found');
+      }
+
+      const data = await response.json();
+      if (!data || !data.rankings) {
+        throw new Error('Incomplete ranking payload');
+      }
+
+      loadingState.classList.add('hidden');
+      detailContent.classList.remove('hidden');
+
+      renderSummary(data);
+      renderRankings(data.rankings, rankingsContainer);
+    } catch (error) {
+      console.error('Error loading ranking detail:', error);
+      loadingState.classList.add('hidden');
+      errorState.classList.remove('hidden');
+    }
+
+    function renderSummary(data) {
+      const { context, target_result: target } = data;
+      const titleEl = document.getElementById('result-title');
+      const subtitleEl = document.getElementById('result-subtitle');
+      const tagsEl = document.getElementById('result-tags');
+
+      titleEl.textContent = `${context.event} • ${context.meet_type}`;
+
+      const placeText = target.place ? `Placed ${ordinal(target.place)}` : 'Placement unavailable';
+      subtitleEl.textContent = `${target.result} (${context.result_type}) — ${placeText}`;
+
+      tagsEl.innerHTML = '';
+      tagsEl.appendChild(buildTag(`Year: ${context.year}`));
+      tagsEl.appendChild(buildTag(`Gender: ${context.gender || 'N/A'}`));
+      if (target.school_name) {
+        tagsEl.appendChild(buildTag(`School: ${target.school_name}`));
+      }
+      if (target.enrollment) {
+        tagsEl.appendChild(buildTag(`Enrollment: ${target.enrollment}`));
+      }
+      if (target.meet_host) {
+        const host = target.meet_host + (target.meet_num ? ` (Meet ${target.meet_num})` : '');
+        tagsEl.appendChild(buildTag(`Meet Host: ${host}`));
+      }
+    }
+
+    function renderRankings(rankings, container) {
+      container.innerHTML = '';
+
+      const configs = [
+        { key: 'overall', title: 'Overall Field', description: 'How this result stacks up against the full field at the meet.' },
+        { key: 'like_schools', title: 'Similar Enrollment', description: 'Comparison against schools with comparable enrollment sizes.' },
+        { key: 'same_grade', title: 'Same Grade', description: 'Comparison against athletes in the same grade.' },
+      ];
+
+      configs.forEach((config, index) => {
+        const rankingData = rankings[config.key];
+        const card = document.createElement('div');
+        card.className = 'card bg-base-100 shadow-xl overflow-hidden';
+
+        const detailId = `ranking-panel-${config.key}-${index}`;
+
+        const summaryButton = document.createElement('button');
+        summaryButton.type = 'button';
+  summaryButton.className = 'flex w-full items-center justify-between px-5 py-4 text-left bg-base-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary border-b border-base-200 cursor-pointer';
+        summaryButton.setAttribute('aria-controls', detailId);
+        summaryButton.setAttribute('aria-expanded', 'false');
+
+        const summaryInfo = document.createElement('div');
+        const title = document.createElement('h2');
+        title.className = 'text-lg sm:text-xl font-semibold text-primary';
+        title.textContent = config.title;
+        summaryInfo.appendChild(title);
+        summaryButton.appendChild(summaryInfo);
+
+        const summaryRight = document.createElement('div');
+        summaryRight.className = 'flex items-center gap-3 text-sm font-medium text-gray-700';
+
+        const summaryRank = document.createElement('span');
+        summaryRank.textContent = getSummaryText(rankingData);
+        summaryRight.appendChild(summaryRank);
+
+        const chevron = buildChevronIcon();
+        summaryRight.appendChild(chevron);
+
+        summaryButton.appendChild(summaryRight);
+
+        card.appendChild(summaryButton);
+
+        const detail = document.createElement('div');
+        detail.className = 'card-body space-y-4 hidden';
+        detail.id = detailId;
+
+        const description = document.createElement('p');
+        description.className = 'text-sm text-gray-600';
+        description.textContent = config.description;
+        detail.appendChild(description);
+
+        if (!rankingData) {
+          const empty = document.createElement('p');
+          empty.className = 'text-sm text-gray-500 italic';
+          empty.textContent = 'Not enough data to generate this ranking.';
+          detail.appendChild(empty);
+        } else {
+          const headline = document.createElement('p');
+          headline.className = 'text-lg sm:text-xl font-semibold text-gray-800';
+          headline.textContent = `Ranked ${rankingData.rank} of ${rankingData.total}`;
+          detail.appendChild(headline);
+
+          if (rankingData.criteria) {
+            const chips = document.createElement('div');
+            chips.className = 'flex flex-wrap gap-2 text-xs sm:text-sm';
+            const criteriaEntries = getCriteriaEntries(config.key, rankingData.criteria);
+            criteriaEntries.forEach(([key, value]) => {
+              chips.appendChild(buildTag(`${formatLabel(key)}: ${value}`));
+            });
+            detail.appendChild(chips);
+          }
+
+          detail.appendChild(buildLeaderboardTable(rankingData.top_results));
+        }
+
+        summaryButton.addEventListener('click', () => {
+          const isHidden = detail.classList.toggle('hidden');
+          const expanded = !isHidden;
+          summaryButton.setAttribute('aria-expanded', expanded.toString());
+          chevron.classList.toggle('rotate-180', expanded);
+        });
+
+        card.appendChild(detail);
+        container.appendChild(card);
+      });
+    }
+
+    function buildLeaderboardTable(entries) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'overflow-x-auto';
+
+  const table = document.createElement('table');
+  table.className = 'table table-compact w-full';
+
+      const thead = document.createElement('thead');
+      thead.innerHTML = `
+        <tr class="text-primary text-xs sm:text-sm uppercase">
+          <th class="w-16">Rank</th>
+          <th>Athlete</th>
+          <th class="hidden sm:table-cell">School</th>
+          <th>Result</th>
+          <th class="hidden md:table-cell">Place</th>
+        </tr>
+      `;
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      entries.forEach(entry => {
+  const tr = document.createElement('tr');
+  tr.className = entry.is_target ? 'bg-primary/10 text-primary font-semibold' : '';
+
+        const rankTd = document.createElement('td');
+        rankTd.textContent = entry.rank;
+        rankTd.className = 'text-xs sm:text-sm';
+        tr.appendChild(rankTd);
+
+        const nameTd = document.createElement('td');
+        nameTd.className = 'text-xs sm:text-sm';
+        nameTd.textContent = entry.name || '—';
+        tr.appendChild(nameTd);
+
+        const schoolTd = document.createElement('td');
+        schoolTd.className = 'hidden sm:table-cell text-xs sm:text-sm';
+        schoolTd.textContent = entry.school || '—';
+        tr.appendChild(schoolTd);
+
+        const resultTd = document.createElement('td');
+        resultTd.className = 'text-xs sm:text-sm';
+        resultTd.textContent = entry.result || '—';
+        tr.appendChild(resultTd);
+
+        const placeTd = document.createElement('td');
+        placeTd.className = 'hidden md:table-cell text-xs sm:text-sm';
+        placeTd.textContent = entry.place != null ? ordinal(entry.place) : '—';
+        tr.appendChild(placeTd);
+
+        tbody.appendChild(tr);
+      });
+
+      table.appendChild(tbody);
+      wrapper.appendChild(table);
+      return wrapper;
+    }
+
+    function getCriteriaEntries(sectionKey, criteria) {
+      const entries = Object.entries(criteria || {});
+      if (sectionKey !== 'like_schools') {
+        return entries;
+      }
+
+      const enrollmentOrder = ['enrollment','min_enrollment', 'max_enrollment'];
+      const ordered = enrollmentOrder
+        .filter(key => key in criteria)
+        .map(key => [key, criteria[key]]);
+
+      const remaining = entries.filter(([key]) => !enrollmentOrder.includes(key));
+      return [...ordered, ...remaining];
+    }
+
+    function getSummaryText(rankingData) {
+      if (!rankingData) {
+        return 'No data yet';
+      }
+      return `Rank ${rankingData.rank} / ${rankingData.total}`;
+    }
+
+    function buildChevronIcon() {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 20 20');
+      svg.setAttribute('fill', 'currentColor');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.classList.add('h-5', 'w-5', 'text-gray-500', 'transition-transform', 'duration-200');
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('fill-rule', 'evenodd');
+      path.setAttribute('clip-rule', 'evenodd');
+      path.setAttribute('d', 'M5.23 7.21a.75.75 0 011.06.02L10 11l3.71-3.77a.75.75 0 111.08 1.04l-4.25 4.32a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z');
+      svg.appendChild(path);
+
+      return svg;
+    }
+
+    function buildTag(text) {
+      const span = document.createElement('span');
+      span.className = 'badge badge-outline rounded-full px-3 py-2';
+      span.textContent = text;
+      return span;
+    }
+
+    function formatLabel(label) {
+      return label.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+    }
+
+    function ordinal(value) {
+      if (value == null) return '—';
+      const n = Number(value);
+      if (!Number.isFinite(n)) return '—';
+      const mod100 = n % 100;
+      const suffix = (mod100 >= 11 && mod100 <= 13)
+        ? 'th'
+        : { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th';
+      return `${n}${suffix}`;
+    }
+  });
+</script>
+{% endblock %}

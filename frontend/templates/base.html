@@ -174,8 +174,8 @@
         </span>
         <div class="search-pill__content">
           <form id="searchForm" class="search-pill__form" role="search" onsubmit="return false;" novalidate>
-            <label for="searchInput" class="sr-only">Search for your school or athlete</label>
-            <input id="searchInput" name="q" type="text" placeholder="Search for your school or athlete"
+            <label for="searchInput" class="sr-only">Search for your athlete's name and school</label>
+            <input id="searchInput" name="q" type="text" placeholder="Search for your athlete's name and school"
               autocomplete="off" class="search-pill__input" />
           </form>
           <button type="button" id="search-close" class="search-pill__close" aria-label="Close search">
@@ -215,7 +215,7 @@
 
   <style>
     .search-pill {
-      --pill-closed-size: 5rem;
+      --pill-closed-size: 3.4rem;
       position: relative;
       display: flex;
       align-items: center;
@@ -439,7 +439,7 @@
 
     @media (min-width: 768px) {
       .search-pill {
-        --pill-closed-size: 3.4rem;
+        --pill-closed-size: 3.8rem;
       }
 
       .nav-pill {

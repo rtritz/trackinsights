@@ -8,7 +8,6 @@ from .models import (
     School,
     AthleteResult,
     RelayResult,
-    RelayAthlete,
     Meet,
     Event,
     SchoolEnrollment,
@@ -440,6 +439,11 @@ def _build_playoff_history(athlete_id: int):
             "place": res.place,
             "result_type": getattr(res, "result_type", "Final"),
             "formatted": _format_stage_result(res.result, res.place),
+            "meet_id": getattr(res, "meet_id", None),
+            "result_value": getattr(res, "result2", None),
+            "grade": getattr(res, "grade", None),
+            "event": res.event,
+            "source": res.__class__.__name__,
         }
         entry[meet.meet_type] = _select_preferred_result(entry[meet.meet_type], candidate)
 
@@ -449,14 +453,35 @@ def _build_playoff_history(athlete_id: int):
             {
                 "year": values["year"],
                 "event": values["event"],
-                "sectional": values["Sectional"]["formatted"] if values["Sectional"] else "–",
-                "regional": values["Regional"]["formatted"] if values["Regional"] else "–",
-                "state": values["State"]["formatted"] if values["State"] else "–",
+                "sectional": _serialize_history_stage(values["Sectional"], "Sectional", values["event"]),
+                "regional": _serialize_history_stage(values["Regional"], "Regional", values["event"]),
+                "state": _serialize_history_stage(values["State"], "State", values["event"]),
             }
         )
 
     history_rows.sort(key=lambda row: (-row["year"], row["event"]))
     return history_rows
+
+
+def _serialize_history_stage(stage_entry, meet_type, event_name):
+    if not stage_entry:
+        return None
+
+    is_relay = stage_entry.get("source") == "RelayResult"
+    meet_id = stage_entry.get("meet_id")
+    result_type = stage_entry.get("result_type")
+
+    return {
+        "text": stage_entry.get("formatted") or "–",
+        "result": stage_entry.get("result"),
+        "result_value": stage_entry.get("result_value"),
+        "place": stage_entry.get("place"),
+        "result_type": result_type,
+        "meet_id": meet_id,
+        "event": event_name,
+        "meet_type": meet_type,
+        "has_detail": bool(meet_id and not is_relay and result_type),
+    }
 
 
 def get_athlete_personal_bests(athlete_id: int, min_year: int = 2022, athlete_obj=None):
@@ -599,10 +624,10 @@ def get_athlete_result_rankings(athlete_id: int, meet_id: int, event_name: str, 
     meet_type = meet.meet_type
     event_type = event.event_type
     result_grade = athlete_result.grade
-    year_key = str(year)
+    year_key = year
 
     enrollment_value = None
-    if athlete.school_id is not None and year_key:
+    if athlete.school_id is not None and year_key is not None:
         enrollment_record = (
             SchoolEnrollment.query.filter_by(
                 school_id=athlete.school_id,
@@ -746,21 +771,10 @@ def _fetch_relay_rows_for_athlete(athlete_id, meet_types=None, min_year=None):
     if athlete_id is None:
         return []
 
-    query = (
-        db.session.query(RelayResult, Meet, Event)
-        .join(RelayAthlete, RelayAthlete.relay_id == RelayResult.relay_id)
-        .join(Meet, RelayResult.meet_id == Meet.meet_id)
-        .join(Event, RelayResult.event == Event.event)
-        .filter(RelayAthlete.athlete_id == athlete_id)
-    )
-
-    if meet_types:
-        query = query.filter(Meet.meet_type.in_(tuple(meet_types)))
-
-    if min_year is not None:
-        query = query.filter(Meet.year.isnot(None), Meet.year >= min_year)
-
-    return query.all()
+    # The production Track.db dataset does not provide a reliable
+    # athlete-to-relay mapping, so skip relay aggregation when the
+    # necessary columns are unavailable.
+    return []
 
 
 def _select_preferred_result(existing, candidate):

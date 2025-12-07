@@ -118,21 +118,6 @@
     </p>
   </div> -->
 
-  <!-- Bottom 20% clickable zone with custom cursor -->
-  <div id="scroll-zone" class="cursor-none absolute bottom-0 left-0 w-full h-[20%] z-4"
-    style="pointer-events: auto; transition: opacity 0.3s ease;"></div>
-
-  <!-- Custom cursor follower -->
-  <div id="custom-cursor" class="fixed pointer-events-none z-50 opacity-0 transition-opacity duration-300"
-    style="transform: translate(-50%, -50%);">
-    <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-      <!-- Circle background -->
-      <circle cx="32" cy="32" r="30" fill="none" stroke="#8c0327" stroke-width="3" opacity="0.8" />
-      <!-- Down arrow -->
-      <path d="M 32 20 L 32 42 M 22 34 L 32 44 L 42 34" stroke="#8c0327" stroke-width="3" stroke-linecap="round"
-        stroke-linejoin="round" fill="none" />
-    </svg>
-  </div>
 
   <style>
     .hero-title {
@@ -226,11 +211,6 @@
       }
     }
 
-    /* Hide default cursor in scroll zone */
-    #scroll-zone {
-      cursor: none;
-    }
-
     /* Gentle bounce animation for "See More" text */
     @keyframes fade-bounce {
 
@@ -248,22 +228,6 @@
       animation: fade-bounce 2s ease-in-out infinite;
     }
 
-    /* Pulse animation for custom cursor */
-    @keyframes pulse-cursor {
-
-      0%,
-      100% {
-        transform: translate(-50%, -50%) scale(1);
-      }
-
-      50% {
-        transform: translate(-50%, -50%) scale(1.1);
-      }
-    }
-
-    #custom-cursor.active {
-      animation: pulse-cursor 1.5s ease-in-out infinite;
-    }
   </style>
 
 </div>
