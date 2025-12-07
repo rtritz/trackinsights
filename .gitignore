@@ -9,4 +9,4 @@ env/
 .mypy_cache/
 .vscode/
 .DS_Store
-data/Track.db
+

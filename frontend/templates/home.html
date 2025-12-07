@@ -2,26 +2,13 @@
 
 {% block content %}
 
-<!-- DaisyUI Top Navbar -->
-<!-- <div class="navbar bg-none px-4 p-2 mt-2 fixed top-0 left-0 w-full z-50">
-      
-      <div class="navbar-start">
-      </div>
-      <div class="navbar-center lg:flex">
-        <div class="menu menu-horizontal">
-          <button class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">Home</button>
-          <button class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">Queries</button>
-          <button class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">About</button>
-          <button class="backdrop-blur-md bg-white/30 btn btn-ghost rounded-full mx-2 lg:mx-5">Contact</button>
-        </div>
-      </div>
-      <div class="navbar-end">
-        </div>
-    </div> -->
+
+
 
 <!-- Z is less than 10 -->
 <div class="w-full h-screen sticky top-0">
-  <div style="isolation:isolate" class="w-full h-screen flex items-center justify-center bg-transparent relative overflow-hidden">
+  <div style="isolation:isolate"
+    class="w-full h-screen flex items-center justify-center bg-transparent relative overflow-hidden">
     <!-- Background image slideshow -->
     <div id="bg-slideshow" class="absolute top-0 left-0 w-full h-full">
       <img id="bg-image-1"
@@ -75,12 +62,12 @@
           if (currentImageElement === 1) {
             // Preload the image first to avoid gaps
             const tempImg = new Image();
-            tempImg.onload = function() {
+            tempImg.onload = function () {
               // Load the new image into img2 (underneath)
               img2.src = shuffledImages[currentIndex];
               img2.style.opacity = '1';
               img2.style.zIndex = '0';
-              
+
               // Fade out img1 (on top) to reveal img2
               img1.style.zIndex = '1';
               img1.style.opacity = '0';
@@ -90,12 +77,12 @@
           } else {
             // Preload the image first to avoid gaps
             const tempImg = new Image();
-            tempImg.onload = function() {
+            tempImg.onload = function () {
               // Load the new image into img1 (underneath)
               img1.src = shuffledImages[currentIndex];
               img1.style.opacity = '1';
               img1.style.zIndex = '0';
-              
+
               // Fade out img2 (on top) to reveal img1
               img2.style.zIndex = '1';
               img2.style.opacity = '0';
@@ -113,174 +100,136 @@
       })();
     </script>
 
-    <!-- <div class="w-full flex justify-center items-center z-2 relative" style="pointer-events: none;"> -->
-    <!-- <div class="w-screen absolute left-1/2 -translate-x-1/2 top-1/2 z-30 pointer-events-none">
-            <span class="block text-center font-impact italic text-primary text-[12vw] sm:text-[14vw] md:text-[16vw] lg:text-[18vw] xl:text-[20vw] font-bold drop-shadow-lg select-none" style="line-height:1.1;">Track</span>
-          </div>
-          <div class="w-screen absolute left-1/2 -translate-x-1/2 top-1/2 z-30 pointer-events-none">
-            <span class="block text-center font-impact italic text-primary text-[12vw] sm:text-[14vw] md:text-[16vw] lg:text-[18vw] xl:text-[20vw] font-bold drop-shadow-lg select-none" style="line-height:1.1;">Insights</span>
-          </div> -->
-    <!-- <div class="w-screen absolute left-1/2 -translate-x-1/2 top-1/2 pointer-events-none"> -->
-    <!-- <img src="../static/images/Track_Insights_Text.png" alt="Track Insights"
-      style="height:60vh; width:80vw; mix-blend-mode:lighten;"
-      class="filter drop-shadow-2xl brightness-50 absolute  left-1/2 top-1/2 -translate-x-[52%] -translate-y-[58%] lg:-translate-y-[60%] select-none z-2 "
-      style="pointer-events: none;" />
-      <img src="../static/images/Track_Insights_Text.png" alt="Track Insights"
-      style="height:60vh; width:80vw; opacity:80%"
-      class=" drop-shadow-2xl absolute left-1/2 top-1/2 -translate-x-[52%] -translate-y-[58%] lg:-translate-y-[60%] select-none z-2 "
-      style="pointer-events: none;" /> -->
-    
-
-    <!-- </div>   -->
+    <div class="hero-title" tabindex="0">
+      <span class="hero-title__text">
+        Track Insights
+      </span>
+      <!-- <span class="hero-title__hint">Press to search for your athlete</span> -->
+    </div>
   </div>
   <!-- <img src="../static/images/Track_Insights_Text.png" alt="Track Insights" style="height:60vh; width:80vw;"
       class="isolate brightness-100 opacity-50 absolute left-1/2 top-1/2 -translate-x-[52%] -translate-y-[58%] lg:-translate-y-[60%] select-none z-2"
       style="pointer-events: none;" /> -->
-  
+
   <!-- See more text hint -->
-  <div class="absolute bottom-8 left-1/2 -translate-x-1/2 z-3 pointer-events-none" style="isolation: isolate;">
-    <p class="text-white text-sm font-semibold tracking-widest uppercase animate-fade-bounce" style="mix-blend-mode:difference; filter: contrast(2);">
+  <!-- <div class="absolute bottom-8 left-1/2 -translate-x-1/2 z-3 pointer-events-none" style="isolation: isolate;">
+    <p class="text-white text-xl font-semibold tracking-widest uppercase animate-fade-bounce">
       See More
     </p>
-  </div>
+  </div> -->
 
-  <!-- Bottom 20% clickable zone with custom cursor -->
-  <div id="scroll-zone" class="cursor-none absolute bottom-0 left-0 w-full h-[20%] z-4" style="pointer-events: auto; transition: opacity 0.3s ease;"></div>
-  
-  <!-- Custom cursor follower -->
-  <div id="custom-cursor" class="fixed pointer-events-none z-50 opacity-0 transition-opacity duration-300" style="transform: translate(-50%, -50%);">
-    <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-      <!-- Circle background -->
-      <circle cx="32" cy="32" r="30" fill="none" stroke="#8c0327" stroke-width="3" opacity="0.8"/>
-      <!-- Down arrow -->
-      <path d="M 32 20 L 32 42 M 22 34 L 32 44 L 42 34" stroke="#8c0327" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-    </svg>
-  </div>
-  
+
   <style>
-    /* Hide default cursor in scroll zone */
-    #scroll-zone {
-      cursor: none;
+    .hero-title {
+      position: relative;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(2rem, 5vw, 4rem) clamp(3rem, 8vw, 6rem);
+      text-transform: uppercase;
+      letter-spacing: clamp(0.3rem, 1vw, 1.4rem);
+      font-family: Impact, 'Arial Black', sans-serif;
+      font-size: clamp(3.5rem, 8vw, 8rem);
+      color: rgba(255, 255, 255, 0.92);
+      text-align: center;
+      cursor: pointer;
+      border-radius: clamp(1.5rem, 4vw, 3.5rem);
+      transition: transform 450ms cubic-bezier(0.19, 1, 0.22, 1),
+        letter-spacing 450ms cubic-bezier(0.19, 1, 0.22, 1),
+        color 300ms ease;
+      isolation: isolate;
     }
-    
+
+    .hero-title::before {
+      content: '';
+      position: absolute;
+      inset: clamp(-2.5rem, -3vw, -1.5rem);
+      border-radius: inherit;
+      background: rgba(6, 6, 12, 0.4);
+      backdrop-filter: blur(0px);
+      -webkit-backdrop-filter: blur(0px);
+      opacity: 0;
+      transform: scale(0.94);
+      transition: opacity 350ms ease, transform 450ms cubic-bezier(0.19, 1, 0.22, 1),
+        backdrop-filter 350ms ease, -webkit-backdrop-filter 350ms ease;
+      z-index: -1;
+    }
+
+    .hero-title__text {
+      display: block;
+      line-height: 0.85;
+      filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.45));
+      transition: filter 350ms ease;
+    }
+
+    .hero-title__hint {
+      margin-top: clamp(0.5rem, 1.2vw, 1rem);
+      font-size: clamp(0.75rem, 1.4vw, 1.2rem);
+      letter-spacing: 0.45em;
+      color: rgba(255, 255, 255, 0.65);
+      font-family: 'Poppins', 'Segoe UI', sans-serif;
+      text-transform: uppercase;
+      transition: opacity 250ms ease, transform 300ms ease;
+    }
+
+    .hero-title:hover,
+    .hero-title:focus-visible {
+      transform: translateY(-6px) scale(1.02);
+      letter-spacing: clamp(0.35rem, 1.1vw, 1.5rem);
+      color: #fff9ec;
+    }
+
+    .hero-title:hover::before,
+    .hero-title:focus-visible::before {
+      opacity: 1;
+      transform: scale(1.02);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .hero-title:hover .hero-title__text,
+    .hero-title:focus-visible .hero-title__text {
+      filter: drop-shadow(0 22px 38px rgba(0, 0, 0, 0.55));
+    }
+
+    .hero-title:hover .hero-title__hint,
+    .hero-title:focus-visible .hero-title__hint {
+      opacity: 0.85;
+      transform: translateY(-2px);
+    }
+
+    @media (max-width: 640px) {
+      .hero-title {
+        padding: clamp(1.5rem, 6vw, 3rem) clamp(1.75rem, 7vw, 3.5rem);
+        letter-spacing: clamp(0.2rem, 1.5vw, 0.8rem);
+      }
+
+      .hero-title::before {
+        inset: clamp(-1.75rem, -4vw, -1rem);
+      }
+    }
+
     /* Gentle bounce animation for "See More" text */
     @keyframes fade-bounce {
-      0%, 100% {
+
+      0%,
+      100% {
         transform: translateY(0px);
       }
+
       50% {
         transform: translateY(-5px);
       }
     }
-    
+
     .animate-fade-bounce {
       animation: fade-bounce 2s ease-in-out infinite;
     }
-    
-    /* Pulse animation for custom cursor */
-    @keyframes pulse-cursor {
-      0%, 100% {
-        transform: translate(-50%, -50%) scale(1);
-      }
-      50% {
-        transform: translate(-50%, -50%) scale(1.1);
-      }
-    }
-    
-    #custom-cursor.active {
-      animation: pulse-cursor 1.5s ease-in-out infinite;
-    }
+
   </style>
-  
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      const scrollZone = document.getElementById('scroll-zone');
-      const nextSection = document.getElementById('search-section');
-      const customCursor = document.getElementById('custom-cursor');
 
-      // Track cursor position and show/hide custom cursor
-      let isInZone = false;
-      
-      scrollZone.addEventListener('mouseenter', function() {
-        isInZone = true;
-        customCursor.classList.add('active');
-        customCursor.style.opacity = '1';
-      });
-      
-      scrollZone.addEventListener('mouseleave', function() {
-        isInZone = false;
-        customCursor.classList.remove('active');
-        customCursor.style.opacity = '0';
-      });
-      
-      scrollZone.addEventListener('mousemove', function(e) {
-        if (isInZone) {
-          customCursor.style.left = e.clientX + 'px';
-          customCursor.style.top = e.clientY + 'px';
-        }
-      });
-
-
-      if (scrollZone && nextSection) {
-        scrollZone.addEventListener('click', function () {
-          nextSection.scrollIntoView({ behavior: 'smooth', block: "start" });
-        });
-      }
-
-      // Auto-scroll to search section when user scrolls
-      let hasScrolledToSearch = false;
-      let scrollTimeout;
-
-      window.addEventListener('scroll', function () {
-        if (hasScrolledToSearch) return;
-
-        // If user has scrolled down at all (more than 20px)
-        if (window.scrollY > 20) {
-          hasScrolledToSearch = true;
-
-          // Clear any existing timeout
-          clearTimeout(scrollTimeout);
-
-          // Smooth scroll to search section
-          nextSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      });
-    });
-  </script>
 </div>
-</div>
-<div style="min-height: 10vh;" class="w-full bg-white relative rounded-t-full"></div>
-
-<div id="search-section" style="min-height: 100vh;" class="w-full bg-white relative">
-
-  <div class="flex h-20"></div>
-  <!-- Search box and results -->
-  <div class="flex flex-col items-center justify-center w-full max-w-2xl mx-auto pt-16 p-6 bg-white/80 rounded-2xl ">
-    <h2 class="font-impact italic text-primary text-3xl md:text-4xl font-bold mb-6"
-      style="font-family: Impact, 'Arial Black', sans-serif;">
-      Search for your school or athlete
-    </h2>
-    <form id="searchForm" class="w-full flex flex-col sm:flex-row gap-4 items-center justify-center mb-4"
-      onsubmit="return false;">
-      <input id="searchInput" name="q" type="text" placeholder="Search..."
-        class="input input-bordered input-primary w-full text-lg" autocomplete="off" />
-    </form>
-    <script>
-      // Debounced live search every 100ms
-      (function () {
-        let debounceTimer;
-        const input = document.getElementById('searchInput');
-        const form = document.getElementById('searchForm');
-        if (!input || !form) return;
-        input.addEventListener('input', function () {
-          clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => {
-            form.dispatchEvent(new Event('submit', { cancelable: true }));
-          }, 100);
-        });
-      })();
-    </script>
-    <div id="results" class="w-full mt-2 text-base-content"></div>
-  </div>
 </div>
 {% endblock %}
