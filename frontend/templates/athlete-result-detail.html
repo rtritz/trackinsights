@@ -128,51 +128,81 @@
         { key: 'same_grade', title: 'Same Grade', description: 'Comparison against athletes in the same grade.' },
       ];
 
-      configs.forEach(config => {
+      configs.forEach((config, index) => {
         const rankingData = rankings[config.key];
         const card = document.createElement('div');
-        card.className = 'card bg-base-100 shadow-xl';
+        card.className = 'card bg-base-100 shadow-xl overflow-hidden';
 
-        const body = document.createElement('div');
-        body.className = 'card-body space-y-4';
+        const detailId = `ranking-panel-${config.key}-${index}`;
 
-        const header = document.createElement('div');
+        const summaryButton = document.createElement('button');
+        summaryButton.type = 'button';
+  summaryButton.className = 'flex w-full items-center justify-between px-5 py-4 text-left bg-base-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary border-b border-base-200 cursor-pointer';
+        summaryButton.setAttribute('aria-controls', detailId);
+        summaryButton.setAttribute('aria-expanded', 'false');
+
+        const summaryInfo = document.createElement('div');
         const title = document.createElement('h2');
-        title.className = 'card-title text-primary text-xl sm:text-2xl';
+        title.className = 'text-lg sm:text-xl font-semibold text-primary';
         title.textContent = config.title;
-        header.appendChild(title);
+        summaryInfo.appendChild(title);
+        summaryButton.appendChild(summaryInfo);
+
+        const summaryRight = document.createElement('div');
+        summaryRight.className = 'flex items-center gap-3 text-sm font-medium text-gray-700';
+
+        const summaryRank = document.createElement('span');
+        summaryRank.textContent = getSummaryText(rankingData);
+        summaryRight.appendChild(summaryRank);
+
+        const chevron = buildChevronIcon();
+        summaryRight.appendChild(chevron);
+
+        summaryButton.appendChild(summaryRight);
+
+        card.appendChild(summaryButton);
+
+        const detail = document.createElement('div');
+        detail.className = 'card-body space-y-4 hidden';
+        detail.id = detailId;
 
         const description = document.createElement('p');
         description.className = 'text-sm text-gray-600';
         description.textContent = config.description;
-        header.appendChild(description);
-
-        body.appendChild(header);
+        detail.appendChild(description);
 
         if (!rankingData) {
           const empty = document.createElement('p');
           empty.className = 'text-sm text-gray-500 italic';
           empty.textContent = 'Not enough data to generate this ranking.';
-          body.appendChild(empty);
+          detail.appendChild(empty);
         } else {
           const headline = document.createElement('p');
           headline.className = 'text-lg sm:text-xl font-semibold text-gray-800';
           headline.textContent = `Ranked ${rankingData.rank} of ${rankingData.total}`;
-          body.appendChild(headline);
+          detail.appendChild(headline);
 
           if (rankingData.criteria) {
             const chips = document.createElement('div');
             chips.className = 'flex flex-wrap gap-2 text-xs sm:text-sm';
-            Object.entries(rankingData.criteria).forEach(([key, value]) => {
+            const criteriaEntries = getCriteriaEntries(config.key, rankingData.criteria);
+            criteriaEntries.forEach(([key, value]) => {
               chips.appendChild(buildTag(`${formatLabel(key)}: ${value}`));
             });
-            body.appendChild(chips);
+            detail.appendChild(chips);
           }
 
-          body.appendChild(buildLeaderboardTable(rankingData.top_results));
+          detail.appendChild(buildLeaderboardTable(rankingData.top_results));
         }
 
-        card.appendChild(body);
+        summaryButton.addEventListener('click', () => {
+          const isHidden = detail.classList.toggle('hidden');
+          const expanded = !isHidden;
+          summaryButton.setAttribute('aria-expanded', expanded.toString());
+          chevron.classList.toggle('rotate-180', expanded);
+        });
+
+        card.appendChild(detail);
         container.appendChild(card);
       });
     }
@@ -199,7 +229,7 @@
       const tbody = document.createElement('tbody');
       entries.forEach(entry => {
   const tr = document.createElement('tr');
-  tr.className = entry.is_target ? 'bg-red-100 text-red-700 font-semibold' : '';
+  tr.className = entry.is_target ? 'bg-primary/10 text-primary font-semibold' : '';
 
         const rankTd = document.createElement('td');
         rankTd.textContent = entry.rank;
@@ -232,6 +262,44 @@
       table.appendChild(tbody);
       wrapper.appendChild(table);
       return wrapper;
+    }
+
+    function getCriteriaEntries(sectionKey, criteria) {
+      const entries = Object.entries(criteria || {});
+      if (sectionKey !== 'like_schools') {
+        return entries;
+      }
+
+      const enrollmentOrder = ['enrollment','min_enrollment', 'max_enrollment'];
+      const ordered = enrollmentOrder
+        .filter(key => key in criteria)
+        .map(key => [key, criteria[key]]);
+
+      const remaining = entries.filter(([key]) => !enrollmentOrder.includes(key));
+      return [...ordered, ...remaining];
+    }
+
+    function getSummaryText(rankingData) {
+      if (!rankingData) {
+        return 'No data yet';
+      }
+      return `Rank ${rankingData.rank} / ${rankingData.total}`;
+    }
+
+    function buildChevronIcon() {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 20 20');
+      svg.setAttribute('fill', 'currentColor');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.classList.add('h-5', 'w-5', 'text-gray-500', 'transition-transform', 'duration-200');
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('fill-rule', 'evenodd');
+      path.setAttribute('clip-rule', 'evenodd');
+      path.setAttribute('d', 'M5.23 7.21a.75.75 0 011.06.02L10 11l3.71-3.77a.75.75 0 111.08 1.04l-4.25 4.32a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z');
+      svg.appendChild(path);
+
+      return svg;
     }
 
     function buildTag(text) {
