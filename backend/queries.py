@@ -15,6 +15,16 @@ from .models import (
     SchoolEnrollment,
 )
 from . import db
+from .util.conversion_util import Conversion
+
+
+CONVERSION = Conversion()
+SPRINT_DNQ_EVENTS = {
+    "100 Meters",
+    "200 Meters",
+    "100 Hurdles",
+    "110 Hurdles",
+}
 
 SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
 if SCRIPTS_DIR.is_dir():
@@ -1124,6 +1134,115 @@ def _summarize_leaderboard(entries, limit=10):
         )
 
     return summary
+
+
+def estimate_event_rank(
+    event_name: str,
+    performance_value,
+    *,
+    gender: str,
+    year: int,
+    meet_type: str = "Sectional",
+    result_type: str = "Final",
+):
+    """Project where a hypothetical mark would rank for a given event cohort.
+
+    Mirrors the legacy ``WhereDoIRank`` script so the frontend (or CLI tools)
+    can reuse the logic without duplicating database code.
+
+    Args:
+        event_name: Event to evaluate (e.g., "1600 Meters").
+        performance_value: User-entered performance. Track events accept
+            strings like "2:05.42" or numeric seconds; field events accept
+            strings like "5' 6\"" or numeric inches.
+        gender: Cohort gender label (e.g., "Girls", "Boys").
+        year: Season year to inspect.
+        meet_type: Playoff stage to compare against (defaults to "Sectional").
+        result_type: Result type to filter on (defaults to "Final").
+
+    Returns:
+        Dict describing the projected placement, or ``None`` if insufficient
+        historical results exist for the requested filters.
+    """
+
+    event = Event.query.filter_by(event=event_name).one_or_none()
+    if not event or not event.event_type:
+        return None
+
+    event_type = event.event_type
+    normalized_value = _normalize_performance_input(performance_value, event_type)
+
+    gender_filter = func.lower(Meet.gender) == (gender or "").strip().lower()
+    query = (
+        db.session.query(AthleteResult.result2)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .filter(
+            AthleteResult.event == event_name,
+            AthleteResult.result_type == result_type,
+            AthleteResult.result2.isnot(None),
+            AthleteResult.place.isnot(None),
+            Meet.meet_type == meet_type,
+            gender_filter,
+            Meet.year == year,
+        )
+    )
+
+    if _is_lower_better(event_type):
+        query = query.order_by(AthleteResult.result2.asc())
+    else:
+        query = query.order_by(AthleteResult.result2.desc())
+
+    result_values = [row[0] for row in query.all() if row[0] is not None]
+    if not result_values:
+        return None
+
+    projected_place = _project_place(result_values, normalized_value, event_type, event_name)
+
+    return {
+        "event": event_name,
+        "event_type": event_type,
+        "gender": gender,
+        "year": year,
+        "meet_type": meet_type,
+        "result_type": result_type,
+        "comparison_count": len(result_values),
+        "projected_place": projected_place,
+        "input_value": normalized_value,
+    }
+
+
+def _normalize_performance_input(value, event_type: str) -> float:
+    if value is None:
+        raise ValueError("performance_value is required")
+
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    if not isinstance(value, str):
+        raise TypeError("performance_value must be a string or number")
+
+    cleaned = value.strip()
+    if not cleaned:
+        raise ValueError("performance_value cannot be empty")
+
+    if _is_lower_better(event_type):
+        return float(CONVERSION.time_to_seconds(cleaned))
+    return float(CONVERSION.distance_to_inches(cleaned))
+
+
+def _project_place(result_values, candidate_value, event_type: str, event_name: str) -> str:
+    comparator = (lambda existing: existing < candidate_value) if _is_lower_better(event_type) else (
+        lambda existing: existing > candidate_value
+    )
+
+    for index, existing in enumerate(result_values, start=1):
+        if not comparator(existing):
+            return str(index)
+
+    if event_name in SPRINT_DNQ_EVENTS:
+        return "DNQ for Finals"
+
+    return str(len(result_values) + 1)
 
 
 def _is_lower_better(event_type: str) -> bool:
