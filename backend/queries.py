@@ -1,4 +1,6 @@
+import sys
 from functools import lru_cache
+from pathlib import Path
 
 from sqlalchemy import or_, func, and_
 from sqlalchemy.orm import joinedload
@@ -13,6 +15,139 @@ from .models import (
     SchoolEnrollment,
 )
 from . import db
+
+SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
+if SCRIPTS_DIR.is_dir():
+    scripts_path = str(SCRIPTS_DIR)
+    if scripts_path not in sys.path:
+        sys.path.insert(0, scripts_path)
+
+try:  # pragma: no-cover
+    from percentiles import get_percentiles as _script_get_percentiles  # type: ignore
+    from util.const_util import CONST  # type: ignore
+except Exception as exc:  # pragma: no-cover
+    _script_get_percentiles = None
+    _SCRIPT_IMPORT_ERROR = exc
+else:
+    _SCRIPT_IMPORT_ERROR = None
+
+DEFAULT_PERCENTILES = (25, 50, 75)
+PERCENTILE_CHOICES = (10, 25, 50, 75, 90, 95)
+GRADE_LEVELS = ("FR", "SO", "JR", "SR")
+
+
+def _require_percentile_script():
+    if _script_get_percentiles is None:
+        message = (
+            "The percentiles script could not be imported. "
+            "See the original exception for details: "
+            f"{_SCRIPT_IMPORT_ERROR!r}"
+        )
+        raise RuntimeError(message)
+
+
+def _unique_events():
+    event_groups = (
+        getattr(CONST.EVENT, "ALL_TRACK", []),
+        getattr(CONST.EVENT, "ALL_FIELD", []),
+        getattr(CONST.EVENT, "ALL_RELAY", []),
+        getattr(CONST.EVENT, "ALL_GIRLS_HURDLES", []),
+        getattr(CONST.EVENT, "ALL_BOYS_HURDLES", []),
+    )
+    seen = set()
+    output = []
+    for group in event_groups:
+        for name in group:
+            if name not in seen:
+                seen.add(name)
+                output.append(name)
+    return sorted(output)
+
+
+@lru_cache(maxsize=1)
+def _available_meet_years(limit: int = 30):
+    db_path = Path(getattr(CONST, "DB_PATH", "")).expanduser()
+    if not db_path.exists():
+        return []
+
+    import sqlite3
+
+    query = "SELECT DISTINCT year FROM meet WHERE year IS NOT NULL ORDER BY year DESC LIMIT ?"
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute(query, (limit,)).fetchall()
+    return [int(row[0]) for row in rows if row and row[0] is not None]
+
+
+def get_percentile_options():
+    _require_percentile_script()
+    return {
+        "events": _unique_events(),
+        "genders": list(getattr(CONST.GENDER, "ALL", [])),
+        "meet_types": list(getattr(CONST.MEET_TYPE, "ALL", [])),
+        "grade_levels": list(GRADE_LEVELS),
+        "default_percentiles": list(DEFAULT_PERCENTILES),
+        "percentile_choices": list(PERCENTILE_CHOICES),
+        "years": _available_meet_years(),
+        "db_path": str(getattr(CONST, "DB_PATH", "")),
+    }
+
+
+def _coerce_sequence(values, item_cast):
+    processed = []
+    for raw in values:
+        if raw is None:
+            continue
+        text = str(raw).strip()
+        if not text:
+            continue
+        processed.append(item_cast(text))
+    return tuple(processed)
+
+
+def _tuple_or_none(seq):
+    if not seq:
+        return None
+    return tuple(seq)
+
+
+def get_percentiles_report(
+    *,
+    events=None,
+    genders=None,
+    percentiles=None,
+    years=None,
+    meet_types=None,
+    grade_levels=None,
+):
+    _require_percentile_script()
+
+    kwargs = {
+        "events": _tuple_or_none(_coerce_sequence(events or [], str)),
+        "genders": _tuple_or_none(_coerce_sequence(genders or [], str)),
+        "percentiles": _tuple_or_none(
+            _coerce_sequence(percentiles or DEFAULT_PERCENTILES, int)
+        ),
+        "years": _tuple_or_none(_coerce_sequence(years or [], int)),
+        "meet_types": _tuple_or_none(_coerce_sequence(meet_types or [], str)),
+        "grade_levels": _tuple_or_none(
+            _coerce_sequence(grade_levels or [], lambda text: text.upper())
+        ),
+    }
+
+    df = _script_get_percentiles(**kwargs)
+    if df is None:
+        return {"columns": [], "rows": [], "filters": kwargs}
+
+    columns = [str(column) for column in df.columns]
+    raw_rows = df.to_dict(orient="records")
+    rows = [{str(key): value for key, value in row.items()} for row in raw_rows]
+
+    return {
+        "columns": columns,
+        "rows": rows,
+        "filters": {k: v for k, v in kwargs.items() if v},
+        "result_count": len(rows),
+    }
 
 
 def get_athletes(limit=100):

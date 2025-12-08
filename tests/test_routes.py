@@ -39,6 +39,49 @@ def test_api_athletes(client):
     assert any(item['id'] == athlete_id for item in data)
 
 
+def test_percentile_options_endpoint(client, monkeypatch):
+    sample_options = {
+        'events': ['100 Meters'],
+        'genders': ['Boys', 'Girls'],
+        'meet_types': ['Sectional'],
+        'grade_levels': ['FR'],
+        'percentile_choices': [25, 50],
+        'default_percentiles': [25],
+        'years': [2024],
+    }
+
+    monkeypatch.setattr('backend.routes.api_routes.get_percentile_options', lambda: sample_options)
+
+    rv = client.get('/api/percentiles/options')
+    assert rv.status_code == 200
+    assert rv.get_json()['events'] == ['100 Meters']
+
+
+def test_percentile_data_endpoint(client, monkeypatch):
+    captured = {}
+
+    def fake_report(**filters):
+        captured['filters'] = filters
+        return {
+            'columns': ['Gender', 'Event', '25'],
+            'rows': [{'Gender': 'Boys', 'Event': '100 Meters', '25': '11.00'}],
+            'filters': filters,
+            'result_count': 1,
+        }
+
+    monkeypatch.setattr('backend.routes.api_routes.get_percentiles_report', fake_report)
+
+    rv = client.get('/api/percentiles?genders=Boys&percentiles=25,50&meet_types=Sectional&years=2024&grade_levels=FR')
+    assert rv.status_code == 200
+    payload = rv.get_json()
+    assert payload['result_count'] == 1
+    assert captured['filters']['genders'] == ('Boys',)
+    assert captured['filters']['percentiles'] == (25, 50)
+    assert captured['filters']['years'] == (2024,)
+    assert captured['filters']['grade_levels'] == ('FR',)
+    assert captured['filters']['meet_types'] == ('Sectional',)
+
+
 def test_search_bar_includes_gender_and_class_year(app):
     from backend.queries import search_bar
     with app.app_context():
