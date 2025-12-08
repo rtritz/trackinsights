@@ -7,6 +7,8 @@ from ..queries import (
     search_bar,
     get_athlete_dashboard_data,
     get_athlete_result_rankings,
+    get_percentile_options,
+    get_percentiles_report,
 )
 
 
@@ -84,4 +86,55 @@ def api_get_result_rankings(aid):
         return jsonify({'error': 'not found'}), 404
 
     return jsonify(data)
+
+
+def _parse_multi_value(param_name, cast=str):
+    values = request.args.getlist(param_name)
+    if not values:
+        raw_value = request.args.get(param_name)
+        if raw_value:
+            values = [raw_value]
+
+    normalized = []
+    for entry in values:
+        if entry is None:
+            continue
+        for piece in str(entry).replace(';', ',').split(','):
+            piece = piece.strip()
+            if not piece:
+                continue
+            try:
+                normalized.append(cast(piece))
+            except ValueError as exc:
+                raise ValueError(f"Invalid value '{piece}' for {param_name}") from exc
+
+    return tuple(normalized) if normalized else None
+
+
+@api_bp.route('/percentiles/options')
+def api_percentile_options():
+    data = get_percentile_options()
+    return jsonify(data)
+
+
+@api_bp.route('/percentiles')
+def api_percentiles():
+    try:
+        filters = {
+            'events': _parse_multi_value('events'),
+            'genders': _parse_multi_value('genders'),
+            'percentiles': _parse_multi_value('percentiles', int),
+            'years': _parse_multi_value('years', int),
+            'meet_types': _parse_multi_value('meet_types'),
+            'grade_levels': _parse_multi_value('grade_levels', lambda value: value.upper()),
+        }
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    try:
+        payload = get_percentiles_report(**filters)
+    except RuntimeError as exc:
+        return jsonify({'error': str(exc)}), 500
+
+    return jsonify(payload)
 

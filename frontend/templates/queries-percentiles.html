@@ -1,0 +1,486 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="min-h-screen bg-white pt-15 pb-0 px-3 sm:px-6">
+  <div class="relative max-w-6xl mx-auto">
+    <div class="absolute inset-0 -z-10 mx-[-40px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none"></div>
+    <div class="relative space-y-8">
+      <a href="{{ url_for('main.queries_page') }}" class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-2 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+        </svg>
+        Back
+      </a>
+      <header class="text-center space-y-4">
+        <h1 class="font-impact italic text-4xl sm:text-5xl text-primary"
+          style="font-family: Impact, 'Arial Black', sans-serif;">
+          Query: Track & Field Percentiles
+        </h1>
+
+      </header>
+
+      <div class="rounded-[32px] bg-white/90 ring-1 ring-base-200 shadow-[0_25px_70px_rgba(15,23,42,0.08)] p-4 sm:p-6">
+        <div class="flex flex-wrap lg:flex-nowrap gap-6 items-stretch">
+          <section class="bg-white border border-base-200/80 rounded-2xl shadow-lg shadow-base-300/40 w-full lg:w-[22rem] xl:w-[24rem] shrink-0 flex flex-col">
+            <div class="gap-3 p-4 flex-1 flex flex-col" id="percentile-filter-card">
+              <div class="flex items-center justify-between">
+
+                <button type="button" id="clear-all" class="btn btn-ghost btn-sm text-sm">Reset filters</button>
+              </div>
+
+              <fieldset class="space-y-2">
+                <legend class="sr-only">Events</legend>
+                <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
+                  <span>Events</span>
+                  <button type="button" id="event-clear" class="btn btn-ghost btn-xs"
+                    aria-label="Clear selected event">Clear event</button>
+                </div>
+                <div id="event-chip-group" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5"></div>
+              </fieldset>
+
+              <fieldset class="space-y-2">
+                <legend class="sr-only">Meet types</legend>
+                <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
+                  <span>Meet Types</span>
+                  <button type="button" id="meet-clear" class="btn btn-ghost btn-xs text-[10px] px-2"
+                    aria-label="Clear meet types">Clear meet types</button>
+                </div>
+                <div id="meet-chip-group" class="flex flex-wrap gap-1.5"></div>
+              </fieldset>
+
+              <fieldset class="space-y-2">
+                <legend class="sr-only">Grade levels</legend>
+                <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
+                  <span>Grade Levels</span>
+                  <button type="button" id="grade-clear" class="btn btn-ghost btn-xs text-[10px] px-2"
+                    aria-label="Clear grade levels">Clear grades</button>
+                </div>
+                <div id="grade-chip-group" class="flex flex-wrap gap-1.5"></div>
+              </fieldset>
+            </div>
+          </section>
+
+          <section class="bg-white border border-base-200/80 rounded-2xl shadow-xl shadow-base-300/30 min-h-[520px] flex-1 min-w-0 lg:max-w-[48rem] flex flex-col">
+            <div class="space-y-4 p-4 flex-1 flex flex-col">
+              <div class="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+                <div id="results-summary">Select an event to view percentiles…</div>
+                <button type="button" id="copy-query" class="btn btn-xs btn-outline">Copy query URL</button>
+              </div>
+
+              <div id="results-error" class="hidden alert alert-error">
+                <span id="results-error-message">Something went wrong.</span>
+              </div>
+
+              <div class="relative flex-1 flex flex-col">
+                <div id="results-loading" class="hidden absolute inset-0 bg-white/80 z-10">
+                  <div class="flex flex-col items-center justify-center h-full text-center">
+                    <span class="loading loading-spinner loading-lg text-primary"></span>
+                    <p class="mt-3 text-sm text-gray-500">Crunching numbers…</p>
+                  </div>
+                </div>
+                <div class="overflow-x-auto border border-base-200 rounded-lg flex-1">
+                  <table class="table table-zebra text-sm">
+                    <thead id="results-head"></thead>
+                    <tbody id="results-body"></tbody>
+                  </table>
+                </div>
+                <p id="results-status" class="text-[12px] text-gray-500 mt-3">Filters update automatically. Boys and Girls
+                  are compared side-by-side.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const eventChipGroup = document.getElementById('event-chip-group');
+    const meetChipGroup = document.getElementById('meet-chip-group');
+    const gradeChipGroup = document.getElementById('grade-chip-group');
+    const eventClearBtn = document.getElementById('event-clear');
+    const meetClearBtn = document.getElementById('meet-clear');
+    const gradeClearBtn = document.getElementById('grade-clear');
+    const clearAllBtn = document.getElementById('clear-all');
+    const resultsLoading = document.getElementById('results-loading');
+    const resultsError = document.getElementById('results-error');
+    const resultsErrorMessage = document.getElementById('results-error-message');
+    const resultsSummary = document.getElementById('results-summary');
+    const resultsStatus = document.getElementById('results-status');
+    const resultsHead = document.getElementById('results-head');
+    const resultsBody = document.getElementById('results-body');
+    const copyQueryBtn = document.getElementById('copy-query');
+
+    const state = {
+      options: null,
+      lastQuery: '',
+      fetchTimeout: null,
+      columns: ['Gender', 'Event', '25', '50', '75'],
+      selectedEvent: null,
+    };
+
+    const chipBaseClasses = 'chip-btn btn btn-xs border border-base-300 text-sm whitespace-nowrap px-3 py-1.5 transition-colors justify-center text-center shadow-none hover:shadow-none focus:shadow-none';
+    const eventChipClasses = 'chip-btn btn btn-xs border border-base-300 text-sm w-full px-3 py-2 transition-colors justify-center text-center shadow-none hover:shadow-none focus:shadow-none';
+    const DEFAULT_MEET_TYPE_SELECTIONS = ['Sectional', 'Regional', 'State'];
+    const DEFAULT_GRADE_SELECTIONS = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'FR', 'SO', 'JR', 'SR'];
+    const EVENT_GENDER_OVERRIDES = {
+      '100 Hurdles': {
+        Boys: '110 Hurdles',
+        Girls: '100 Hurdles',
+      },
+    };
+
+    const toTitleCase = (text = '') =>
+      text
+        .split(' ')
+        .map(word => (word ? word[0].toUpperCase() + word.slice(1).toLowerCase() : ''))
+        .join(' ');
+
+    const fetchJson = async (url) => {
+      const response = await fetch(url);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        const message = payload.error || `Request failed (${response.status})`;
+        throw new Error(message);
+      }
+      return response.json();
+    };
+
+    const setChipSelected = (chip, isSelected) => {
+      chip.dataset.selected = isSelected ? 'true' : 'false';
+      chip.classList.toggle('btn-primary', isSelected);
+      chip.classList.toggle('btn-outline', !isSelected);
+      chip.classList.toggle('btn-ghost', !isSelected);
+      chip.classList.toggle('text-white', isSelected);
+      chip.classList.toggle('text-base-content', !isSelected);
+    };
+
+    const createChip = (value, container) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = chipBaseClasses;
+      chip.dataset.value = value;
+      chip.dataset.selected = 'false';
+      chip.textContent = value;
+      chip.addEventListener('click', () => {
+        const nextState = chip.dataset.selected !== 'true';
+        setChipSelected(chip, nextState);
+        queueFetch();
+      });
+      container.appendChild(chip);
+      setChipSelected(chip, false);
+      return chip;
+    };
+
+    const syncEventSelection = () => {
+      Array.from(eventChipGroup.querySelectorAll('.chip-btn')).forEach(chip => {
+        const isSelected = chip.dataset.value === state.selectedEvent;
+        setChipSelected(chip, isSelected);
+      });
+    };
+
+    const renderEventChips = (events) => {
+      eventChipGroup.innerHTML = '';
+      events.forEach(eventName => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = eventChipClasses;
+        chip.dataset.value = eventName;
+        chip.textContent = eventName;
+        chip.addEventListener('click', () => {
+          state.selectedEvent = state.selectedEvent === eventName ? null : eventName;
+          syncEventSelection();
+          queueFetch();
+        });
+        eventChipGroup.appendChild(chip);
+        setChipSelected(chip, state.selectedEvent === eventName);
+      });
+
+      if (!state.selectedEvent && events.length) {
+        state.selectedEvent = events[0];
+        syncEventSelection();
+        queueFetch();
+      }
+    };
+
+    const renderChipGroup = (values, container) => {
+      container.innerHTML = '';
+      values.forEach(value => {
+        createChip(value, container);
+      });
+    };
+
+    const applyDefaultSelections = (container, defaults = []) => {
+      if (!container || !defaults.length) {
+        return;
+      }
+      const normalized = defaults
+        .map(value => value?.toString().trim().toLowerCase())
+        .filter(Boolean);
+      Array.from(container.querySelectorAll('.chip-btn')).forEach(chip => {
+        const chipValue = chip.dataset.value?.toString().trim().toLowerCase();
+        if (chipValue && normalized.includes(chipValue)) {
+          setChipSelected(chip, true);
+        }
+      });
+    };
+
+    const getEventQueryList = () => {
+      if (!state.selectedEvent) {
+        return [];
+      }
+      const overrides = EVENT_GENDER_OVERRIDES[state.selectedEvent];
+      if (!overrides) {
+        return [state.selectedEvent];
+      }
+      const requested = [state.selectedEvent, ...Object.values(overrides).filter(Boolean)];
+      return Array.from(new Set(requested));
+    };
+
+    const getSelectedChips = (container) => {
+      return Array.from(container.querySelectorAll('.chip-btn[data-selected="true"]')).map(chip => chip.dataset.value);
+    };
+
+    const buildQueryString = (params) => {
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([key, values]) => {
+        if (!values || values.length === 0) {
+          return;
+        }
+        query.set(key, values.join(','));
+      });
+      return query.toString();
+    };
+
+    const showLoading = (isLoading) => {
+      resultsLoading.classList.toggle('hidden', !isLoading);
+    };
+
+    const showError = (message) => {
+      if (message) {
+        resultsError.classList.remove('hidden');
+        resultsErrorMessage.textContent = message;
+      } else {
+        resultsError.classList.add('hidden');
+      }
+    };
+
+    const renderTableSkeleton = () => {
+      resultsHead.innerHTML = '<tr><th class="text-xs uppercase tracking-wide">Percentile</th><th class="text-xs uppercase tracking-wide">Boys</th><th class="text-xs uppercase tracking-wide">Girls</th></tr>';
+      resultsBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-400 py-8">Select an event to start comparing.</td></tr>`;
+    };
+
+    const deriveGenderOrder = (rows) => {
+      const preferred = (state.options?.genders || ['Boys', 'Girls']).filter(Boolean);
+      const present = [];
+      rows.forEach(row => {
+        const gender = row.Gender || row.gender;
+        if (gender && !present.includes(gender)) {
+          present.push(gender);
+        }
+      });
+
+      const baseOrder = preferred.length ? [...preferred] : [...present];
+      present.forEach(gender => {
+        if (!baseOrder.includes(gender)) {
+          baseOrder.push(gender);
+        }
+      });
+      return baseOrder;
+    };
+
+    const renderResults = (payload) => {
+      if (!state.selectedEvent) {
+        renderTableSkeleton();
+        resultsSummary.textContent = 'No event selected';
+        resultsStatus.textContent = 'Pick an event on the left to compare Boys vs Girls percentiles.';
+        return;
+      }
+
+      const { columns = state.columns, rows = [], filters = {}, result_count = 0 } = payload || {};
+      if (Array.isArray(columns) && columns.length) {
+        state.columns = columns;
+      }
+
+      const metricColumns = state.columns.filter(column => !['Gender', 'Event'].includes(column));
+      const activeMetrics = metricColumns.length ? metricColumns : ['25', '50', '75'];
+      const genders = deriveGenderOrder(rows);
+      const rowByGender = new Map();
+      const overrides = EVENT_GENDER_OVERRIDES[state.selectedEvent] || {};
+      rows.forEach(row => {
+        const gender = row.Gender || row.gender;
+        if (!gender) {
+          return;
+        }
+        const preferredEvent = overrides[gender];
+        const rowEvent = row.Event || row.event;
+        const existing = rowByGender.get(gender);
+
+        if (preferredEvent) {
+          if (rowEvent === preferredEvent) {
+            rowByGender.set(gender, row);
+            return;
+          }
+          if (!existing) {
+            rowByGender.set(gender, row);
+          }
+          return;
+        }
+
+        if (!existing) {
+          rowByGender.set(gender, row);
+        }
+      });
+
+      const headers = ['Percentile', ...genders];
+      resultsHead.innerHTML = '<tr>' + headers.map(column => `<th class="text-xs uppercase tracking-wide">${column}</th>`).join('') + '</tr>';
+
+      if (!genders.length || !rows.length) {
+        resultsBody.innerHTML = `<tr><td colspan="${headers.length}" class="text-center text-gray-400 py-8">No results matched these filters.</td></tr>`;
+      } else {
+        resultsBody.innerHTML = activeMetrics
+          .map(metric => {
+            const cells = genders
+              .map(gender => {
+                const source = rowByGender.get(gender);
+                return `<td>${source && source[metric] ? source[metric] : '—'}</td>`;
+              })
+              .join('');
+            return `<tr><td class="font-semibold text-xs uppercase tracking-wide">${metric}</td>${cells}</tr>`;
+          })
+          .join('');
+      }
+
+      const normalizedFilters = { ...filters };
+      if (state.selectedEvent) {
+        normalizedFilters.events = [state.selectedEvent];
+      }
+
+      const activeFilters = Object.entries(normalizedFilters)
+        .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+        .join(' | ');
+      const genderLabel = genders.length ? genders.join(' vs ') : 'No gender data';
+      const summaryText = `${state.selectedEvent || 'No event'} | ${genderLabel} | ${activeFilters || 'All meet/grade levels'}`;
+      resultsSummary.textContent = toTitleCase(summaryText);
+      resultsStatus.textContent = 'Showing Boys and Girls side-by-side using default percentiles (25th, 50th, 75th).';
+    };
+
+    const fetchPercentiles = async () => {
+      if (!state.selectedEvent) {
+        renderTableSkeleton();
+        resultsSummary.textContent = 'No event selected';
+        resultsStatus.textContent = 'Pick an event on the left to compare Boys vs Girls percentiles.';
+        state.lastQuery = '';
+        return;
+      }
+
+      const params = {
+        events: getEventQueryList(),
+        genders: (state.options?.genders || []).filter(Boolean),
+        meet_types: getSelectedChips(meetChipGroup),
+        grade_levels: getSelectedChips(gradeChipGroup),
+      };
+
+      const query = buildQueryString(params);
+      state.lastQuery = query;
+
+      showError(null);
+      showLoading(true);
+
+      try {
+        const endpoint = query ? `/api/percentiles?${query}` : '/api/percentiles';
+        const payload = await fetchJson(endpoint);
+        renderResults(payload);
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        showLoading(false);
+      }
+    };
+
+    const queueFetch = () => {
+      if (state.fetchTimeout) {
+        clearTimeout(state.fetchTimeout);
+      }
+      state.fetchTimeout = setTimeout(fetchPercentiles, 200);
+    };
+
+    const clearChips = (container) => {
+      Array.from(container.querySelectorAll('.chip-btn')).forEach(chip => {
+        setChipSelected(chip, false);
+      });
+    };
+
+    const resetFilters = () => {
+      clearChips(meetChipGroup);
+      clearChips(gradeChipGroup);
+      state.selectedEvent = state.options?.events?.[0] || null;
+      syncEventSelection();
+      applyDefaultSelections(meetChipGroup, DEFAULT_MEET_TYPE_SELECTIONS);
+      applyDefaultSelections(gradeChipGroup, DEFAULT_GRADE_SELECTIONS);
+      queueFetch();
+    };
+
+    eventClearBtn.addEventListener('click', () => {
+      state.selectedEvent = null;
+      syncEventSelection();
+      renderTableSkeleton();
+      state.lastQuery = '';
+      resultsSummary.textContent = 'No event selected';
+      resultsStatus.textContent = 'Pick an event on the left to compare Boys vs Girls percentiles.';
+    });
+
+    meetClearBtn.addEventListener('click', () => {
+      clearChips(meetChipGroup);
+      queueFetch();
+    });
+
+    gradeClearBtn.addEventListener('click', () => {
+      clearChips(gradeChipGroup);
+      queueFetch();
+    });
+
+    clearAllBtn.addEventListener('click', resetFilters);
+
+    copyQueryBtn.addEventListener('click', async () => {
+      if (!state.selectedEvent || !state.lastQuery) {
+        copyQueryBtn.textContent = 'Select an event first';
+        setTimeout(() => (copyQueryBtn.textContent = 'Copy query URL'), 1800);
+        return;
+      }
+      const path = '/queries/percentiles';
+      const url = state.lastQuery ? `${window.location.origin}${path}?${state.lastQuery}` : `${window.location.origin}${path}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        copyQueryBtn.textContent = 'Copied!';
+        setTimeout(() => (copyQueryBtn.textContent = 'Copy query URL'), 1800);
+      } catch (error) {
+        copyQueryBtn.textContent = 'Copy failed';
+        setTimeout(() => (copyQueryBtn.textContent = 'Copy query URL'), 1800);
+      }
+    });
+
+    const bootstrap = async () => {
+      renderTableSkeleton();
+      try {
+        const options = await fetchJson('/api/percentiles/options');
+        state.options = options;
+        state.selectedEvent = options.events?.[0] || null;
+        renderEventChips(options.events || []);
+        renderChipGroup(options.meet_types || [], meetChipGroup);
+        applyDefaultSelections(meetChipGroup, DEFAULT_MEET_TYPE_SELECTIONS);
+        renderChipGroup(options.grade_levels || [], gradeChipGroup);
+        applyDefaultSelections(gradeChipGroup, DEFAULT_GRADE_SELECTIONS);
+      } catch (error) {
+        showError(error.message);
+        resultsSummary.textContent = 'Unable to load options';
+      }
+      queueFetch();
+    };
+
+    bootstrap();
+  });
+</script>
+{% endblock %}
