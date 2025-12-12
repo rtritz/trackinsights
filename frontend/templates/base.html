@@ -149,17 +149,27 @@
   </style>
 
   
-  <nav class="navbar fixed top-0 md:top-3 left-0 right-0 px-3 sm:px-5 md:px-10 z-50 bg-white shadow-md md:bg-transparent md:shadow-none" aria-label="Primary">
+  <nav class="navbar fixed top-0 md:top-3 left-0 right-0 px-3 sm:px-5 md:px-10 z-50 bg-white shadow-md md:bg-transparent md:shadow-none navbar-mobile-pad" aria-label="Primary">
     <div class="flex w-full items-center justify-between gap-3 md:hidden">
-      <a href="{{ url_for('main.home') }}" class="font-impact italic text-primary text-2xl font-bold tracking-widest"
+      <a href="{{ url_for('main.home') }}" class="font-impact italic text-primary text-2xl font-bold tracking-wide"
         style="font-family: Impact, 'Arial Black', sans-serif;">Track Insights</a>
+      <div class="flex items-center gap-2">
+        <a href="{{ url_for('main.search_page') }}" class="btn btn-circle btn-sm border-primary/50 text-primary bg-white/70 shadow-md"
+          aria-label="Go to search">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            stroke-width="2">
+            <circle cx="11" cy="11" r="6" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </a>
         <button type="button" id="mobile-nav-toggle"
-        class="btn btn-circle btn-primary btn-sm text-white border-none shadow-lg" aria-label="Open menu">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
-          stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
+          class="btn btn-circle btn-primary btn-sm text-white border-none shadow-lg" aria-label="Open menu">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
     </div>
     <div class="navbar-end hidden md:flex w-full gap-2 sm:gap-3 relative overflow-visible justify-end">
       <a href="{{ url_for('main.home') }}" aria-label="Home" class="nav-pill">
@@ -575,6 +585,22 @@
     .mobile-menu-link:hover::after,
     .mobile-menu-link:focus-visible::after {
       width: 80%;
+    }
+
+    .navbar-mobile-pad {
+      padding-top: 0;
+    }
+
+    @media (max-width: 767px) and (orientation: portrait) {
+      .navbar-mobile-pad {
+        padding-top: 1.25rem; /* Tailwind pt-5 */
+      }
+    }
+
+    @media (min-width: 768px) {
+      .navbar-mobile-pad {
+        padding-top: 0.5rem; /* Tailwind pt-2 */
+      }
     }
   </style>
   

@@ -180,7 +180,7 @@
 
         function createStageCell(stageData) {
             const td = document.createElement('td');
-            td.className = 'text-xs sm:text-sm';
+            td.className = 'text-xs sm:text-sm lg:text-base leading-relaxed';
 
             if (!stageData) {
                 td.textContent = '–';
@@ -213,19 +213,44 @@
             sectional: {
                 title: 'Sectional Spotlight',
                 accent: 'text-rose-700',
-                emptyText: 'Chasing that first sectional medal…',
+                encouragements: [
+                    'You shouldn\'t see this if you\'ve appeared on this website!'
+                ],
             },
             regional: {
                 title: 'Regional Rise',
                 accent: 'text-rose-700',
-                emptyText: 'All gas, no podium yet. It\'s coming.',
+                encouragements: [
+                    'Regional history gets written by grinders like you.',
+                    'You’re one race away from owning the regional stage.',
+                    'Stay patient; the regional badge is saving you a spot.',
+                ],
             },
             state: {
                 title: 'State Legends',
                 accent: 'text-rose-700',
-                emptyText: 'A state medal would look good here.',
+                encouragements: [
+                    'State is calling. Answer with your next PR.',
+                    'Can\'t wait to see you on the big stage.',
+                    'The state heat sheets have room for your name. Keep pushing.',
+                ],
             },
         };
+
+        const fallbackEncouragement = 'Keep grinding—your next milestone is closer than you think.';
+
+        function getStageEncouragement(stageKey) {
+            if (stageKey === 'state' && Math.random() < 0.01) {
+                return 'John Pork wants you here...!';
+            }
+
+            const options = stageConfigs[stageKey]?.encouragements;
+            if (Array.isArray(options) && options.length > 0) {
+                const randomIndex = Math.floor(Math.random() * options.length);
+                return options[randomIndex];
+            }
+            return fallbackEncouragement;
+        }
 
         function getMedalCircleClass(place) {
             if (place === 1) {
@@ -343,17 +368,18 @@
 
                 const headingLabel = stageData?.label || `${stageKey.charAt(0).toUpperCase()}${stageKey.slice(1)} Stage`;
                 const totalAppearances = stageData?.entries?.length || 0;
+                const emptyStateText = getStageEncouragement(stageKey);
 
                 badgeCard.innerHTML = `
                         <div class="flex flex-wrap items-center gap-3 justify-between">
                             <div>
                                 <h3 class="text-2xl font-black text-gray-900">${config.title}</h3>
-                                <p class="text-sm text-gray-600">${headingLabel}</p>
+                                <p class="hidden text-sm text-gray-600">${headingLabel}</p>
                             </div>
                         </div>
                         <div class="flex flex-wrap gap-3 sm:gap-4" data-stage-medals="${stageKey}"></div>
                         ${(!stageData || !stageData.entries || stageData.entries.length === 0)
-                        ? `<p class="text-sm text-gray-500 italic">${config.emptyText}</p>`
+                        ? `<p class="text-sm text-gray-500 italic">${emptyStateText}</p>`
                         : ''}
                     `;
 
@@ -379,11 +405,11 @@
                         <table class="table table-compact sm:table-normal w-full min-w-full">
                             <thead>
                                 <tr class="text-primary">
-                                    <th class="text-sm sm:text-base">Year</th>
-                                    <th class="text-sm sm:text-base">Event</th>
-                                    <th class="text-sm sm:text-base">Sectional</th>
-                                    <th class="text-sm sm:text-base">Regional</th>
-                                    <th class="text-sm sm:text-base">State</th>
+                                    <th class="text-sm sm:text-base lg:text-lg">Year</th>
+                                    <th class="text-sm sm:text-base lg:text-lg">Event</th>
+                                    <th class="text-sm sm:text-base lg:text-lg">Sectional</th>
+                                    <th class="text-sm sm:text-base lg:text-lg">Regional</th>
+                                    <th class="text-sm sm:text-base lg:text-lg">State</th>
                                 </tr>
                             </thead>
                             <tbody id="playoff-table-body">
@@ -399,12 +425,12 @@
                     tr.className = 'hover';
 
                     const yearCell = document.createElement('td');
-                    yearCell.className = 'font-semibold text-xs sm:text-sm whitespace-nowrap';
+                    yearCell.className = 'font-semibold text-xs sm:text-sm lg:text-base whitespace-nowrap';
                     yearCell.textContent = row.year || '–';
                     tr.appendChild(yearCell);
 
                     const eventCell = document.createElement('td');
-                    eventCell.className = 'text-xs sm:text-sm';
+                    eventCell.className = 'text-xs sm:text-sm lg:text-base';
                     eventCell.textContent = row.event || '–';
                     tr.appendChild(eventCell);
 
