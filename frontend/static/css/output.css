@@ -1479,8 +1479,14 @@
   .top-full {
     top: 100%;
   }
+  .right-4 {
+    right: calc(var(--spacing) * 4);
+  }
   .right-6 {
     right: calc(var(--spacing) * 6);
+  }
+  .bottom-4 {
+    bottom: calc(var(--spacing) * 4);
   }
   .bottom-8 {
     bottom: calc(var(--spacing) * 8);
@@ -2142,6 +2148,9 @@
   .w-\[98\%\] {
     width: 98%;
   }
+  .w-auto {
+    width: auto;
+  }
   .w-full {
     width: 100%;
   }
@@ -2316,6 +2325,9 @@
       margin-block-start: calc(calc(var(--spacing) * 10) * var(--tw-space-y-reverse));
       margin-block-end: calc(calc(var(--spacing) * 10) * calc(1 - var(--tw-space-y-reverse)));
     }
+  }
+  .self-start {
+    align-self: flex-start;
   }
   .overflow-hidden {
     overflow: hidden;
@@ -2855,6 +2867,9 @@
     @supports (color: color-mix(in lab, red, red)) {
       color: color-mix(in oklab, var(--color-primary) 70%, transparent);
     }
+  }
+  .text-red-600 {
+    color: var(--color-red-600);
   }
   .text-rose-600 {
     color: var(--color-rose-600);
@@ -3577,14 +3592,31 @@
       font-size: 14vw;
     }
   }
+  .sm\:btn-sm {
+    @media (width >= 40rem) {
+      --fontsize: 0.75rem;
+      --btn-p: 0.75rem;
+      --size: calc(var(--size-field, 0.25rem) * 8);
+    }
+  }
   .md\:top-4 {
     @media (width >= 48rem) {
       top: calc(var(--spacing) * 4);
     }
   }
+  .md\:right-6 {
+    @media (width >= 48rem) {
+      right: calc(var(--spacing) * 6);
+    }
+  }
   .md\:right-10 {
     @media (width >= 48rem) {
       right: calc(var(--spacing) * 10);
+    }
+  }
+  .md\:bottom-6 {
+    @media (width >= 48rem) {
+      bottom: calc(var(--spacing) * 6);
     }
   }
   .md\:table-cell {
