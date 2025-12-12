@@ -21,12 +21,10 @@
 
     <script>
       (function () {
-        // Define all background images
-
-        //lengths were 82 and 52
-        const boysImages = Array.from({ length: 82 }, (_, i) => `../static/images/background_images_boys/bg_${i + 1}.jpg`);
-        const girlsImages = Array.from({ length: 52 }, (_, i) => `../static/images/background_images_girls/bg_${i + 1}.jpg`);
-        const allImages = [...boysImages, ...girlsImages];
+  // Define all background images
+  const licensedImageCount = 12;
+  const licensedImages = Array.from({ length: licensedImageCount }, (_, i) => `../static/images/background_images_licensed/bg_${i + 1}.webp`);
+  const allImages = [...licensedImages];
 
         // Shuffle array
         function shuffle(array) {
@@ -105,6 +103,10 @@
         Track Insights
       </span>
       <!-- <span class="hero-title__hint">Press to search for your athlete</span> -->
+    </div>
+
+    <div class="absolute bottom-4 right-4 md:bottom-6 md:right-6 text-[10px] sm:text-xs  uppercase text-white/80 drop-shadow-lg font-semibold">
+      Images licensed from IndyStar
     </div>
   </div>
   <!-- <img src="../static/images/Track_Insights_Text.png" alt="Track Insights" style="height:60vh; width:80vw;"
