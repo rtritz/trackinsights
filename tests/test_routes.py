@@ -107,18 +107,24 @@ def test_dashboard_endpoint(client):
     sectional_badge = data['badges']['sectional']
     assert sectional_badge['stage'] == 'Sectional'
     assert sectional_badge['achievement'] == 'Placer'
-    assert sectional_badge['count'] == 3
+    assert sectional_badge['count'] == 4
+    assert len(sectional_badge['entries']) == 4
+    assert any(entry['event'] == '4 x 400 Relay' for entry in sectional_badge['entries'])
 
     regional_badge = data['badges']['regional']
     assert regional_badge['achievement'] == 'Placer'
     assert regional_badge['count'] == 3
+    assert len(regional_badge['entries']) == 4
+    assert all(entry['place_label'] for entry in regional_badge['entries'] if entry['place'])
 
     state_badge = data['badges']['state']
-    assert state_badge['achievement'] == 'Placer'
-    assert state_badge['count'] == 2
+    assert state_badge['achievement'] == 'Qualifier'
+    assert state_badge['count'] == 4
+    assert len(state_badge['entries']) == 4
+    assert state_badge['entries'][0]['year'] == 2024
 
     playoff_history = data['playoff_history']
-    assert len(playoff_history) == 3
+    assert len(playoff_history) == 4
     row_400 = next(item for item in playoff_history if item['event'] == '400m')
     assert row_400['year'] == 2024
 
@@ -140,7 +146,7 @@ def test_dashboard_endpoint(client):
     assert '10th' in state_entry['text']
 
     personal_bests = data['personal_bests']
-    assert len(personal_bests) == 3
+    assert len(personal_bests) == 4
 
     pb_400 = next(item for item in personal_bests if item['event'] == '400m')
     assert pb_400['event_type'] == 'Track'
@@ -150,7 +156,7 @@ def test_dashboard_endpoint(client):
     assert isinstance(pb_400['meet_id'], int)
     assert pb_400['result_type'] == 'Final'
     assert pb_400['school_rank'] == {'rank': 1, 'total': 1, 'since_year': 2022}
-    assert pb_400['state_rank'] == {'rank': 2, 'total': 4, 'since_year': 2022}
+    assert pb_400['state_rank'] == {'rank': 2, 'total': 5, 'since_year': 2022}
 
     pb_800 = next(item for item in personal_bests if item['event'] == '800m')
     assert pb_800['result'] == '1:55.20'
@@ -159,6 +165,17 @@ def test_dashboard_endpoint(client):
     pb_lj = next(item for item in personal_bests if item['event'] == 'Long Jump')
     assert pb_lj['event_type'] == 'Field'
     assert pb_lj['state_rank'] == {'rank': 1, 'total': 4, 'since_year': 2022}
+
+    relay_history = next(item for item in playoff_history if item['event'] == '4 x 400 Relay')
+    assert relay_history['sectional']['result'] == '3:19.50'
+    assert relay_history['sectional']['has_detail'] is False
+    assert relay_history['regional']['result'] == '3:18.00'
+    assert relay_history['state']['result'] == '3:17.80'
+
+    pb_relay = next(item for item in personal_bests if item['event'] == '4 x 400 Relay')
+    assert pb_relay['event_type'] == 'Relay'
+    assert pb_relay['result'] == '3:17.80'
+    assert pb_relay['meet_type'] == 'State'
 
 
 def test_result_rankings_endpoint(client):
@@ -196,19 +213,56 @@ def test_result_rankings_endpoint(client):
 
     overall = payload['rankings']['overall']
     assert overall['rank'] == 2
-    assert overall['total'] == 4
+    assert overall['total'] == 6
     assert any(entry['is_target'] for entry in overall['top_results'])
 
     like_schools = payload['rankings']['like_schools']
     assert like_schools['rank'] == 2
-    assert like_schools['total'] == 3
+    assert like_schools['total'] == 4
     assert like_schools['criteria']['min_enrollment'] == 750
     assert like_schools['criteria']['max_enrollment'] == 1250
 
     same_grade = payload['rankings']['same_grade']
     assert same_grade['rank'] == 2
-    assert same_grade['total'] == 3
+    assert same_grade['total'] == 4
     assert same_grade['criteria'] == {'grade': '12'}
+
+    where_rank = payload['where_do_i_rank']
+    assert where_rank is not None
+    assert where_rank['event'] == '400m'
+    assert where_rank['meet_type'] == 'Sectional'
+    assert isinstance(where_rank['sectional_results'], list)
+    assert len(where_rank['sectional_results']) >= 1
+
+
+def test_estimate_event_rank_sectional_breakdown(app):
+    from backend.queries import estimate_event_rank
+
+    with app.app_context():
+        seed_dashboard_data()
+        payload = estimate_event_rank(
+            event_name='400m',
+            performance_value='51.30',
+            gender='Boys',
+            year=2024,
+            meet_type='Sectional',
+        )
+
+    assert payload is not None
+    assert payload['projected_place_label'] == '3rd'
+    assert payload['comparison_count'] == 7
+
+    sectionals = payload['sectional_results']
+    assert len(sectionals) == 2
+
+    primary = next(item for item in sectionals if '(Meet 1)' in item['sectional_name'])
+    assert primary['projected_place'] == 3
+    assert primary['field_size'] == 4
+
+    secondary = next(item for item in sectionals if '(Meet 2)' in item['sectional_name'])
+    assert secondary['projected_place'] == 1
+    assert secondary['field_size'] == 3
+    assert secondary['result_type_counts'].get('Prelim') == 1
 
 
 def seed_reference_data():
@@ -254,6 +308,7 @@ def seed_dashboard_data():
         Meet,
         AthleteResult,
         SchoolEnrollment,
+        RelayResult,
     )
 
     target_year = 2024
@@ -328,7 +383,18 @@ def seed_dashboard_data():
         female_athletes.append(female)
     db.session.flush()
 
+    prelim_only_athlete = Athlete(
+        first='Prelim',
+        last='Only',
+        gender='Boys',
+        graduation_year=2024,
+        school=small_school,
+    )
+    db.session.add(prelim_only_athlete)
+    db.session.flush()
+
     sectional_meet = Meet(host='Sectional Host', meet_type='Sectional', meet_num=1, gender='Boys', year=2024)
+    sectional_meet_two = Meet(host='Sectional Host Two', meet_type='Sectional', meet_num=2, gender='Boys', year=2024)
     regional_meet = Meet(host='Regional Host', meet_type='Regional', meet_num=1, gender='Boys', year=2024)
     state_meet = Meet(host='State Host', meet_type='State', meet_num=1, gender='Boys', year=2024)
     girls_sectional_meet = Meet(host='Girls Sectional Host', meet_type='Sectional', meet_num=1, gender='Girls', year=2024)
@@ -336,6 +402,7 @@ def seed_dashboard_data():
     girls_state_meet = Meet(host='Girls State Host', meet_type='State', meet_num=1, gender='Girls', year=2024)
     db.session.add_all([
         sectional_meet,
+        sectional_meet_two,
         regional_meet,
         state_meet,
         girls_sectional_meet,
@@ -344,6 +411,47 @@ def seed_dashboard_data():
     ])
     db.session.flush()
 
+    relay_roster = ", ".join(
+        [
+            "Test Athlete",
+            "Other1 Runner",
+            "Other2 Runner",
+            "Other3 Runner",
+        ]
+    )
+
+    db.session.add_all(
+        [
+            RelayResult(
+                school_id=unit_school.school_id,
+                meet_id=sectional_meet.meet_id,
+                event='4 x 400 Relay',
+                result='3:19.50',
+                result2=199.50,
+                place=1,
+                athlete_names=relay_roster,
+            ),
+            RelayResult(
+                school_id=unit_school.school_id,
+                meet_id=regional_meet.meet_id,
+                event='4 x 400 Relay',
+                result='3:18.00',
+                result2=198.00,
+                place=2,
+                athlete_names=relay_roster,
+            ),
+            RelayResult(
+                school_id=unit_school.school_id,
+                meet_id=state_meet.meet_id,
+                event='4 x 400 Relay',
+                result='3:17.80',
+                result2=197.80,
+                place=4,
+                athlete_names=relay_roster,
+            ),
+        ]
+    )
+
     db.session.add_all([
         # 400m results
         AthleteResult(athlete_id=athlete.athlete_id, meet_id=sectional_meet.meet_id, event='400m', result_type='Final', grade='12', result='50.90', result2=50.90, place=2),
@@ -351,6 +459,9 @@ def seed_dashboard_data():
         AthleteResult(athlete_id=others[1].athlete_id, meet_id=sectional_meet.meet_id, event='400m', result_type='Final', grade=other_grades[1], result='51.50', result2=51.50, place=3),
         AthleteResult(athlete_id=others[2].athlete_id, meet_id=sectional_meet.meet_id, event='400m', result_type='Final', grade=other_grades[2], result='52.00', result2=52.00, place=4),
         AthleteResult(athlete_id=athlete.athlete_id, meet_id=sectional_meet.meet_id, event='400m', result_type='Prelim', grade='12', result='50.95', result2=50.95, place=1),
+    AthleteResult(athlete_id=others[0].athlete_id, meet_id=sectional_meet_two.meet_id, event='400m', result_type='Final', grade=other_grades[0], result='51.80', result2=51.80, place=1),
+    AthleteResult(athlete_id=others[2].athlete_id, meet_id=sectional_meet_two.meet_id, event='400m', result_type='Final', grade=other_grades[2], result='52.40', result2=52.40, place=2),
+    AthleteResult(athlete_id=prelim_only_athlete.athlete_id, meet_id=sectional_meet_two.meet_id, event='400m', result_type='Prelim', grade='12', result='52.00', result2=52.00, place=9),
         AthleteResult(athlete_id=athlete.athlete_id, meet_id=regional_meet.meet_id, event='400m', result_type='Final', grade='12', result='51.02', result2=51.02, place=6),
         AthleteResult(athlete_id=athlete.athlete_id, meet_id=regional_meet.meet_id, event='400m', result_type='Prelim', grade='12', result='51.20', result2=51.20, place=1),
         AthleteResult(athlete_id=athlete.athlete_id, meet_id=regional_meet.meet_id, event='4 x 400 Relay', result_type='Final', grade='12', result='3:18.00', result2=198.00, place=1),
