@@ -106,7 +106,9 @@
                     <span>Percentile Granularity</span>
                     <span id="percentile-slider-value" class="text-sm font-semibold text-primary">Every 25%</span>
                   </div>
-                  <input type="range" id="percentile-slider" min="0" max="5" step="1" value="3" class="range range-primary range-xs w-full" aria-label="Percentile granularity selector" draggable="false">
+                  <input type="range" id="percentile-slider" min="0" max="5" step="1" value="3"
+                    class="range range-primary range-xs w-full" aria-label="Percentile granularity selector"
+                    draggable="false">
                   <div class="flex justify-between text-[11px] text-gray-500 font-medium w-full">
                     <span>1%</span>
                     <span>5%</span>
@@ -116,9 +118,9 @@
                     <span>50%</span>
                   </div>
                 </div>
-                <!-- <p id="results-status" class="text-[12px] text-gray-500 mt-3">Filters update automatically. Boys and
-                  Girls
-                  are compared side-by-side.</p> -->
+                <p id="results-status" class="text-[12px] text-gray-500 mt-3">
+                  Filters update automatically. Boys and Girls are compared side-by-side.
+                </p>
               </div>
             </div>
           </section>
@@ -139,13 +141,13 @@
     const eventClearBtn = document.getElementById('event-clear');
     const meetClearBtn = document.getElementById('meet-clear');
     const gradeClearBtn = document.getElementById('grade-clear');
-  const yearClearBtn = document.getElementById('year-clear');
+    const yearClearBtn = document.getElementById('year-clear');
     const clearAllBtn = document.getElementById('clear-all');
     const resultsLoading = document.getElementById('results-loading');
     const resultsError = document.getElementById('results-error');
     const resultsErrorMessage = document.getElementById('results-error-message');
     const resultsSummary = document.getElementById('results-summary');
-    // const resultsStatus = document.getElementById('results-status');
+    const resultsStatus = document.getElementById('results-status');
     const resultsHead = document.getElementById('results-head');
     const resultsBody = document.getElementById('results-body');
     const copyQueryBtn = document.getElementById('copy-query');
@@ -153,8 +155,8 @@
     const chipBaseClasses = 'chip-btn btn btn-xs border border-base-300 text-sm whitespace-nowrap px-3 py-1.5 transition-colors justify-center text-center shadow-none hover:shadow-none focus:shadow-none';
     const eventChipClasses = 'chip-btn btn btn-xs border border-base-300 text-sm w-full px-3 py-2 transition-colors justify-center text-center shadow-none hover:shadow-none focus:shadow-none';
     const DEFAULT_MEET_TYPE_SELECTIONS = ['Sectional', 'Regional', 'State'];
-  const DEFAULT_GRADE_SELECTIONS = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'FR', 'SO', 'JR', 'SR'];
-  let defaultYearSelections = [];
+    const DEFAULT_GRADE_SELECTIONS = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'FR', 'SO', 'JR', 'SR'];
+    let defaultYearSelections = [];
     const EVENT_GROUPS = [
       {
         label: 'Sprints & Distance',
@@ -173,14 +175,39 @@
         events: ['High Jump', 'Long Jump', 'Pole Vault', 'Shot Put', 'Discus'],
       },
     ];
-  const YEAR_DISPLAY_ORDER = ['2023', '2024', '2025'];
-  const PERCENTILE_STEP_OPTIONS = [1, 5, 10, 25, 33, 50];
+    const YEAR_DISPLAY_ORDER = ['2023', '2024', '2025'];
+    const PERCENTILE_STEP_OPTIONS = [1, 5, 10, 25, 33, 50];
     const DEFAULT_PERCENTILE_STEP = 25;
     const EVENT_GENDER_OVERRIDES = {
       '100 Hurdles': {
         Boys: '110 Hurdles',
         Girls: '100 Hurdles',
       },
+    };
+
+    const parseQueryList = (params, key, transform = value => value) => {
+      const raw = params.get(key);
+      if (!raw) {
+        return [];
+      }
+      return raw
+        .split(',')
+        .map(piece => transform(piece.trim()))
+        .filter(value => value !== null && value !== undefined && value !== '');
+    };
+
+    const parseInitialFilters = () => {
+      const params = new URLSearchParams(window.location.search || '');
+      return {
+        events: parseQueryList(params, 'events'),
+        meet_types: parseQueryList(params, 'meet_types'),
+        grade_levels: parseQueryList(params, 'grade_levels'),
+        years: parseQueryList(params, 'years'),
+        percentiles: parseQueryList(params, 'percentiles', value => {
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : null;
+        }),
+      };
     };
 
     const buildPercentileValues = (step = DEFAULT_PERCENTILE_STEP) => {
@@ -201,6 +228,8 @@
       percentileStep: DEFAULT_PERCENTILE_STEP,
       percentiles: buildPercentileValues(DEFAULT_PERCENTILE_STEP),
     };
+
+    const initialFilters = parseInitialFilters();
 
     const orderEvents = (events = []) => {
       const priorityEntries = EVENT_GROUPS.flatMap((group, groupIndex) =>
@@ -249,7 +278,7 @@
     };
 
     const applyPercentileStep = (step) => {
-  const normalizedStep = PERCENTILE_STEP_OPTIONS.find(option => Math.abs(option - step) < 0.01) || DEFAULT_PERCENTILE_STEP;
+      const normalizedStep = PERCENTILE_STEP_OPTIONS.find(option => Math.abs(option - step) < 0.01) || DEFAULT_PERCENTILE_STEP;
       if (state.percentileStep === normalizedStep && Array.isArray(state.percentiles) && state.percentiles.length) {
         updatePercentileSliderLabel();
         return false;
@@ -260,27 +289,61 @@
       return true;
     };
 
-    const copyTextToClipboard = async (text) => {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        return true;
-      }
-
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.setAttribute('readonly', '');
-      textarea.style.position = 'absolute';
-      textarea.style.left = '-9999px';
-      document.body.appendChild(textarea);
-      textarea.select();
-      try {
-        const successful = document.execCommand('copy');
-        document.body.removeChild(textarea);
-        return successful;
-      } catch (error) {
-        document.body.removeChild(textarea);
+    const applyPercentilesFromQuery = (values) => {
+      if (!Array.isArray(values) || !values.length) {
         return false;
       }
+      const normalized = values
+        .map(value => Number(value))
+        .filter(value => Number.isFinite(value) && value > 0 && value < 100)
+        .sort((a, b) => a - b);
+      if (!normalized.length) {
+        return false;
+      }
+      const matchingStep = PERCENTILE_STEP_OPTIONS.find(option => {
+        const expected = buildPercentileValues(option);
+        return expected.length === normalized.length && expected.every((value, index) => value === normalized[index]);
+      });
+      if (matchingStep) {
+        applyPercentileStep(matchingStep);
+        return true;
+      }
+      state.percentiles = normalized;
+      state.percentileStep = normalized[0] || DEFAULT_PERCENTILE_STEP;
+      updatePercentileSliderLabel();
+      return true;
+    };
+
+    const copyTextToClipboard = async (text) => {
+      const fallbackCopy = () => {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'absolute';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          const successful = document.execCommand('copy');
+          document.body.removeChild(textarea);
+          return successful;
+        } catch (error) {
+          document.body.removeChild(textarea);
+          return false;
+        }
+      };
+
+      if (navigator?.clipboard?.writeText && window.isSecureContext) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (error) {
+          console.warn('Secure clipboard copy failed, falling back', error);
+          return fallbackCopy();
+        }
+      }
+
+      return fallbackCopy();
     };
 
     const toTitleCase = (text = '') =>
@@ -485,7 +548,9 @@
       if (!state.selectedEvent) {
         renderTableSkeleton();
         resultsSummary.textContent = 'No event selected';
-        resultsStatus.textContent = 'Pick an event on the left to compare Boys vs Girls percentiles.';
+        if (resultsStatus) {
+          resultsStatus.textContent = 'Pick an event on the left to compare Boys vs Girls percentiles.';
+        }
         return;
       }
 
@@ -561,7 +626,9 @@
       if (!state.selectedEvent) {
         renderTableSkeleton();
         resultsSummary.textContent = 'No event selected';
-        resultsStatus.textContent = 'Pick an event on the left to compare Boys vs Girls percentiles.';
+        if (resultsStatus) {
+          resultsStatus.textContent = 'Pick an event on the left to compare Boys vs Girls percentiles.';
+        }
         state.lastQuery = '';
         return;
       }
@@ -642,7 +709,9 @@
       renderTableSkeleton();
       state.lastQuery = '';
       resultsSummary.textContent = 'No event selected';
-      resultsStatus.textContent = 'Pick an event on the left to compare Boys vs Girls percentiles.';
+      if (resultsStatus) {
+        resultsStatus.textContent = 'Pick an event on the left to compare Boys vs Girls percentiles.';
+      }
     });
 
     meetClearBtn.addEventListener('click', () => {
@@ -689,22 +758,35 @@
     const bootstrap = async () => {
       renderTableSkeleton();
       try {
-  const options = await fetchJson('/api/percentiles/options');
-  const orderedEvents = orderEvents(options.events || []);
-  state.options = { ...options, events: orderedEvents };
-  state.selectedEvent = orderedEvents[0] || null;
-  renderEventChips(orderedEvents);
+        const options = await fetchJson('/api/percentiles/options');
+        const orderedEvents = orderEvents(options.events || []);
+        state.options = { ...options, events: orderedEvents };
+        const requestedEvent = initialFilters.events.find(eventName => orderedEvents.includes(eventName));
+        if (requestedEvent) {
+          state.selectedEvent = requestedEvent;
+        } else if (!state.selectedEvent && orderedEvents.length) {
+          state.selectedEvent = orderedEvents[0];
+        }
+        renderEventChips(orderedEvents);
         renderChipGroup(options.meet_types || [], meetChipGroup);
-        applyDefaultSelections(meetChipGroup, DEFAULT_MEET_TYPE_SELECTIONS);
+        const meetDefaults = initialFilters.meet_types.length ? initialFilters.meet_types : DEFAULT_MEET_TYPE_SELECTIONS;
+        applyDefaultSelections(meetChipGroup, meetDefaults);
         renderChipGroup(options.grade_levels || [], gradeChipGroup);
-        applyDefaultSelections(gradeChipGroup, DEFAULT_GRADE_SELECTIONS);
+        const gradeDefaults = initialFilters.grade_levels.length ? initialFilters.grade_levels : DEFAULT_GRADE_SELECTIONS;
+        applyDefaultSelections(gradeChipGroup, gradeDefaults);
         const orderedYears = orderYears(options.years || []);
         renderChipGroup(orderedYears, yearChipGroup);
         defaultYearSelections = YEAR_DISPLAY_ORDER.filter(year => orderedYears.includes(year));
         if (!defaultYearSelections.length) {
           defaultYearSelections = [...orderedYears];
         }
-        applyDefaultSelections(yearChipGroup, defaultYearSelections);
+        const yearDefaults = initialFilters.years.length ? initialFilters.years : defaultYearSelections;
+        applyDefaultSelections(yearChipGroup, yearDefaults);
+        const hadCustomPercentiles = applyPercentilesFromQuery(initialFilters.percentiles);
+        if (!hadCustomPercentiles) {
+          applyPercentileStep(DEFAULT_PERCENTILE_STEP);
+        }
+        syncPercentileSlider();
       } catch (error) {
         showError(error.message);
         resultsSummary.textContent = 'Unable to load options';
