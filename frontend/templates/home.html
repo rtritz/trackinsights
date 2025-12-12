@@ -21,12 +21,10 @@
 
     <script>
       (function () {
-        // Define all background images
-
-        //lengths were 82 and 52
-        const boysImages = Array.from({ length: 82 }, (_, i) => `../static/images/background_images_boys/bg_${i + 1}.jpg`);
-        const girlsImages = Array.from({ length: 52 }, (_, i) => `../static/images/background_images_girls/bg_${i + 1}.jpg`);
-        const allImages = [...boysImages, ...girlsImages];
+  // Define all background images
+  const licensedImageCount = 12;
+  const licensedImages = Array.from({ length: licensedImageCount }, (_, i) => `../static/images/background_images_licensed/bg_${i + 1}.webp`);
+  const allImages = [...licensedImages];
 
         // Shuffle array
         function shuffle(array) {

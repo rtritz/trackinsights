@@ -1,13 +1,18 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="min-h-screen bg-white pt-15 pb-0 px-3 sm:px-6">
+<div class="min-h-screen bg-white pt-5 pb-0 px-3 sm:px-6">
   <div class="relative max-w-6xl mx-auto">
-    <div class="absolute inset-0 -z-10 mx-[-40px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none"></div>
+    <div
+      class="absolute inset-0 -z-10 mx-[-40px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none">
+    </div>
     <div class="relative space-y-8">
-      <a href="{{ url_for('main.queries_page') }}" class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-2 transition-colors">
+      <a href="{{ url_for('main.queries_page') }}"
+        class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-4 mt-4 transition-colors">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+          <path fill-rule="evenodd"
+            d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+            clip-rule="evenodd" />
         </svg>
         Back
       </a>
@@ -21,7 +26,8 @@
 
       <div class="rounded-[32px] bg-white/90 ring-1 ring-base-200 shadow-[0_25px_70px_rgba(15,23,42,0.08)] p-4 sm:p-6">
         <div class="flex flex-wrap lg:flex-nowrap gap-6 items-stretch">
-          <section class="bg-white border border-base-200/80 rounded-2xl shadow-lg shadow-base-300/40 w-full lg:w-[22rem] xl:w-[24rem] shrink-0 flex flex-col">
+          <section
+            class="bg-white border border-base-200/80 rounded-2xl shadow-lg shadow-base-300/40 w-full lg:w-[22rem] xl:w-[24rem] shrink-0 flex flex-col">
             <div class="gap-3 p-4 flex-1 flex flex-col" id="percentile-filter-card">
               <div class="flex items-center justify-between">
 
@@ -57,13 +63,24 @@
                 </div>
                 <div id="grade-chip-group" class="flex flex-wrap gap-1.5"></div>
               </fieldset>
+
+              <fieldset class="space-y-2">
+                <legend class="sr-only">Years</legend>
+                <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
+                  <span>Years</span>
+                  <button type="button" id="year-clear" class="btn btn-ghost btn-xs text-[10px] px-2"
+                    aria-label="Clear years">Clear years</button>
+                </div>
+                <div id="year-chip-group" class="flex flex-wrap gap-1.5"></div>
+              </fieldset>
             </div>
           </section>
 
-          <section class="bg-white border border-base-200/80 rounded-2xl shadow-xl shadow-base-300/30 min-h-[520px] flex-1 min-w-0 lg:max-w-[48rem] flex flex-col">
+          <section
+            class="bg-white border border-base-200/80 rounded-2xl shadow-xl shadow-base-300/30 min-h-[520px] flex-1 min-w-0 lg:max-w-[48rem] flex flex-col">
             <div class="space-y-4 p-4 flex-1 flex flex-col">
               <div class="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
-                <div id="results-summary">Select an event to view percentiles…</div>
+                <div id="results-summary" class="hidden">Select an event to view percentiles…</div>
                 <button type="button" id="copy-query" class="btn btn-xs btn-outline">Copy query URL</button>
               </div>
 
@@ -84,8 +101,24 @@
                     <tbody id="results-body"></tbody>
                   </table>
                 </div>
-                <p id="results-status" class="text-[12px] text-gray-500 mt-3">Filters update automatically. Boys and Girls
-                  are compared side-by-side.</p>
+                <div class="mt-4 space-y-2">
+                  <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
+                    <span>Percentile Granularity</span>
+                    <span id="percentile-slider-value" class="text-sm font-semibold text-primary">Every 25%</span>
+                  </div>
+                  <input type="range" id="percentile-slider" min="0" max="5" step="1" value="3" class="range range-primary range-xs w-full" aria-label="Percentile granularity selector" draggable="false">
+                  <div class="flex justify-between text-[11px] text-gray-500 font-medium w-full">
+                    <span>1%</span>
+                    <span>5%</span>
+                    <span>10%</span>
+                    <span>25%</span>
+                    <span>33%</span>
+                    <span>50%</span>
+                  </div>
+                </div>
+                <!-- <p id="results-status" class="text-[12px] text-gray-500 mt-3">Filters update automatically. Boys and
+                  Girls
+                  are compared side-by-side.</p> -->
               </div>
             </div>
           </section>
@@ -100,18 +133,64 @@
     const eventChipGroup = document.getElementById('event-chip-group');
     const meetChipGroup = document.getElementById('meet-chip-group');
     const gradeChipGroup = document.getElementById('grade-chip-group');
+    const yearChipGroup = document.getElementById('year-chip-group');
+    const percentileSlider = document.getElementById('percentile-slider');
+    const percentileSliderValue = document.getElementById('percentile-slider-value');
     const eventClearBtn = document.getElementById('event-clear');
     const meetClearBtn = document.getElementById('meet-clear');
     const gradeClearBtn = document.getElementById('grade-clear');
+  const yearClearBtn = document.getElementById('year-clear');
     const clearAllBtn = document.getElementById('clear-all');
     const resultsLoading = document.getElementById('results-loading');
     const resultsError = document.getElementById('results-error');
     const resultsErrorMessage = document.getElementById('results-error-message');
     const resultsSummary = document.getElementById('results-summary');
-    const resultsStatus = document.getElementById('results-status');
+    // const resultsStatus = document.getElementById('results-status');
     const resultsHead = document.getElementById('results-head');
     const resultsBody = document.getElementById('results-body');
     const copyQueryBtn = document.getElementById('copy-query');
+
+    const chipBaseClasses = 'chip-btn btn btn-xs border border-base-300 text-sm whitespace-nowrap px-3 py-1.5 transition-colors justify-center text-center shadow-none hover:shadow-none focus:shadow-none';
+    const eventChipClasses = 'chip-btn btn btn-xs border border-base-300 text-sm w-full px-3 py-2 transition-colors justify-center text-center shadow-none hover:shadow-none focus:shadow-none';
+    const DEFAULT_MEET_TYPE_SELECTIONS = ['Sectional', 'Regional', 'State'];
+  const DEFAULT_GRADE_SELECTIONS = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'FR', 'SO', 'JR', 'SR'];
+  let defaultYearSelections = [];
+    const EVENT_GROUPS = [
+      {
+        label: 'Sprints & Distance',
+        events: ['100 Meters', '200 Meters', '400 Meters', '800 Meters', '1600 Meters', '3200 Meters'],
+      },
+      {
+        label: 'Hurdles',
+        events: ['100 Hurdles', '110 Hurdles', '300 Hurdles'],
+      },
+      {
+        label: 'Relays',
+        events: ['4 x 100 Relay', '4 x 400 Relay', '4 x 800 Relay'],
+      },
+      {
+        label: 'Field Events',
+        events: ['High Jump', 'Long Jump', 'Pole Vault', 'Shot Put', 'Discus'],
+      },
+    ];
+  const YEAR_DISPLAY_ORDER = ['2023', '2024', '2025'];
+  const PERCENTILE_STEP_OPTIONS = [1, 5, 10, 25, 33, 50];
+    const DEFAULT_PERCENTILE_STEP = 25;
+    const EVENT_GENDER_OVERRIDES = {
+      '100 Hurdles': {
+        Boys: '110 Hurdles',
+        Girls: '100 Hurdles',
+      },
+    };
+
+    const buildPercentileValues = (step = DEFAULT_PERCENTILE_STEP) => {
+      const numericStep = Number(step) || DEFAULT_PERCENTILE_STEP;
+      const values = [];
+      for (let value = numericStep; value < 100; value += numericStep) {
+        values.push(value);
+      }
+      return values;
+    };
 
     const state = {
       options: null,
@@ -119,17 +198,89 @@
       fetchTimeout: null,
       columns: ['Gender', 'Event', '25', '50', '75'],
       selectedEvent: null,
+      percentileStep: DEFAULT_PERCENTILE_STEP,
+      percentiles: buildPercentileValues(DEFAULT_PERCENTILE_STEP),
     };
 
-    const chipBaseClasses = 'chip-btn btn btn-xs border border-base-300 text-sm whitespace-nowrap px-3 py-1.5 transition-colors justify-center text-center shadow-none hover:shadow-none focus:shadow-none';
-    const eventChipClasses = 'chip-btn btn btn-xs border border-base-300 text-sm w-full px-3 py-2 transition-colors justify-center text-center shadow-none hover:shadow-none focus:shadow-none';
-    const DEFAULT_MEET_TYPE_SELECTIONS = ['Sectional', 'Regional', 'State'];
-    const DEFAULT_GRADE_SELECTIONS = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'FR', 'SO', 'JR', 'SR'];
-    const EVENT_GENDER_OVERRIDES = {
-      '100 Hurdles': {
-        Boys: '110 Hurdles',
-        Girls: '100 Hurdles',
-      },
+    const orderEvents = (events = []) => {
+      const priorityEntries = EVENT_GROUPS.flatMap((group, groupIndex) =>
+        group.events.map((name, eventIndex) => [name, groupIndex * 100 + eventIndex])
+      );
+      const priority = new Map(priorityEntries);
+      return [...events].sort((a = '', b = '') => {
+        const aRank = priority.has(a) ? priority.get(a) : Number.MAX_SAFE_INTEGER;
+        const bRank = priority.has(b) ? priority.get(b) : Number.MAX_SAFE_INTEGER;
+        if (aRank !== bRank) {
+          return aRank - bRank;
+        }
+        return a.localeCompare(b);
+      });
+    };
+
+    const orderYears = (years = []) => {
+      const normalized = years.map(year => year?.toString()).filter(Boolean);
+      const prioritized = YEAR_DISPLAY_ORDER.filter(year => normalized.includes(year));
+      const remaining = normalized.filter(year => !YEAR_DISPLAY_ORDER.includes(year)).sort((a, b) => Number(b) - Number(a));
+      return [...prioritized, ...remaining];
+    };
+
+    const insertGroupDividers = (container) => {
+      const divider = document.createElement('div');
+      divider.className = 'col-span-full border-t border-base-200/60';
+      container.appendChild(divider);
+    };
+
+    const updatePercentileSliderLabel = () => {
+      if (!percentileSliderValue) {
+        return;
+      }
+      const step = state.percentileStep || DEFAULT_PERCENTILE_STEP;
+      percentileSliderValue.textContent = `Every ${step}%`;
+    };
+
+    const syncPercentileSlider = () => {
+      if (!percentileSlider) {
+        return;
+      }
+      const currentStep = state.percentileStep || DEFAULT_PERCENTILE_STEP;
+      const index = PERCENTILE_STEP_OPTIONS.indexOf(currentStep);
+      percentileSlider.value = String(index >= 0 ? index : 0);
+      updatePercentileSliderLabel();
+    };
+
+    const applyPercentileStep = (step) => {
+  const normalizedStep = PERCENTILE_STEP_OPTIONS.find(option => Math.abs(option - step) < 0.01) || DEFAULT_PERCENTILE_STEP;
+      if (state.percentileStep === normalizedStep && Array.isArray(state.percentiles) && state.percentiles.length) {
+        updatePercentileSliderLabel();
+        return false;
+      }
+      state.percentileStep = normalizedStep;
+      state.percentiles = buildPercentileValues(normalizedStep);
+      updatePercentileSliderLabel();
+      return true;
+    };
+
+    const copyTextToClipboard = async (text) => {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'absolute';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        return successful;
+      } catch (error) {
+        document.body.removeChild(textarea);
+        return false;
+      }
     };
 
     const toTitleCase = (text = '') =>
@@ -183,7 +334,21 @@
 
     const renderEventChips = (events) => {
       eventChipGroup.innerHTML = '';
-      events.forEach(eventName => {
+      const orderedEvents = orderEvents(events);
+      const groupsLookup = new Map();
+      EVENT_GROUPS.forEach(group => {
+        group.events.forEach(eventName => {
+          groupsLookup.set(eventName, group.label);
+        });
+      });
+
+      let previousGroupLabel = null;
+      orderedEvents.forEach(eventName => {
+        const currentLabel = groupsLookup.get(eventName) || null;
+        if (previousGroupLabel !== null && currentLabel && currentLabel !== previousGroupLabel) {
+          insertGroupDividers(eventChipGroup);
+        }
+
         const chip = document.createElement('button');
         chip.type = 'button';
         chip.className = eventChipClasses;
@@ -196,16 +361,21 @@
         });
         eventChipGroup.appendChild(chip);
         setChipSelected(chip, state.selectedEvent === eventName);
+
+        previousGroupLabel = currentLabel || previousGroupLabel;
       });
 
-      if (!state.selectedEvent && events.length) {
-        state.selectedEvent = events[0];
+      if (!state.selectedEvent && orderedEvents.length) {
+        state.selectedEvent = orderedEvents[0];
         syncEventSelection();
         queueFetch();
       }
     };
 
     const renderChipGroup = (values, container) => {
+      if (!container) {
+        return;
+      }
       container.innerHTML = '';
       values.forEach(value => {
         createChip(value, container);
@@ -240,7 +410,21 @@
     };
 
     const getSelectedChips = (container) => {
+      if (!container) {
+        return [];
+      }
       return Array.from(container.querySelectorAll('.chip-btn[data-selected="true"]')).map(chip => chip.dataset.value);
+    };
+
+    const collectQueryParams = () => {
+      return {
+        events: getEventQueryList(),
+        genders: (state.options?.genders || []).filter(Boolean),
+        meet_types: getSelectedChips(meetChipGroup),
+        grade_levels: getSelectedChips(gradeChipGroup),
+        years: getSelectedChips(yearChipGroup),
+        percentiles: state.percentiles,
+      };
     };
 
     const buildQueryString = (params) => {
@@ -252,6 +436,12 @@
         query.set(key, values.join(','));
       });
       return query.toString();
+    };
+
+    const describePercentiles = () => {
+      const step = state.percentileStep || DEFAULT_PERCENTILE_STEP;
+      const label = step % 1 === 0 ? step.toString() : step.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+      return `every ${label}% percentile`;
     };
 
     const showLoading = (isLoading) => {
@@ -364,7 +554,7 @@
       const genderLabel = genders.length ? genders.join(' vs ') : 'No gender data';
       const summaryText = `${state.selectedEvent || 'No event'} | ${genderLabel} | ${activeFilters || 'All meet/grade levels'}`;
       resultsSummary.textContent = toTitleCase(summaryText);
-      resultsStatus.textContent = 'Showing Boys and Girls side-by-side using default percentiles (25th, 50th, 75th).';
+      // resultsStatus.textContent = `Showing Boys and Girls side-by-side using ${describePercentiles()}.`;
     };
 
     const fetchPercentiles = async () => {
@@ -376,12 +566,7 @@
         return;
       }
 
-      const params = {
-        events: getEventQueryList(),
-        genders: (state.options?.genders || []).filter(Boolean),
-        meet_types: getSelectedChips(meetChipGroup),
-        grade_levels: getSelectedChips(gradeChipGroup),
-      };
+      const params = collectQueryParams();
 
       const query = buildQueryString(params);
       state.lastQuery = query;
@@ -407,7 +592,31 @@
       state.fetchTimeout = setTimeout(fetchPercentiles, 200);
     };
 
+    if (percentileSlider) {
+      const handleSliderChange = () => {
+        const raw = Number(percentileSlider.value);
+        const index = Math.min(
+          Math.max(Math.round(Number.isFinite(raw) ? raw : 0), 0),
+          PERCENTILE_STEP_OPTIONS.length - 1,
+        );
+        percentileSlider.value = String(index);
+        const nextStep = PERCENTILE_STEP_OPTIONS[index] || DEFAULT_PERCENTILE_STEP;
+        const changed = applyPercentileStep(nextStep);
+        if (changed) {
+          queueFetch();
+        }
+      };
+      percentileSlider.addEventListener('input', handleSliderChange);
+      percentileSlider.addEventListener('change', handleSliderChange);
+      syncPercentileSlider();
+    } else {
+      updatePercentileSliderLabel();
+    }
+
     const clearChips = (container) => {
+      if (!container) {
+        return;
+      }
       Array.from(container.querySelectorAll('.chip-btn')).forEach(chip => {
         setChipSelected(chip, false);
       });
@@ -416,10 +625,14 @@
     const resetFilters = () => {
       clearChips(meetChipGroup);
       clearChips(gradeChipGroup);
+      clearChips(yearChipGroup);
       state.selectedEvent = state.options?.events?.[0] || null;
       syncEventSelection();
       applyDefaultSelections(meetChipGroup, DEFAULT_MEET_TYPE_SELECTIONS);
       applyDefaultSelections(gradeChipGroup, DEFAULT_GRADE_SELECTIONS);
+      applyDefaultSelections(yearChipGroup, defaultYearSelections);
+      applyPercentileStep(DEFAULT_PERCENTILE_STEP);
+      syncPercentileSlider();
       queueFetch();
     };
 
@@ -442,37 +655,56 @@
       queueFetch();
     });
 
+    if (yearClearBtn) {
+      yearClearBtn.addEventListener('click', () => {
+        clearChips(yearChipGroup);
+        queueFetch();
+      });
+    }
+
     clearAllBtn.addEventListener('click', resetFilters);
 
     copyQueryBtn.addEventListener('click', async () => {
-      if (!state.selectedEvent || !state.lastQuery) {
+      if (!state.selectedEvent) {
         copyQueryBtn.textContent = 'Select an event first';
         setTimeout(() => (copyQueryBtn.textContent = 'Copy query URL'), 1800);
         return;
       }
-      const path = '/queries/percentiles';
-      const url = state.lastQuery ? `${window.location.origin}${path}?${state.lastQuery}` : `${window.location.origin}${path}`;
-      try {
-        await navigator.clipboard.writeText(url);
-        copyQueryBtn.textContent = 'Copied!';
+
+      const params = collectQueryParams();
+      const query = buildQueryString(params);
+      if (!query) {
+        copyQueryBtn.textContent = 'No filters yet';
         setTimeout(() => (copyQueryBtn.textContent = 'Copy query URL'), 1800);
-      } catch (error) {
-        copyQueryBtn.textContent = 'Copy failed';
-        setTimeout(() => (copyQueryBtn.textContent = 'Copy query URL'), 1800);
+        return;
       }
+
+      const path = '/queries/percentiles';
+      const url = `${window.location.origin}${path}?${query}`;
+      const success = await copyTextToClipboard(url);
+      copyQueryBtn.textContent = success ? 'Copied!' : 'Copy failed';
+      setTimeout(() => (copyQueryBtn.textContent = 'Copy query URL'), 1800);
     });
 
     const bootstrap = async () => {
       renderTableSkeleton();
       try {
-        const options = await fetchJson('/api/percentiles/options');
-        state.options = options;
-        state.selectedEvent = options.events?.[0] || null;
-        renderEventChips(options.events || []);
+  const options = await fetchJson('/api/percentiles/options');
+  const orderedEvents = orderEvents(options.events || []);
+  state.options = { ...options, events: orderedEvents };
+  state.selectedEvent = orderedEvents[0] || null;
+  renderEventChips(orderedEvents);
         renderChipGroup(options.meet_types || [], meetChipGroup);
         applyDefaultSelections(meetChipGroup, DEFAULT_MEET_TYPE_SELECTIONS);
         renderChipGroup(options.grade_levels || [], gradeChipGroup);
         applyDefaultSelections(gradeChipGroup, DEFAULT_GRADE_SELECTIONS);
+        const orderedYears = orderYears(options.years || []);
+        renderChipGroup(orderedYears, yearChipGroup);
+        defaultYearSelections = YEAR_DISPLAY_ORDER.filter(year => orderedYears.includes(year));
+        if (!defaultYearSelections.length) {
+          defaultYearSelections = [...orderedYears];
+        }
+        applyDefaultSelections(yearChipGroup, defaultYearSelections);
       } catch (error) {
         showError(error.message);
         resultsSummary.textContent = 'Unable to load options';
