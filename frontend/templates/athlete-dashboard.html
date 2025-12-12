@@ -42,7 +42,7 @@
         <!-- Header Section -->
         <div
             class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 mb-6 sm:mb-8 shadow-lg">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div class="flex flex-col gap-4">
                 <div class="w-full">
                     <h1 id="athlete-name"
                         class="font-impact italic text-primary text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2 break-words"
@@ -55,6 +55,13 @@
                         <span id="athlete-gender"></span>
                         <span id="athlete-class" class="badge badge-md sm:badge-lg badge-outline"></span>
                     </div>
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2 mt-3">
+                        <button type="button" id="copy-dashboard-link"
+                            class="btn btn-outline btn-primary btn-xs sm:btn-sm px-3 w-auto self-start">
+                            Copy share link
+                        </button>
+                        <span id="share-dashboard-status" class="text-xs text-gray-600" aria-live="polite"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -65,8 +72,8 @@
                 style="font-family: Impact, 'Arial Black', sans-serif;">
                 Achievements
             </h2>
-            <div id="badges-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-                <!-- Badges will be inserted here -->
+            <div id="badges-container"
+                class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 auto-rows-fr">
             </div>
         </div>
 
@@ -86,16 +93,89 @@
 <script>
     // @ts-nocheck
     document.addEventListener('DOMContentLoaded', async function () {
-        const loadingState = document.getElementById('loading-state');
-        const errorState = document.getElementById('error-state');
-        const dashboardContent = document.getElementById('dashboard-content');
-        const athleteId = Number(dashboardContent?.dataset?.athleteId);
+    const loadingState = document.getElementById('loading-state');
+    const errorState = document.getElementById('error-state');
+    const dashboardContent = document.getElementById('dashboard-content');
+    const athleteId = Number(dashboardContent?.dataset?.athleteId);
+    const shareButton = document.getElementById('copy-dashboard-link');
+    const shareStatus = document.getElementById('share-dashboard-status');
 
         if (!Number.isFinite(athleteId) || athleteId <= 0) {
             console.error('Invalid athlete identifier for dashboard view.');
             loadingState.classList.add('hidden');
             errorState.classList.remove('hidden');
             return;
+        }
+
+        const copyTextToClipboard = async (text) => {
+            const fallbackCopy = () => {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.setAttribute('readonly', 'true');
+                textarea.style.position = 'absolute';
+                textarea.style.left = '-9999px';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    const successful = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    return successful;
+                } catch (error) {
+                    document.body.removeChild(textarea);
+                    return false;
+                }
+            };
+
+            if (navigator?.clipboard?.writeText && window.isSecureContext) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch (error) {
+                    console.warn('Clipboard copy failed, falling back', error);
+                    return fallbackCopy();
+                }
+            }
+
+            return fallbackCopy();
+        };
+
+        const setShareStatus = (message, tone = 'muted') => {
+            if (!shareStatus) {
+                return;
+            }
+            shareStatus.textContent = message;
+            shareStatus.classList.remove('text-green-600', 'text-red-600', 'text-gray-600');
+            const toneClass = tone === 'success' ? 'text-green-600' : tone === 'error' ? 'text-red-600' : 'text-gray-600';
+            shareStatus.classList.add('text-xs', toneClass);
+        };
+
+        const resetShareButton = () => {
+            if (!shareButton) {
+                return;
+            }
+            shareButton.disabled = false;
+            shareButton.textContent = 'Copy share link';
+        };
+
+        const handleShareButtonClick = async () => {
+            if (!shareButton) {
+                return;
+            }
+            const url = window.location.href.split('#')[0];
+            shareButton.disabled = true;
+            const succeeded = await copyTextToClipboard(url);
+            if (succeeded) {
+                shareButton.textContent = 'Link copied!';
+                setShareStatus('Copied to clipboard', 'success');
+            } else {
+                shareButton.textContent = 'Copy failed';
+                setShareStatus('Unable to copy link', 'error');
+            }
+            setTimeout(resetShareButton, 1800);
+        };
+
+        if (shareButton) {
+            shareButton.addEventListener('click', handleShareButtonClick);
         }
 
         function createStageCell(stageData) {
@@ -127,6 +207,85 @@
             }
 
             return td;
+        }
+
+        const stageConfigs = {
+            sectional: {
+                title: 'Sectional Spotlight',
+                accent: 'text-rose-700',
+                emptyText: 'Chasing that first sectional medal…',
+            },
+            regional: {
+                title: 'Regional Rise',
+                accent: 'text-rose-700',
+                emptyText: 'All gas, no podium yet. It\'s coming.',
+            },
+            state: {
+                title: 'State Legends',
+                accent: 'text-rose-700',
+                emptyText: 'A state medal would look good here.',
+            },
+        };
+
+        function getMedalCircleClass(place) {
+            if (place === 1) {
+                return 'bg-yellow-300 text-yellow-900 shadow-lg shadow-yellow-500/50 ring-2 ring-white/60';
+            }
+            if (place === 2) {
+                return 'bg-slate-200 text-slate-800 shadow-md shadow-slate-400/40 ring-2 ring-white/50';
+            }
+            if (place === 3) {
+                return 'bg-amber-600 text-white shadow-lg shadow-amber-700/40 ring-2 ring-white/40';
+            }
+            if (typeof place === 'number' && place > 3) {
+                return 'bg-sky-100 text-sky-700 shadow-inner ring-2 ring-white/30';
+            }
+            return 'bg-slate-100 text-slate-700 shadow-inner ring-2 ring-white/30';
+        }
+
+        function createMedalElement(entry) {
+            const wrapper = document.createElement('button');
+            wrapper.type = 'button';
+            wrapper.className = 'group relative flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition z-0';
+            wrapper.setAttribute('aria-label', `${entry.event || 'Event'} medal`);
+
+            const circleClass = getMedalCircleClass(entry.place);
+            const circle = document.createElement('div');
+            circle.className = `w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-lg font-extrabold tracking-tight shadow-lg ${circleClass}`;
+            circle.textContent = entry.place_label || 'Q';
+
+            const detailPanel = document.createElement('div');
+            detailPanel.className = 'absolute top-full left-1/2 -translate-x-1/2 mt-3 w-48 sm:w-56 rounded-2xl bg-white shadow-2xl border border-rose-100 p-3 text-[11px] sm:text-xs text-gray-700 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto transition z-20';
+
+            const detailLines = [
+                entry.year ? `${entry.year}${entry.is_relay ? ' • Relay' : ''}` : (entry.is_relay ? 'Relay' : null),
+                entry.result ? `Result: ${entry.result}` : null,
+                entry.place_label ? `Place: ${entry.place_label}` : null,
+            ].filter(Boolean);
+
+            detailPanel.innerHTML = `
+                <p class="font-bold text-gray-900 text-sm">${entry.event || 'Event'}</p>
+                <div class="mt-1 space-y-1">
+                    ${detailLines.map(line => `<p>${line}</p>`).join('') || '<p>Qualified</p>'}
+                </div>
+            `;
+
+            wrapper.appendChild(circle);
+            wrapper.appendChild(detailPanel);
+
+            const elevate = () => {
+                wrapper.style.zIndex = '40';
+            };
+            const resetElevation = () => {
+                wrapper.style.zIndex = '';
+            };
+
+            wrapper.addEventListener('mouseenter', elevate);
+            wrapper.addEventListener('mouseleave', resetElevation);
+            wrapper.addEventListener('focus', elevate);
+            wrapper.addEventListener('blur', resetElevation);
+
+            return wrapper;
         }
 
         try {
@@ -175,27 +334,34 @@
             badgesContainer.innerHTML = '';
 
             const badgeStages = ['sectional', 'regional', 'state'];
-            badgeStages.forEach(stage => {
-                const badge = data.badges[stage];
-                const badgeCard = document.createElement('div');
-                badgeCard.className = 'card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow';
+            badgeStages.forEach(stageKey => {
+                const stageData = data.badges[stageKey];
+                const config = stageConfigs[stageKey];
 
-                if (badge) {
-                    badgeCard.innerHTML = `
-                            <div class="card-body p-4 sm:p-6">
-                                <h3 class="card-title text-primary capitalize text-lg sm:text-xl break-words">${stage}</h3>
-                                <p class="text-xl sm:text-2xl font-bold break-words">${badge.label || badge.stage}</p>
-                                ${badge.best_percentile ? `<p class="text-xs sm:text-sm text-gray-600">Top ${badge.best_percentile.toFixed(1)}%</p>` : ''}
-                                ${badge.placer_count ? `<p class="text-xs sm:text-sm text-gray-600">${badge.placer_count} placements</p>` : ''}
+                const badgeCard = document.createElement('div');
+                badgeCard.className = 'rounded-3xl border border-gray-200 bg-gray-50/80 p-4 sm:p-6 flex flex-col gap-4 shadow-sm';
+
+                const headingLabel = stageData?.label || `${stageKey.charAt(0).toUpperCase()}${stageKey.slice(1)} Stage`;
+                const totalAppearances = stageData?.entries?.length || 0;
+
+                badgeCard.innerHTML = `
+                        <div class="flex flex-wrap items-center gap-3 justify-between">
+                            <div>
+                                <h3 class="text-2xl font-black text-gray-900">${config.title}</h3>
+                                <p class="text-sm text-gray-600">${headingLabel}</p>
                             </div>
-                        `;
-                } else {
-                    badgeCard.innerHTML = `
-                            <div class="card-body p-4 sm:p-6 opacity-50">
-                                <h3 class="card-title text-gray-500 capitalize text-lg sm:text-xl">${stage}</h3>
-                                <p class="text-gray-400">No data</p>
-                            </div>
-                        `;
+                        </div>
+                        <div class="flex flex-wrap gap-3 sm:gap-4" data-stage-medals="${stageKey}"></div>
+                        ${(!stageData || !stageData.entries || stageData.entries.length === 0)
+                        ? `<p class="text-sm text-gray-500 italic">${config.emptyText}</p>`
+                        : ''}
+                    `;
+
+                const medalWrap = badgeCard.querySelector(`[data-stage-medals="${stageKey}"]`);
+                if (stageData?.entries?.length) {
+                    stageData.entries.forEach(entry => {
+                        medalWrap.appendChild(createMedalElement(entry));
+                    });
                 }
 
                 badgesContainer.appendChild(badgeCard);
