@@ -49,10 +49,10 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.className = 'btn btn-ghost p-2 px-4 bg-gray-100 rounded-full w-full text-left justify-between flex';
 
             if (item.type === 'school') {
-        btn.innerHTML = `
-              <span class="result-text">${escapeHtml(item.name)}</span>
-              <span class="result-badge font-bold border-2 border-green-500 text-green-600" style="margin-right:4px;">School</span>
-            `.trim();
+              btn.innerHTML = `
+                            <span class="result-text">${escapeHtml(item.name)}</span>
+                            <span class="result-badge font-bold border-2 border-green-500 text-green-600 rounded-full" style="margin-right:4px;">School</span>
+                        `.trim();
               btn.addEventListener('click', () => {
                 window.location.href = `/school-dashboard/${item.id}`;
                 console.log('Navigating to school ID:', item.id);
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function () {
               const classYear = item.graduation_year ? escapeHtml(item.graduation_year) : '00';
         btn.innerHTML = `
               <span class="result-text">${escapeHtml(item.name)}, Class of ${classYear} - ${escapeHtml(item.school || '')}</span>
-              <span class="result-badge font-bold border-2 ${genderBadgeClass}" style="margin-right:4px;">${genderLabel}</span>
+              <span class="result-badge font-bold border-2 rounded-full px-1 ${genderBadgeClass}" style="margin-right:4px;">${genderLabel}</span>
             `.trim();
               btn.addEventListener('click', () => {
                 window.location.href = `/athlete-dashboard/${item.id}`;
