@@ -142,7 +142,7 @@
       font-size: clamp(3.5rem, 8vw, 8rem);
       color: rgba(255, 255, 255, 0.92);
       text-align: center;
-      cursor: pointer;
+      /* cursor: pointer; */
       border-radius: clamp(1.5rem, 4vw, 3.5rem);
       transition: transform 450ms cubic-bezier(0.19, 1, 0.22, 1),
         letter-spacing 450ms cubic-bezier(0.19, 1, 0.22, 1),
@@ -182,7 +182,7 @@
       margin-top: clamp(0.5rem, 1.2vw, 1rem);
       font-size: clamp(0.75rem, 1.4vw, 1.2rem);
       letter-spacing: 0.45em;
-      color: rgba(255, 255, 255, 0.65);
+      color: rgba(205, 205, 205, 1);
       font-family: 'Poppins', 'Segoe UI', sans-serif;
       text-transform: uppercase;
       transition: opacity 250ms ease, transform 300ms ease;
@@ -194,6 +194,31 @@
 
     .hero-title__desktop-space {
       display: none;
+    }
+
+    .hero-title--static {
+      pointer-events: none;
+      cursor: default;
+      transition: none;
+    }
+
+    .hero-title--static:hover,
+    .hero-title--static:focus-visible {
+      transform: none;
+      letter-spacing: clamp(0.2rem, 1.5vw, 0.8rem);
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    .hero-title--static::before {
+      opacity: 0;
+      transform: scale(0.94);
+      backdrop-filter: blur(0px);
+      -webkit-backdrop-filter: blur(0px);
+    }
+
+    .hero-title--static .hero-title__hint,
+    .hero-title__hint--hidden {
+      display: none !important;
     }
 
     .hero-title:hover,
@@ -226,10 +251,23 @@
       .hero-title {
         padding: clamp(1.5rem, 6vw, 3rem) clamp(1.75rem, 7vw, 3.5rem);
         letter-spacing: clamp(0.2rem, 1.5vw, 0.8rem);
+        width: min(88vw, 360px);
+        margin: 0 auto;
       }
 
       .hero-title::before {
         inset: clamp(-1.75rem, -4vw, -1rem);
+      }
+    }
+
+    @media (max-width: 900px) and (orientation: landscape) {
+      .hero-title {
+        pointer-events: none;
+        cursor: default;
+      }
+
+      .hero-title__hint {
+        display: none;
       }
     }
 
@@ -248,6 +286,32 @@
 
       .hero-title__hint {
         display: none;
+      }
+
+      .hero-title:hover,
+      .hero-title:focus-visible {
+        transform: none;
+        letter-spacing: clamp(0.3rem, 1vw, 1.4rem);
+        color: rgba(255, 255, 255, 0.92);
+      }
+
+      .hero-title:hover::before,
+      .hero-title:focus-visible::before {
+        opacity: 0;
+        transform: scale(0.94);
+        backdrop-filter: blur(0px);
+        -webkit-backdrop-filter: blur(0px);
+      }
+
+      .hero-title:hover .hero-title__text,
+      .hero-title:focus-visible .hero-title__text {
+        filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.45));
+      }
+
+      .hero-title:hover .hero-title__hint,
+      .hero-title:focus-visible .hero-title__hint {
+        opacity: 1;
+        transform: none;
       }
     }
 
@@ -269,6 +333,48 @@
     }
 
   </style>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const heroTitle = document.querySelector('.hero-title');
+      const heroHint = document.querySelector('.hero-title__hint');
+
+      if (!heroTitle) {
+        return;
+      }
+
+      const landscapeQuery = window.matchMedia('(max-width: 900px) and (orientation: landscape)');
+
+      const updateHeroInteractivity = () => {
+        const isLandscapeMobile = landscapeQuery.matches;
+
+        if (isLandscapeMobile) {
+          heroTitle.classList.add('hero-title--static');
+          heroTitle.removeAttribute('tabindex');
+        } else {
+          heroTitle.classList.remove('hero-title--static');
+          if (!heroTitle.hasAttribute('tabindex')) {
+            heroTitle.setAttribute('tabindex', '0');
+          }
+        }
+
+        if (heroHint) {
+          heroHint.classList.toggle('hero-title__hint--hidden', isLandscapeMobile);
+        }
+      };
+
+      updateHeroInteractivity();
+
+      if (landscapeQuery.addEventListener) {
+        landscapeQuery.addEventListener('change', updateHeroInteractivity);
+      } else if (landscapeQuery.addListener) {
+        landscapeQuery.addListener(updateHeroInteractivity);
+      }
+
+      window.addEventListener('orientationchange', updateHeroInteractivity);
+      window.addEventListener('resize', updateHeroInteractivity);
+    });
+  </script>
 
 </div>
 </div>
