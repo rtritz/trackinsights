@@ -29,6 +29,11 @@ def test_home_status(client):
     assert rv.status_code == 200
 
 
+def test_search_page_status(client):
+    rv = client.get('/search')
+    assert rv.status_code == 200
+
+
 def test_api_athletes(client):
     with client.application.app_context():
         athlete_id = seed_dashboard_data()

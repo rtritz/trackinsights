@@ -98,14 +98,14 @@
       })();
     </script>
 
-    <div class="hero-title" tabindex="0">
+  <div class="hero-title no-select" tabindex="0">
       <span class="hero-title__text">
-        Track Insights
+        Track<span class="hero-title__desktop-space">&nbsp;</span><br class="hero-title__break" />Insights
       </span>
-      <!-- <span class="hero-title__hint">Press to search for your athlete</span> -->
+      <span class="hero-title__hint">Press to find an athlete</span>
     </div>
 
-    <div class="absolute bottom-4 right-4 md:bottom-6 md:right-6 text-[10px] sm:text-xs  uppercase text-white/80 drop-shadow-lg font-semibold">
+  <div class="absolute bottom-4 right-4 md:bottom-6 md:right-6 text-[10px] sm:text-xs  uppercase text-white/80 drop-shadow-lg font-semibold no-select">
       Images licensed from IndyStar
     </div>
   </div>
@@ -122,6 +122,12 @@
 
 
   <style>
+    .no-select {
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
     .hero-title {
       position: relative;
       z-index: 5;
@@ -166,6 +172,12 @@
       transition: filter 350ms ease;
     }
 
+    @media (max-width: 640px) {
+      .hero-title__text {
+        line-height: 0.95;
+      }
+    }
+
     .hero-title__hint {
       margin-top: clamp(0.5rem, 1.2vw, 1rem);
       font-size: clamp(0.75rem, 1.4vw, 1.2rem);
@@ -174,6 +186,14 @@
       font-family: 'Poppins', 'Segoe UI', sans-serif;
       text-transform: uppercase;
       transition: opacity 250ms ease, transform 300ms ease;
+    }
+
+    .hero-title__break {
+      display: inline;
+    }
+
+    .hero-title__desktop-space {
+      display: none;
     }
 
     .hero-title:hover,
@@ -210,6 +230,24 @@
 
       .hero-title::before {
         inset: clamp(-1.75rem, -4vw, -1rem);
+      }
+    }
+
+    @media (min-width: 1024px) {
+      .hero-title__text {
+        white-space: nowrap;
+      }
+
+      .hero-title__break {
+        display: none;
+      }
+
+      .hero-title__desktop-space {
+        display: inline;
+      }
+
+      .hero-title__hint {
+        display: none;
       }
     }
 

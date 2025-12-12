@@ -149,10 +149,19 @@
   </style>
 
   
-  <nav class="navbar fixed top-3 right-6 md:top-4 md:right-10 z-50 bg-transparent" aria-label="Primary">
-    <div class="navbar-start w-[1%]"></div>
-    <div class="navbar-center w-[1%]"></div>
-  <div class="navbar-end w-[98%] gap-2 sm:gap-3 relative overflow-visible">
+  <nav class="navbar fixed top-0 md:top-3 left-0 right-0 px-3 sm:px-5 md:px-10 z-50 bg-white shadow-md md:bg-transparent md:shadow-none" aria-label="Primary">
+    <div class="flex w-full items-center justify-between gap-3 md:hidden">
+      <a href="{{ url_for('main.home') }}" class="font-impact italic text-primary text-2xl font-bold tracking-widest"
+        style="font-family: Impact, 'Arial Black', sans-serif;">Track Insights</a>
+        <button type="button" id="mobile-nav-toggle"
+        class="btn btn-circle btn-primary btn-sm text-white border-none shadow-lg" aria-label="Open menu">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+    </div>
+    <div class="navbar-end hidden md:flex w-full gap-2 sm:gap-3 relative overflow-visible justify-end">
       <a href="{{ url_for('main.home') }}" aria-label="Home" class="nav-pill">
         <span class="nav-pill__icon-bubble" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="nav-pill__icon" aria-hidden="true"
@@ -163,8 +172,8 @@
         </span>
         <span class="nav-pill__label">Home</span>
       </a>
-      <div id="search-pill" class="search-pill" data-open="false" role="button" tabindex="0" aria-expanded="false"
-        aria-controls="results">
+      <div id="nav-search-pill" class="search-pill" data-open="false" role="button" tabindex="0"
+        aria-expanded="false" aria-controls="nav-search-results">
         <span class="search-pill__icon-bubble" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
             stroke-linecap="round" stroke-linejoin="round" class="search-pill__icon">
@@ -173,12 +182,12 @@
           </svg>
         </span>
         <div class="search-pill__content">
-          <form id="searchForm" class="search-pill__form" role="search" onsubmit="return false;" novalidate>
-            <label for="searchInput" class="sr-only">Search for your athlete's name and school</label>
-            <input id="searchInput" name="q" type="text" placeholder="Search for your athlete's name and school"
+          <form id="navSearchForm" class="search-pill__form" role="search" onsubmit="return false;" novalidate>
+            <label for="navSearchInput" class="sr-only">Search for your athlete's name and school</label>
+            <input id="navSearchInput" name="q" type="text" placeholder="Search for your athlete's name and school"
               autocomplete="off" class="search-pill__input" />
           </form>
-          <button type="button" id="search-close" class="search-pill__close" aria-label="Close search">
+          <button type="button" id="nav-search-close" class="search-pill__close" aria-label="Close search">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -208,9 +217,25 @@
         </span>
         <span class="nav-pill__label">About</span>
       </a>
-      <div id="results" class="search-results-panel text-base-content"></div>
+      <div id="nav-search-results" class="search-results-panel text-base-content"></div>
     </div>
   </nav>
+  <div id="mobile-nav-overlay"
+    class="fixed inset-0 bg-[#9b0a14] text-white hidden flex-col items-center justify-center gap-8 px-6 py-10 z-[60]">
+    <button type="button" id="mobile-nav-close" class="absolute top-6 right-6 btn btn-ghost btn-circle text-white"
+      aria-label="Close menu">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+    <nav class="flex flex-col items-center gap-6 text-2xl font-impact tracking-wider text-center">
+      <a href="{{ url_for('main.home') }}" class="mobile-menu-link uppercase">Home</a>
+      <a href="{{ url_for('main.search_page') }}" class="mobile-menu-link uppercase">Search</a>
+      <a href="{{ url_for('main.queries_page') }}" class="mobile-menu-link uppercase">Queries</a>
+      <a href="{{ url_for('main.about') }}" class="mobile-menu-link uppercase">About</a>
+    </nav>
+  </div>
   
 
   <style>
@@ -517,6 +542,40 @@
         border-radius: 1.5rem;
       }
     }
+
+    #mobile-nav-overlay {
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 200ms ease;
+    }
+
+    #mobile-nav-overlay.flex {
+      pointer-events: auto;
+      opacity: 1;
+    }
+
+    .mobile-menu-link {
+      font-size: clamp(1.75rem, 6vw, 2.75rem);
+      letter-spacing: 0.2em;
+      position: relative;
+    }
+
+    .mobile-menu-link::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: -0.4rem;
+      width: 0;
+      height: 3px;
+      background: #fff;
+      transition: width 200ms ease;
+    }
+
+    .mobile-menu-link:hover::after,
+    .mobile-menu-link:focus-visible::after {
+      width: 80%;
+    }
   </style>
   
   <script>
@@ -551,17 +610,52 @@
       const scrollZone = document.getElementById('scroll-zone');
       const customCursor = document.getElementById('custom-cursor');
       const heroTitle = document.querySelector('.hero-title');
-      const searchPill = document.getElementById('search-pill');
-      const searchInput = document.getElementById('searchInput');
-      const searchClose = document.getElementById('search-close');
-      const searchForm = document.getElementById('searchForm');
-      const resultsPanel = document.getElementById('results');
+      const searchPill = document.getElementById('nav-search-pill');
+      const searchInput = document.getElementById('navSearchInput');
+      const searchClose = document.getElementById('nav-search-close');
+      const searchForm = document.getElementById('navSearchForm');
+      const resultsPanel = document.getElementById('nav-search-results');
       const queriesButton = document.getElementById('queries-toggle');
       const aboutButton = document.getElementById('about-toggle');
       const navbarEnd = document.querySelector('.navbar-end');
+      const mobileNavToggle = document.getElementById('mobile-nav-toggle');
+      const mobileNavOverlay = document.getElementById('mobile-nav-overlay');
+      const mobileNavClose = document.getElementById('mobile-nav-close');
+      const mobileMenuLinks = Array.from(document.querySelectorAll('#mobile-nav-overlay .mobile-menu-link'));
       let isInZone = false;
       let isSearchOpen = false;
       let resultsPanelTimeoutId = null;
+
+      const isMobileViewport = () => window.matchMedia('(max-width: 767px)').matches;
+      const redirectToSearchPage = () => {
+        window.location.href = "{{ url_for('main.search_page') }}";
+      };
+
+      const openMobileMenu = () => {
+        if (!mobileNavOverlay) return;
+        mobileNavOverlay.classList.remove('hidden');
+        mobileNavOverlay.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+      };
+
+      const closeMobileMenu = () => {
+        if (!mobileNavOverlay) return;
+        mobileNavOverlay.classList.add('hidden');
+        mobileNavOverlay.classList.remove('flex');
+        document.body.style.overflow = '';
+      };
+
+      if (mobileNavToggle) {
+        mobileNavToggle.addEventListener('click', openMobileMenu);
+      }
+
+      if (mobileNavClose) {
+        mobileNavClose.addEventListener('click', closeMobileMenu);
+      }
+
+      mobileMenuLinks.forEach(link => {
+        link.addEventListener('click', closeMobileMenu);
+      });
 
       const adjustResultsPanelBounds = () => {
         if (!resultsPanel || !searchPill || !aboutButton || !navbarEnd) return;
@@ -631,7 +725,7 @@
 
       if (searchPill) {
         searchPill.addEventListener('click', (event) => {
-          if (event.target.closest('#search-close')) {
+          if (event.target.closest('#nav-search-close')) {
             return;
           }
           if (!isSearchOpen) {
@@ -678,17 +772,33 @@
       });
 
       if (heroTitle) {
-        heroTitle.addEventListener('click', openSearch);
+        heroTitle.addEventListener('click', () => {
+          if (isMobileViewport()) {
+            redirectToSearchPage();
+            return;
+          }
+          openSearch();
+        });
         heroTitle.addEventListener('keydown', (event) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
+            if (isMobileViewport()) {
+              redirectToSearchPage();
+              return;
+            }
             openSearch();
           }
         });
       }
 
       if (scrollZone) {
-        scrollZone.addEventListener('click', openSearch);
+        scrollZone.addEventListener('click', () => {
+          if (isMobileViewport()) {
+            redirectToSearchPage();
+            return;
+          }
+          openSearch();
+        });
 
         scrollZone.addEventListener('mouseenter', function () {
           isInZone = true;
@@ -742,8 +852,8 @@
 
   {% block content %}{% endblock %}
 
-  <footer class="hidden footer sm:footer-horizontal bg-base-100 text-black items-center p-4 relative">
-    <aside class="grid-flow-col items-center">
+  <footer class="hidden footer sm:footer-horizontal bg-base-200 text-black items-center p-4 relative">
+    <aside class="hidden grid-flow-col items-center">
       <svg width="36" height="36" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill-rule="evenodd"
         clip-rule="evenodd" class="fill-current">
         <path
