@@ -29,7 +29,6 @@ def where_do_i_rank(
     gender: str,
     year: int,
     meet_type: str = "Sectional",
-    result_type: str = "Final",
 ):
     """Thin wrapper so existing callers can import from this module.
 
@@ -44,7 +43,6 @@ def where_do_i_rank(
         gender=gender,
         year=year,
         meet_type=meet_type,
-        result_type=result_type,
     )
 
 

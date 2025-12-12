@@ -96,7 +96,7 @@
     }
 
     .slide-out {
-      animation: slideOutRight .6s ease-in-out forwards;
+      animation: slideOutRight .5s ease-in-out forwards;
     }
 
     @keyframes menuSlideIn {
@@ -187,7 +187,7 @@
           </button>
         </div>
       </div>
-      <button type="button" id="queries-toggle" aria-label="Queries" class="nav-pill">
+      <a href="{{ url_for('main.queries_page') }}" id="queries-toggle" aria-label="Queries" class="nav-pill">
         <span class="nav-pill__icon-bubble" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" class="nav-pill__icon" fill="currentColor"
             aria-hidden="true" focusable="false">
@@ -196,7 +196,7 @@
           </svg>
         </span>
         <span class="nav-pill__label">Queries</span>
-      </button>
+      </a>
       <a href="{{ url_for('main.about') }}" id="about-toggle" aria-label="About" class="nav-pill">
         <span class="nav-pill__icon-bubble" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="nav-pill__icon" aria-hidden="true"
@@ -542,7 +542,7 @@
         setTimeout(() => {
           overlay.remove();
         }, 600);
-      }, 2000);
+      }, 700);
     });
   </script>
 

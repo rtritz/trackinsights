@@ -13,6 +13,16 @@ def search_page():
     return render_template('athlete-search.html')
 
 
+@main_bp.route('/queries')
+def queries_page():
+    return render_template('queries.html')
+
+
+@main_bp.route('/queries/percentiles')
+def percentiles_query_page():
+    return render_template('queries-percentiles.html')
+
+
 @main_bp.route('/athlete-dashboard/<int:athlete_id>')
 def athlete_dashboard(athlete_id):
     return render_template('athlete-dashboard.html', athlete_id=athlete_id)
