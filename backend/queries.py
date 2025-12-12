@@ -1,4 +1,7 @@
+import re
+import sys
 from functools import lru_cache
+from pathlib import Path
 
 from sqlalchemy import or_, func, and_
 from sqlalchemy.orm import joinedload
@@ -23,6 +26,139 @@ SPRINT_DNQ_EVENTS = {
     "100 Hurdles",
     "110 Hurdles",
 }
+
+SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
+if SCRIPTS_DIR.is_dir():
+    scripts_path = str(SCRIPTS_DIR)
+    if scripts_path not in sys.path:
+        sys.path.insert(0, scripts_path)
+
+try:  # pragma: no-cover
+    from percentiles import get_percentiles as _script_get_percentiles  # type: ignore
+    from util.const_util import CONST  # type: ignore
+except Exception as exc:  # pragma: no-cover
+    _script_get_percentiles = None
+    _SCRIPT_IMPORT_ERROR = exc
+else:
+    _SCRIPT_IMPORT_ERROR = None
+
+DEFAULT_PERCENTILES = (25, 50, 75)
+PERCENTILE_CHOICES = (10, 25, 50, 75, 90, 95)
+GRADE_LEVELS = ("FR", "SO", "JR", "SR")
+
+
+def _require_percentile_script():
+    if _script_get_percentiles is None:
+        message = (
+            "The percentiles script could not be imported. "
+            "See the original exception for details: "
+            f"{_SCRIPT_IMPORT_ERROR!r}"
+        )
+        raise RuntimeError(message)
+
+
+def _unique_events():
+    event_groups = (
+        getattr(CONST.EVENT, "ALL_TRACK", []),
+        getattr(CONST.EVENT, "ALL_FIELD", []),
+        getattr(CONST.EVENT, "ALL_RELAY", []),
+        getattr(CONST.EVENT, "ALL_GIRLS_HURDLES", []),
+        getattr(CONST.EVENT, "ALL_BOYS_HURDLES", []),
+    )
+    seen = set()
+    output = []
+    for group in event_groups:
+        for name in group:
+            if name not in seen:
+                seen.add(name)
+                output.append(name)
+    return sorted(output)
+
+
+@lru_cache(maxsize=1)
+def _available_meet_years(limit: int = 30):
+    db_path = Path(getattr(CONST, "DB_PATH", "")).expanduser()
+    if not db_path.exists():
+        return []
+
+    import sqlite3
+
+    query = "SELECT DISTINCT year FROM meet WHERE year IS NOT NULL ORDER BY year DESC LIMIT ?"
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute(query, (limit,)).fetchall()
+    return [int(row[0]) for row in rows if row and row[0] is not None]
+
+
+def get_percentile_options():
+    _require_percentile_script()
+    return {
+        "events": _unique_events(),
+        "genders": list(getattr(CONST.GENDER, "ALL", [])),
+        "meet_types": list(getattr(CONST.MEET_TYPE, "ALL", [])),
+        "grade_levels": list(GRADE_LEVELS),
+        "default_percentiles": list(DEFAULT_PERCENTILES),
+        "percentile_choices": list(PERCENTILE_CHOICES),
+        "years": _available_meet_years(),
+        "db_path": str(getattr(CONST, "DB_PATH", "")),
+    }
+
+
+def _coerce_sequence(values, item_cast):
+    processed = []
+    for raw in values:
+        if raw is None:
+            continue
+        text = str(raw).strip()
+        if not text:
+            continue
+        processed.append(item_cast(text))
+    return tuple(processed)
+
+
+def _tuple_or_none(seq):
+    if not seq:
+        return None
+    return tuple(seq)
+
+
+def get_percentiles_report(
+    *,
+    events=None,
+    genders=None,
+    percentiles=None,
+    years=None,
+    meet_types=None,
+    grade_levels=None,
+):
+    _require_percentile_script()
+
+    kwargs = {
+        "events": _tuple_or_none(_coerce_sequence(events or [], str)),
+        "genders": _tuple_or_none(_coerce_sequence(genders or [], str)),
+        "percentiles": _tuple_or_none(
+            _coerce_sequence(percentiles or DEFAULT_PERCENTILES, int)
+        ),
+        "years": _tuple_or_none(_coerce_sequence(years or [], int)),
+        "meet_types": _tuple_or_none(_coerce_sequence(meet_types or [], str)),
+        "grade_levels": _tuple_or_none(
+            _coerce_sequence(grade_levels or [], lambda text: text.upper())
+        ),
+    }
+
+    df = _script_get_percentiles(**kwargs)
+    if df is None:
+        return {"columns": [], "rows": [], "filters": kwargs}
+
+    columns = [str(column) for column in df.columns]
+    raw_rows = df.to_dict(orient="records")
+    rows = [{str(key): value for key, value in row.items()} for row in raw_rows]
+
+    return {
+        "columns": columns,
+        "rows": rows,
+        "filters": {k: v for k, v in kwargs.items() if v},
+        "result_count": len(rows),
+    }
 
 
 def get_athletes(limit=100):
@@ -338,10 +474,11 @@ def _compute_badges(athlete_id: int):
     regional = [item for item in stage_results if item[1].meet_type == "Regional"]
     state = [item for item in stage_results if item[1].meet_type == "State"]
 
+    podium_threshold = 3
     return {
-        "sectional": _compute_stage_badge("Sectional", sectional, placer_threshold=8),
-        "regional": _compute_stage_badge("Regional", regional, placer_threshold=8),
-        "state": _compute_stage_badge("State", state, placer_threshold=9),
+        "sectional": _compute_stage_badge("Sectional", sectional, placer_threshold=podium_threshold),
+        "regional": _compute_stage_badge("Regional", regional, placer_threshold=podium_threshold),
+        "state": _compute_stage_badge("State", state, placer_threshold=podium_threshold),
     }
 
 
@@ -384,25 +521,54 @@ def _compute_stage_badge(stage_name, results, placer_threshold):
         if res.place is not None and res.place > 0 and res.place <= placer_threshold:
             placer_count += 1
 
+    payload = None
     if placer_count:
         count_prefix = f"{placer_count} x " if placer_count > 1 else ""
-        return {
+        payload = {
             "stage": stage_name,
             "achievement": "Placer",
             "count": placer_count,
             "label": f"{count_prefix}{stage_name} Placer",
         }
-
-    if qualifier_count:
+    elif qualifier_count:
         count_prefix = f"{qualifier_count} x " if qualifier_count > 1 else ""
-        return {
+        payload = {
             "stage": stage_name,
             "achievement": "Qualifier",
             "count": qualifier_count,
             "label": f"{count_prefix}{stage_name} Qualifier",
         }
 
-    return None
+    if not payload:
+        return None
+
+    payload["qualifier_count"] = qualifier_count
+    payload["placer_count"] = placer_count
+    payload["entries"] = _serialize_stage_entries(results)
+    return payload
+
+
+def _serialize_stage_entries(results):
+    serialized = []
+    for res, meet in results:
+        place_value = res.place if (res.place is not None and res.place > 0) else None
+        serialized.append(
+            {
+                "event": res.event,
+                "result": res.result,
+                "place": place_value,
+                "place_label": _format_place_label(place_value) if place_value else None,
+                "meet_id": getattr(res, "meet_id", None),
+                "meet_type": meet.meet_type,
+                "year": meet.year,
+                "meet_host": meet.host,
+                "result_type": getattr(res, "result_type", "Final"),
+                "is_relay": isinstance(res, RelayResult),
+            }
+        )
+
+    serialized.sort(key=lambda entry: (entry["year"] or 0, entry["event"] or ""), reverse=True)
+    return serialized
 
 
 def _build_playoff_history(athlete_id: int):
@@ -745,6 +911,20 @@ def get_athlete_result_rankings(athlete_id: int, meet_id: int, event_name: str, 
         if grade_info:
             grade_info["criteria"] = {"grade": result_grade}
 
+    where_do_i_rank = None
+    performance_input = athlete_result.result or athlete_result.result2
+    if performance_input:
+        try:
+            where_do_i_rank = estimate_event_rank(
+                event_name=event_name,
+                performance_value=performance_input,
+                gender=gender,
+                year=year,
+                meet_type=meet_type,
+            )
+        except Exception:  # pragma: no-cover - defensive guard
+            where_do_i_rank = None
+
     return {
         "context": {
             "year": year,
@@ -774,6 +954,7 @@ def get_athlete_result_rankings(athlete_id: int, meet_id: int, event_name: str, 
             "like_schools": like_info,
             "same_grade": grade_info,
         },
+        "where_do_i_rank": where_do_i_rank,
     }
 
 
@@ -781,10 +962,83 @@ def _fetch_relay_rows_for_athlete(athlete_id, meet_types=None, min_year=None):
     if athlete_id is None:
         return []
 
-    # The production Track.db dataset does not provide a reliable
-    # athlete-to-relay mapping, so skip relay aggregation when the
-    # necessary columns are unavailable.
-    return []
+    athlete = Athlete.query.filter_by(athlete_id=athlete_id).one_or_none()
+    if not athlete:
+        return []
+
+    normalized_name = _normalize_name_text(f"{athlete.first or ''} {athlete.last or ''}")
+    if not normalized_name:
+        return []
+
+    query = (
+        db.session.query(RelayResult, Meet, Event)
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .join(Event, RelayResult.event == Event.event)
+    )
+
+    if athlete.school_id is not None:
+        query = query.filter(RelayResult.school_id == athlete.school_id)
+
+    if athlete.gender:
+        query = query.filter(Meet.gender == athlete.gender)
+
+    if meet_types:
+        query = query.filter(Meet.meet_type.in_(tuple(meet_types)))
+
+    if min_year is not None:
+        query = query.filter(Meet.year.isnot(None), Meet.year >= min_year)
+
+    last_name = (athlete.last or "").strip().lower()
+    if last_name:
+        query = query.filter(func.lower(RelayResult.athlete_names).like(f"%{last_name}%"))
+
+    matched_rows = []
+    for relay_result, meet, event in query.all():
+        names_blob = relay_result.athlete_names or ""
+        if _relay_entry_includes_athlete(names_blob, normalized_name):
+            matched_rows.append((relay_result, meet, event))
+
+    return matched_rows
+
+
+_RELAY_NAME_DELIMITER = re.compile(r"\band\b|&|/|;|,|\+", re.IGNORECASE)
+
+
+def _normalize_name_text(value: str) -> str:
+    if not value:
+        return ""
+    cleaned = re.sub(r"[^a-zA-Z\s]", " ", value)
+    return " ".join(cleaned.lower().split())
+
+
+def _relay_entry_includes_athlete(names_blob: str, normalized_target: str) -> bool:
+    if not names_blob or not normalized_target:
+        return False
+
+    target_tokens = normalized_target.split()
+    if not target_tokens:
+        return False
+
+    for candidate in _extract_relay_names(names_blob):
+        if not candidate:
+            continue
+        candidate_tokens = candidate.split()
+        if all(token in candidate_tokens for token in target_tokens):
+            return True
+    return False
+
+
+def _extract_relay_names(names_blob: str):
+    if not names_blob:
+        return []
+
+    pieces = _RELAY_NAME_DELIMITER.split(names_blob)
+    normalized = []
+    for piece in pieces:
+        value = _normalize_name_text(piece)
+        if value:
+            normalized.append(value)
+    return normalized
 
 
 def _select_preferred_result(existing, candidate):
@@ -1008,26 +1262,15 @@ def estimate_event_rank(
     gender: str,
     year: int,
     meet_type: str = "Sectional",
-    result_type: str = "Final",
 ):
-    """Project where a hypothetical mark would rank for a given event cohort.
+    """Project how a performance would place at every sectional in scope.
 
-    Mirrors the legacy ``WhereDoIRank`` script so the frontend (or CLI tools)
-    can reuse the logic without duplicating database code.
+    Finals are always preferred for athletes who advanced; prelim marks are
+    used for everyone else so the projection mirrors the legacy
+    ``WhereDoIRank`` script.
 
-    Args:
-        event_name: Event to evaluate (e.g., "1600 Meters").
-        performance_value: User-entered performance. Track events accept
-            strings like "2:05.42" or numeric seconds; field events accept
-            strings like "5' 6\"" or numeric inches.
-        gender: Cohort gender label (e.g., "Girls", "Boys").
-        year: Season year to inspect.
-        meet_type: Playoff stage to compare against (defaults to "Sectional").
-        result_type: Result type to filter on (defaults to "Final").
-
-    Returns:
-        Dict describing the projected placement, or ``None`` if insufficient
-        historical results exist for the requested filters.
+    Both prelim and final performances are considered automatically with
+    finals taking precedence when available.
     """
 
     event = Event.query.filter_by(event=event_name).one_or_none()
@@ -1038,30 +1281,91 @@ def estimate_event_rank(
     normalized_value = _normalize_performance_input(performance_value, event_type)
 
     gender_filter = func.lower(Meet.gender) == (gender or "").strip().lower()
-    query = (
-        db.session.query(AthleteResult.result2)
+    raw_results = (
+        db.session.query(
+            AthleteResult.athlete_id.label("athlete_id"),
+            AthleteResult.meet_id.label("meet_id"),
+            AthleteResult.result2.label("result_value"),
+            AthleteResult.result.label("result_text"),
+            AthleteResult.result_type.label("result_type"),
+            AthleteResult.place.label("place"),
+            Meet.host.label("meet_host"),
+            Meet.meet_num.label("meet_num"),
+        )
         .join(Meet, AthleteResult.meet_id == Meet.meet_id)
         .filter(
             AthleteResult.event == event_name,
-            AthleteResult.result_type == result_type,
             AthleteResult.result2.isnot(None),
-            AthleteResult.place.isnot(None),
             Meet.meet_type == meet_type,
             gender_filter,
             Meet.year == year,
         )
-    )
+    ).all()
 
-    if _is_lower_better(event_type):
-        query = query.order_by(AthleteResult.result2.asc())
-    else:
-        query = query.order_by(AthleteResult.result2.desc())
-
-    result_values = [row[0] for row in query.all() if row[0] is not None]
-    if not result_values:
+    if not raw_results:
         return None
 
-    projected_place = _project_place(result_values, normalized_value, event_type, event_name)
+    lower_is_better = _is_lower_better(event_type)
+    per_meet = {}
+    for row in raw_results:
+        meet_entry = per_meet.setdefault(
+            row.meet_id,
+            {
+                "meet_id": row.meet_id,
+                "host": row.meet_host,
+                "meet_num": row.meet_num,
+                "results": {},
+            },
+        )
+        athlete_bucket = meet_entry["results"]
+        candidate = {
+            "athlete_id": row.athlete_id,
+            "result_value": row.result_value,
+            "result_text": row.result_text,
+            "result_type": row.result_type,
+            "place": row.place,
+        }
+        athlete_bucket[row.athlete_id] = _choose_result_entry(
+            athlete_bucket.get(row.athlete_id), candidate, lower_is_better
+        )
+
+    sectional_results = []
+    all_result_values = []
+    for meet_data in per_meet.values():
+        entries = list(meet_data["results"].values())
+        if not entries:
+            continue
+        values = sorted(
+            (entry["result_value"] for entry in entries),
+            reverse=not lower_is_better,
+        )
+        all_result_values.extend(values)
+        raw_place = _project_place(values, normalized_value, event_type, event_name)
+        numeric_place = _safe_int(raw_place)
+        sectional_results.append(
+            {
+                "meet_id": meet_data["meet_id"],
+                "meet_num": meet_data["meet_num"],
+                "sectional_name": _format_sectional_name(meet_data["host"], meet_data["meet_num"]),
+                "projected_place": numeric_place,
+                "projected_place_label": _format_place_label(raw_place),
+                "field_size": len(values),
+                "result_type_counts": _count_result_types(entries),
+            }
+        )
+
+    if not sectional_results:
+        return None
+
+    sectional_results.sort(
+        key=lambda item: (
+            item["meet_num"] if item.get("meet_num") is not None else float("inf"),
+            item.get("sectional_name") or "",
+        )
+    )
+
+    all_values_sorted = sorted(all_result_values, reverse=not lower_is_better)
+    raw_overall_place = _project_place(all_values_sorted, normalized_value, event_type, event_name)
 
     return {
         "event": event_name,
@@ -1069,10 +1373,11 @@ def estimate_event_rank(
         "gender": gender,
         "year": year,
         "meet_type": meet_type,
-        "result_type": result_type,
-        "comparison_count": len(result_values),
-        "projected_place": projected_place,
+        "comparison_count": len(all_values_sorted),
+        "projected_place": raw_overall_place,
+        "projected_place_label": _format_place_label(raw_overall_place),
         "input_value": normalized_value,
+        "sectional_results": sectional_results,
     }
 
 
@@ -1112,4 +1417,54 @@ def _project_place(result_values, candidate_value, event_type: str, event_name: 
 
 def _is_lower_better(event_type: str) -> bool:
     return event_type != "Field"
+
+
+def _choose_result_entry(existing, candidate, lower_is_better: bool):
+    if existing is None:
+        return candidate
+
+    priority = {"Final": 2, "Semi": 1, "Prelim": 1}
+    existing_weight = priority.get(existing.get("result_type"), 0)
+    candidate_weight = priority.get(candidate.get("result_type"), 0)
+
+    if candidate_weight > existing_weight:
+        return candidate
+    if candidate_weight < existing_weight:
+        return existing
+
+    if lower_is_better:
+        return candidate if candidate["result_value"] < existing["result_value"] else existing
+    return candidate if candidate["result_value"] > existing["result_value"] else existing
+
+
+def _format_sectional_name(host, meet_num):
+    if host and meet_num:
+        return f"{host} (Meet {meet_num})"
+    if host:
+        return host
+    if meet_num:
+        return f"Meet {meet_num}"
+    return "Unknown Sectional"
+
+
+def _safe_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_place_label(value):
+    numeric = _safe_int(value)
+    if numeric is None:
+        return value
+    return _ordinal(numeric)
+
+
+def _count_result_types(entries):
+    counts = {}
+    for entry in entries:
+        label = entry.get("result_type") or "Unknown"
+        counts[label] = counts.get(label, 0) + 1
+    return counts
 
