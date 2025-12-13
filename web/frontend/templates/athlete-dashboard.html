@@ -418,7 +418,7 @@
                 const tbody = document.getElementById('playoff-table-body');
                 data.playoff_history.forEach(row => {
                     const tr = document.createElement('tr');
-                    tr.className = 'hover';
+                    tr.className = 'hover:bg-primary/5';
 
                     const yearCell = document.createElement('td');
                     yearCell.className = 'font-semibold text-xs sm:text-sm lg:text-base whitespace-nowrap';
