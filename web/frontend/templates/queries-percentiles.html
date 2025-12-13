@@ -17,8 +17,7 @@
         Back
       </a>
       <header class="text-center space-y-4">
-        <h1 class="font-impact italic text-4xl sm:text-5xl text-primary"
-          style="font-family: Impact, 'Arial Black', sans-serif;">
+        <h1 class="font-impact italic text-4xl sm:text-5xl text-primary">
           Query: Track & Field Percentiles
         </h1>
 
@@ -28,9 +27,9 @@
         <div class="flex flex-wrap lg:flex-nowrap gap-6 items-stretch">
           <section
             class="bg-white border border-base-200/80 rounded-2xl shadow-lg shadow-base-300/40 w-full lg:w-[22rem] xl:w-[24rem] shrink-0 flex flex-col">
-            <div class="gap-3 p-4 flex-1 flex flex-col" id="percentile-filter-card">
+            <div class="gap-0 p-4 flex-1 flex flex-col" id="percentile-filter-card">
               <div class="flex items-center justify-between">
-
+                <div></div>
                 <button type="button" id="clear-all" class="btn btn-ghost btn-sm text-sm">Reset filters</button>
               </div>
 
@@ -38,8 +37,6 @@
                 <legend class="sr-only">Events</legend>
                 <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
                   <span>Events</span>
-                  <button type="button" id="event-clear" class="btn btn-ghost btn-xs"
-                    aria-label="Clear selected event">Clear event</button>
                 </div>
                 <div id="event-chip-group" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5"></div>
               </fieldset>
@@ -48,8 +45,8 @@
                 <legend class="sr-only">Meet types</legend>
                 <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
                   <span>Meet Types</span>
-                  <button type="button" id="meet-clear" class="btn btn-ghost btn-xs text-[10px] px-2"
-                    aria-label="Clear meet types">Clear meet types</button>
+                  <button type="button" id="meet-select-all" class="btn btn-ghost btn-xs text-[10px] px-2"
+                    aria-label="Select all meet types">Select all meet types</button>
                 </div>
                 <div id="meet-chip-group" class="flex flex-wrap gap-1.5"></div>
               </fieldset>
@@ -58,18 +55,18 @@
                 <legend class="sr-only">Grade levels</legend>
                 <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
                   <span>Grade Levels</span>
-                  <button type="button" id="grade-clear" class="btn btn-ghost btn-xs text-[10px] px-2"
-                    aria-label="Clear grade levels">Clear grades</button>
+                  <button type="button" id="grade-select-all" class="btn btn-ghost btn-xs text-[10px] px-2"
+                    aria-label="Select all grade levels">Select all grades</button>
                 </div>
                 <div id="grade-chip-group" class="flex flex-wrap gap-1.5"></div>
               </fieldset>
 
               <fieldset class="space-y-2">
-                <legend class="sr-only">Years</legend>
+                <legend class="sr-only">Seasons</legend>
                 <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
-                  <span>Years</span>
-                  <button type="button" id="year-clear" class="btn btn-ghost btn-xs text-[10px] px-2"
-                    aria-label="Clear years">Clear years</button>
+                  <span>Seasons</span>
+                  <button type="button" id="year-select-all" class="btn btn-ghost btn-xs text-[10px] px-2"
+                    aria-label="Select all seasons">Select all seasons</button>
                 </div>
                 <div id="year-chip-group" class="flex flex-wrap gap-1.5"></div>
               </fieldset>
@@ -138,10 +135,9 @@
     const yearChipGroup = document.getElementById('year-chip-group');
     const percentileSlider = document.getElementById('percentile-slider');
     const percentileSliderValue = document.getElementById('percentile-slider-value');
-    const eventClearBtn = document.getElementById('event-clear');
-    const meetClearBtn = document.getElementById('meet-clear');
-    const gradeClearBtn = document.getElementById('grade-clear');
-    const yearClearBtn = document.getElementById('year-clear');
+  const meetSelectAllBtn = document.getElementById('meet-select-all');
+  const gradeSelectAllBtn = document.getElementById('grade-select-all');
+  const yearSelectAllBtn = document.getElementById('year-select-all');
     const clearAllBtn = document.getElementById('clear-all');
     const resultsLoading = document.getElementById('results-loading');
     const resultsError = document.getElementById('results-error');
@@ -255,7 +251,7 @@
 
     const insertGroupDividers = (container) => {
       const divider = document.createElement('div');
-      divider.className = 'col-span-full border-t border-base-200/60';
+      divider.className = 'col-span-full border-t border border-1 border-base-200/80 ';
       container.appendChild(divider);
     };
 
@@ -371,7 +367,15 @@
       chip.classList.toggle('text-base-content', !isSelected);
     };
 
-    const createChip = (value, container) => {
+    const getSelectedChipCount = (container) => {
+      if (!container) {
+        return 0;
+      }
+      return container.querySelectorAll('.chip-btn[data-selected="true"]').length;
+    };
+
+    const createChip = (value, container, options = {}) => {
+      const { enforceMinOne = false } = options;
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = chipBaseClasses;
@@ -379,7 +383,11 @@
       chip.dataset.selected = 'false';
       chip.textContent = value;
       chip.addEventListener('click', () => {
-        const nextState = chip.dataset.selected !== 'true';
+        const isSelected = chip.dataset.selected === 'true';
+        if (enforceMinOne && isSelected && getSelectedChipCount(container) <= 1) {
+          return;
+        }
+        const nextState = !isSelected;
         setChipSelected(chip, nextState);
         queueFetch();
       });
@@ -435,13 +443,13 @@
       }
     };
 
-    const renderChipGroup = (values, container) => {
+    const renderChipGroup = (values, container, options = {}) => {
       if (!container) {
         return;
       }
       container.innerHTML = '';
       values.forEach(value => {
-        createChip(value, container);
+        createChip(value, container, options);
       });
     };
 
@@ -549,7 +557,7 @@
         renderTableSkeleton();
         resultsSummary.textContent = 'No event selected';
         if (resultsStatus) {
-          resultsStatus.textContent = 'Pick an event on the left to compare Boys vs Girls percentiles.';
+          resultsStatus.textContent = 'Select an event on the left to view Boys vs. Girls percentiles. Use the filters to narrow by meet type, grade level, and season.';
         }
         return;
       }
@@ -689,6 +697,32 @@
       });
     };
 
+    const selectAllChips = (container) => {
+      if (!container) {
+        return false;
+      }
+      let changed = false;
+      Array.from(container.querySelectorAll('.chip-btn')).forEach(chip => {
+        if (chip.dataset.selected !== 'true') {
+          setChipSelected(chip, true);
+          changed = true;
+        }
+      });
+      return changed;
+    };
+
+    const ensureAtLeastOneSelected = (container) => {
+      if (!container) {
+        return;
+      }
+      if (getSelectedChipCount(container) === 0) {
+        const firstChip = container.querySelector('.chip-btn');
+        if (firstChip) {
+          setChipSelected(firstChip, true);
+        }
+      }
+    };
+
     const resetFilters = () => {
       clearChips(meetChipGroup);
       clearChips(gradeChipGroup);
@@ -696,38 +730,40 @@
       state.selectedEvent = state.options?.events?.[0] || null;
       syncEventSelection();
       applyDefaultSelections(meetChipGroup, DEFAULT_MEET_TYPE_SELECTIONS);
+      ensureAtLeastOneSelected(meetChipGroup);
       applyDefaultSelections(gradeChipGroup, DEFAULT_GRADE_SELECTIONS);
+      ensureAtLeastOneSelected(gradeChipGroup);
       applyDefaultSelections(yearChipGroup, defaultYearSelections);
+      ensureAtLeastOneSelected(yearChipGroup);
       applyPercentileStep(DEFAULT_PERCENTILE_STEP);
       syncPercentileSlider();
       queueFetch();
     };
 
-    eventClearBtn.addEventListener('click', () => {
-      state.selectedEvent = null;
-      syncEventSelection();
-      renderTableSkeleton();
-      state.lastQuery = '';
-      resultsSummary.textContent = 'No event selected';
-      if (resultsStatus) {
-        resultsStatus.textContent = 'Pick an event on the left to compare Boys vs Girls percentiles.';
-      }
-    });
+    if (meetSelectAllBtn) {
+      meetSelectAllBtn.addEventListener('click', () => {
+        const changed = selectAllChips(meetChipGroup);
+        if (changed) {
+          queueFetch();
+        }
+      });
+    }
 
-    meetClearBtn.addEventListener('click', () => {
-      clearChips(meetChipGroup);
-      queueFetch();
-    });
+    if (gradeSelectAllBtn) {
+      gradeSelectAllBtn.addEventListener('click', () => {
+        const changed = selectAllChips(gradeChipGroup);
+        if (changed) {
+          queueFetch();
+        }
+      });
+    }
 
-    gradeClearBtn.addEventListener('click', () => {
-      clearChips(gradeChipGroup);
-      queueFetch();
-    });
-
-    if (yearClearBtn) {
-      yearClearBtn.addEventListener('click', () => {
-        clearChips(yearChipGroup);
-        queueFetch();
+    if (yearSelectAllBtn) {
+      yearSelectAllBtn.addEventListener('click', () => {
+        const changed = selectAllChips(yearChipGroup);
+        if (changed) {
+          queueFetch();
+        }
       });
     }
 
@@ -768,20 +804,23 @@
           state.selectedEvent = orderedEvents[0];
         }
         renderEventChips(orderedEvents);
-        renderChipGroup(options.meet_types || [], meetChipGroup);
+  renderChipGroup(options.meet_types || [], meetChipGroup, { enforceMinOne: true });
         const meetDefaults = initialFilters.meet_types.length ? initialFilters.meet_types : DEFAULT_MEET_TYPE_SELECTIONS;
         applyDefaultSelections(meetChipGroup, meetDefaults);
-        renderChipGroup(options.grade_levels || [], gradeChipGroup);
+        ensureAtLeastOneSelected(meetChipGroup);
+  renderChipGroup(options.grade_levels || [], gradeChipGroup, { enforceMinOne: true });
         const gradeDefaults = initialFilters.grade_levels.length ? initialFilters.grade_levels : DEFAULT_GRADE_SELECTIONS;
         applyDefaultSelections(gradeChipGroup, gradeDefaults);
+        ensureAtLeastOneSelected(gradeChipGroup);
         const orderedYears = orderYears(options.years || []);
-        renderChipGroup(orderedYears, yearChipGroup);
+  renderChipGroup(orderedYears, yearChipGroup, { enforceMinOne: true });
         defaultYearSelections = YEAR_DISPLAY_ORDER.filter(year => orderedYears.includes(year));
         if (!defaultYearSelections.length) {
           defaultYearSelections = [...orderedYears];
         }
         const yearDefaults = initialFilters.years.length ? initialFilters.years : defaultYearSelections;
         applyDefaultSelections(yearChipGroup, yearDefaults);
+        ensureAtLeastOneSelected(yearChipGroup);
         const hadCustomPercentiles = applyPercentilesFromQuery(initialFilters.percentiles);
         if (!hadCustomPercentiles) {
           applyPercentileStep(DEFAULT_PERCENTILE_STEP);

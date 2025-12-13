@@ -21,10 +21,10 @@
 
     <script>
       (function () {
-  // Define all background images
-  const licensedImageCount = 12;
-  const licensedImages = Array.from({ length: licensedImageCount }, (_, i) => `../static/images/background_images_licensed/bg_${i + 1}.webp`);
-  const allImages = [...licensedImages];
+        // Define all background images
+        const licensedImageCount = 12;
+        const licensedImages = Array.from({ length: licensedImageCount }, (_, i) => `../static/images/background_images_licensed/bg_${i + 1}.webp`);
+        const allImages = [...licensedImages];
 
         // Shuffle array
         function shuffle(array) {
@@ -100,9 +100,8 @@
 
   <div class="hero-title no-select" tabindex="0">
       <span class="hero-title__text">
-        Track<span class="hero-title__desktop-space">&nbsp;</span><br class="hero-title__break" />Insights
+        Track Insights
       </span>
-      <span class="hero-title__hint">Press to find an athlete</span>
     </div>
 
   <div class="absolute bottom-4 right-4 md:bottom-6 md:right-6 text-[10px] sm:text-xs  uppercase text-white/80 drop-shadow-lg font-semibold no-select">
@@ -122,6 +121,7 @@
 
 
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Impact:wght@400&display=swap');
     .no-select {
       -webkit-user-select: none;
       -moz-user-select: none;
@@ -138,7 +138,7 @@
       padding: clamp(2rem, 5vw, 4rem) clamp(3rem, 8vw, 6rem);
       text-transform: uppercase;
       letter-spacing: clamp(0.3rem, 1vw, 1.4rem);
-      font-family: Impact, 'Arial Black', sans-serif;
+    font-family: 'Impact', 'Arial Black', 'Segoe UI', sans-serif;
       font-size: clamp(3.5rem, 8vw, 8rem);
       color: rgba(255, 255, 255, 0.92);
       text-align: center;
@@ -168,8 +168,9 @@
     .hero-title__text {
       display: block;
       line-height: 0.85;
+      text-shadow: 0 10px 22px rgba(0, 0, 0, 0.55);
       filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.45));
-      transition: filter 350ms ease;
+      transition: filter 350ms ease, text-shadow 350ms ease;
     }
 
     @media (max-width: 640px) {
@@ -178,23 +179,6 @@
       }
     }
 
-    .hero-title__hint {
-      margin-top: clamp(0.5rem, 1.2vw, 1rem);
-      font-size: clamp(0.75rem, 1.4vw, 1.2rem);
-      letter-spacing: 0.45em;
-      color: rgba(205, 205, 205, 1);
-      font-family: 'Poppins', 'Segoe UI', sans-serif;
-      text-transform: uppercase;
-      transition: opacity 250ms ease, transform 300ms ease;
-    }
-
-    .hero-title__break {
-      display: inline;
-    }
-
-    .hero-title__desktop-space {
-      display: none;
-    }
 
     .hero-title--static {
       pointer-events: none;
@@ -216,18 +200,13 @@
       -webkit-backdrop-filter: blur(0px);
     }
 
-    .hero-title--static .hero-title__hint,
-    .hero-title__hint--hidden {
-      display: none !important;
-    }
-
     .hero-title:hover,
     .hero-title:focus-visible {
       transform: translateY(-6px) scale(1.02);
       letter-spacing: clamp(0.35rem, 1.1vw, 1.5rem);
       color: #fff9ec;
     }
-
+    
     .hero-title:hover::before,
     .hero-title:focus-visible::before {
       opacity: 1;
@@ -238,26 +217,8 @@
 
     .hero-title:hover .hero-title__text,
     .hero-title:focus-visible .hero-title__text {
+      text-shadow: 0 14px 28px rgba(0, 0, 0, 0.65);
       filter: drop-shadow(0 22px 38px rgba(0, 0, 0, 0.55));
-    }
-
-    .hero-title:hover .hero-title__hint,
-    .hero-title:focus-visible .hero-title__hint {
-      opacity: 0.85;
-      transform: translateY(-2px);
-    }
-
-    @media (max-width: 640px) {
-      .hero-title {
-        padding: clamp(1.5rem, 6vw, 3rem) clamp(1.75rem, 7vw, 3.5rem);
-        letter-spacing: clamp(0.2rem, 1.5vw, 0.8rem);
-        width: min(88vw, 360px);
-        margin: 0 auto;
-      }
-
-      .hero-title::before {
-        inset: clamp(-1.75rem, -4vw, -1rem);
-      }
     }
 
     @media (max-width: 900px) and (orientation: landscape) {
@@ -266,26 +227,11 @@
         cursor: default;
       }
 
-      .hero-title__hint {
-        display: none;
-      }
     }
 
     @media (min-width: 1024px) {
       .hero-title__text {
         white-space: nowrap;
-      }
-
-      .hero-title__break {
-        display: none;
-      }
-
-      .hero-title__desktop-space {
-        display: inline;
-      }
-
-      .hero-title__hint {
-        display: none;
       }
 
       .hero-title:hover,
@@ -305,14 +251,11 @@
 
       .hero-title:hover .hero-title__text,
       .hero-title:focus-visible .hero-title__text {
+        text-shadow: 0 10px 22px rgba(0, 0, 0, 0.55);
         filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.45));
       }
 
-      .hero-title:hover .hero-title__hint,
-      .hero-title:focus-visible .hero-title__hint {
-        opacity: 1;
-        transform: none;
-      }
+    
     }
 
     /* Gentle bounce animation for "See More" text */
@@ -337,18 +280,20 @@
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const heroTitle = document.querySelector('.hero-title');
-      const heroHint = document.querySelector('.hero-title__hint');
 
       if (!heroTitle) {
         return;
       }
 
       const landscapeQuery = window.matchMedia('(max-width: 900px) and (orientation: landscape)');
+      const mobileQuery = window.matchMedia('(max-width: 767px)');
 
       const updateHeroInteractivity = () => {
         const isLandscapeMobile = landscapeQuery.matches;
+        const isMobile = mobileQuery.matches;
+        const shouldDisable = isLandscapeMobile || isMobile;
 
-        if (isLandscapeMobile) {
+        if (shouldDisable) {
           heroTitle.classList.add('hero-title--static');
           heroTitle.removeAttribute('tabindex');
         } else {
@@ -358,9 +303,6 @@
           }
         }
 
-        if (heroHint) {
-          heroHint.classList.toggle('hero-title__hint--hidden', isLandscapeMobile);
-        }
       };
 
       updateHeroInteractivity();
@@ -369,6 +311,12 @@
         landscapeQuery.addEventListener('change', updateHeroInteractivity);
       } else if (landscapeQuery.addListener) {
         landscapeQuery.addListener(updateHeroInteractivity);
+      }
+
+      if (mobileQuery.addEventListener) {
+        mobileQuery.addEventListener('change', updateHeroInteractivity);
+      } else if (mobileQuery.addListener) {
+        mobileQuery.addListener(updateHeroInteractivity);
       }
 
       window.addEventListener('orientationchange', updateHeroInteractivity);
