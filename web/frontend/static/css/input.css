@@ -1,3 +1,7 @@
+/* npx @tailwindcss/cli -i ./web/frontend/static/css/input.css -o ./web/frontend/static/css/output.css --watch */
+
+
+
 /* npx @tailwindcss/cli -i ./frontend/static/css/input.css -o ./frontend/static/css/output.css --watch */
 
 /* npx shadcn@latest add https://reactbits.dev/r/SplitText-JS-TW */
