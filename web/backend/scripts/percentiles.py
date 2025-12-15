@@ -107,7 +107,7 @@ def get_percentiles(
                 df3 = df2['result2'].quantile(track_percentiles)
             else:
                 event_type = CONST.EVENT_TYPE.FIELD
-                df3 = df2['result2'].quantile(list(reversed(percentile_decimals)))
+                df3 = df2['result2'].quantile(percentile_decimals)
             percentile_values = [convert_back(event_type, df3.iloc[i]) for i in range(len(percentiles))]
             # Add a row for each event/gender
             all_rows.append([event_gender, display_event] + percentile_values)
