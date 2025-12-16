@@ -59,7 +59,7 @@
             <table class="table w-full text-sm" id="where-rank-table">
               <thead>
                 <tr class="text-xs uppercase tracking-wide text-gray-500">
-                  <th class="w-1/3">Sectional</th>
+                  <th class="w-1/3" data-column="projection-location">Sectional</th>
                   <th class="w-28">Projected Place</th>
                   <th class="w-24">Field Size</th>
                 </tr>
@@ -122,9 +122,11 @@
       loadingState.classList.add('hidden');
       detailContent.classList.remove('hidden');
 
-  renderSummary(data);
-  renderWhereDoIRank(data.where_do_i_rank);
-  renderRankings(data.rankings, rankingsContainer);
+      const isRelayEvent = data?.context?.event_type === 'Relay';
+
+  renderSummary(data, isRelayEvent);
+  renderWhereDoIRank(data.where_do_i_rank, data.context);
+  renderRankings(data.rankings, rankingsContainer, isRelayEvent, data.context);
     } catch (error) {
       console.error('Error loading ranking detail:', error);
       loadingState.classList.add('hidden');
@@ -140,7 +142,7 @@
       });
     }
 
-    function renderWhereDoIRank(whereData) {
+    function renderWhereDoIRank(whereData, context = {}) {
       if (!whereRankCard) {
         return;
       }
@@ -157,8 +159,26 @@
         }
         return;
       }
-
       whereRankCard.classList.remove('hidden');
+
+      const stageLabel = (context?.meet_type || 'Sectional').trim() || 'Sectional';
+      const stageLabelLower = stageLabel.toLowerCase();
+      const pluralStageLabel = stageLabelLower.endsWith('s') ? stageLabelLower : `${stageLabelLower}s`;
+      const yearLabel = context?.year ? `${context.year}` : '';
+      const combinedLabel = [yearLabel, stageLabel].filter(Boolean).join(' ').trim();
+      const contextSuffix = combinedLabel ? ` (${combinedLabel})` : '';
+
+      const projectionsHeading = whereRankCard.querySelector('h2');
+      if (projectionsHeading) {
+        const headingYearPrefix = yearLabel ? `${yearLabel} ` : '';
+        projectionsHeading.textContent = `${headingYearPrefix}${stageLabel} Projections`;
+      }
+
+      const projectionsColumnHeader = document.querySelector('#where-rank-table thead th[data-column="projection-location"]');
+      if (projectionsColumnHeader) {
+        projectionsColumnHeader.textContent = stageLabel;
+      }
+
       if (whereRankPanel) {
         whereRankPanel.classList.add('hidden');
       }
@@ -168,8 +188,7 @@
       if (whereRankChevron) {
         whereRankChevron.classList.remove('rotate-180');
       }
-
-      const sectionalResults = [...whereData.sectional_results];
+    const sectionalResults = [...whereData.sectional_results];
       sectionalResults.sort((a, b) => {
         const aNum = Number(a?.meet_num);
         const bNum = Number(b?.meet_num);
@@ -200,15 +219,23 @@
         : null;
 
       const summaryText = averageRank != null
-        ? `Avg projected rank ${averageRank.toFixed(1)} over ${totalSectionals} sectionals`
-        : `${totalSectionals} sectionals`;
+        ? `Avg projected rank ${averageRank.toFixed(1)} over ${totalSectionals} ${pluralStageLabel}${contextSuffix}`
+        : `${totalSectionals} ${pluralStageLabel}${contextSuffix}`;
 
       if (whereRankSummary) {
         whereRankSummary.textContent = summaryText;
       }
 
-  whereRankTableBody.innerHTML = '';
-  sectionalResults.forEach(row => {
+      const descriptionEl = document.getElementById('where-rank-description');
+      if (descriptionEl) {
+        const baseDescription = `See how this performance would place at every ${stageLabelLower} statewide`;
+        descriptionEl.textContent = combinedLabel
+          ? `${baseDescription} for ${combinedLabel}.`
+          : `${baseDescription}.`;
+      }
+
+      whereRankTableBody.innerHTML = '';
+      sectionalResults.forEach(row => {
         const tr = document.createElement('tr');
         if (Number(row.meet_id) === meetId) {
           tr.className = 'bg-primary/5';
@@ -228,12 +255,11 @@
         fieldTd.className = 'text-sm text-gray-600';
         fieldTd.textContent = row.field_size ? `${row.field_size} athletes` : '—';
         tr.appendChild(fieldTd);
-
         whereRankTableBody.appendChild(tr);
       });
     }
 
-    function renderSummary(data) {
+    function renderSummary(data, isRelay = false) {
       const { context, target_result: target } = data;
       const titleEl = document.getElementById('result-title');
       const subtitleEl = document.getElementById('result-subtitle');
@@ -253,38 +279,46 @@
       if (target.enrollment) {
         tagsEl.appendChild(buildTag(`Enrollment: ${target.enrollment}`));
       }
+      if (isRelay && target.relay_team) {
+        tagsEl.appendChild(buildTag(`Relay Team: ${target.relay_team}`));
+      }
       if (target.meet_host) {
         const host = target.meet_host + (target.meet_num ? ` (Meet ${target.meet_num})` : '');
         tagsEl.appendChild(buildTag(`Meet Host: ${host}`));
       }
     }
 
-    function renderRankings(rankings, container) {
+    function renderRankings(rankings, container, isRelay = false, context = {}) {
       container.innerHTML = '';
 
       const configs = [
-        { key: 'overall', title: 'Overall Field', description: 'How this result stacks up against the full field at the meet.' },
-        { key: 'like_schools', title: 'Similar Enrollment', description: 'Comparison against schools with comparable enrollment sizes.' },
-        { key: 'same_grade', title: 'Same Grade', description: 'Comparison against athletes in the same grade.' },
+        { key: 'overall', title: 'Overall Rank', description: 'See how your performance ranks among all participants.' },
+        { key: 'like_schools', title: 'Similar Enrollment Rank', description: 'See how your performance ranks among participants from schools of similar size to yours.' },
+        { key: 'same_grade', title: 'Grade-Level Rank', description: 'See how your performance ranks among participants in your grade level.' },
       ];
 
-      configs.forEach((config, index) => {
+      const activeConfigs = isRelay
+        ? configs.filter(config => config.key !== 'same_grade')
+        : configs;
+
+      activeConfigs.forEach((config, index) => {
         const rankingData = rankings[config.key];
-  const card = document.createElement('div');
-  card.className = 'card bg-white border border-base-200 shadow-sm overflow-hidden';
+        const card = document.createElement('div');
+        card.className = 'card bg-white border border-base-200 shadow-sm overflow-hidden';
 
         const detailId = `ranking-panel-${config.key}-${index}`;
 
         const summaryButton = document.createElement('button');
         summaryButton.type = 'button';
-  summaryButton.className = 'flex w-full items-center justify-between px-5 py-4 text-left bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary border-b border-base-200 cursor-pointer';
+    summaryButton.className = 'flex w-full items-center justify-between px-5 py-4 text-left bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary border-b border-base-200 cursor-pointer';
         summaryButton.setAttribute('aria-controls', detailId);
         summaryButton.setAttribute('aria-expanded', 'false');
 
         const summaryInfo = document.createElement('div');
         const title = document.createElement('h2');
         title.className = 'text-lg sm:text-xl font-semibold text-primary';
-        title.textContent = config.title;
+  const contextPrefix = context?.year && context?.meet_type ? `${context.year} ${context.meet_type} • ` : '';
+  title.textContent = `${contextPrefix}${config.title}`;
         summaryInfo.appendChild(title);
         summaryButton.appendChild(summaryInfo);
 
@@ -308,7 +342,10 @@
 
         const description = document.createElement('p');
         description.className = 'text-sm text-gray-600';
-        description.textContent = config.description;
+        const descriptor = context?.year && context?.meet_type
+          ? `${config.description} (${context.year} ${context.meet_type}).`
+          : config.description;
+        description.textContent = descriptor;
         detail.appendChild(description);
 
         if (!rankingData) {
@@ -332,7 +369,7 @@
             detail.appendChild(chips);
           }
 
-          detail.appendChild(buildLeaderboardTable(rankingData.top_results));
+          detail.appendChild(buildLeaderboardTable(rankingData.top_results, isRelay));
         }
 
         summaryButton.addEventListener('click', () => {
@@ -347,18 +384,20 @@
       });
     }
 
-    function buildLeaderboardTable(entries) {
+    function buildLeaderboardTable(entries, isRelay = false) {
       const wrapper = document.createElement('div');
       wrapper.className = 'overflow-x-auto';
 
-  const table = document.createElement('table');
-  table.className = 'table table-compact w-full';
+      const table = document.createElement('table');
+      table.className = 'table table-compact w-full';
+
+      const nameHeader = isRelay ? 'Relay Team' : 'Athlete';
 
       const thead = document.createElement('thead');
       thead.innerHTML = `
         <tr class="text-primary text-xs sm:text-sm uppercase">
           <th class="w-16">Rank</th>
-          <th>Athlete</th>
+          <th>${nameHeader}</th>
           <th class="hidden sm:table-cell">School</th>
           <th>Result</th>
           <th class="hidden md:table-cell">Place</th>
@@ -368,8 +407,8 @@
 
       const tbody = document.createElement('tbody');
       entries.forEach(entry => {
-  const tr = document.createElement('tr');
-  tr.className = entry.is_target ? 'bg-primary/10 text-primary font-semibold' : '';
+        const tr = document.createElement('tr');
+        tr.className = entry.is_target ? 'bg-primary/10 text-primary font-semibold' : '';
 
         const rankTd = document.createElement('td');
         rankTd.textContent = entry.rank;

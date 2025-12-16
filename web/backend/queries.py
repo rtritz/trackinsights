@@ -2,6 +2,7 @@ import re
 import sys
 from functools import lru_cache
 from pathlib import Path
+from typing import Optional
 
 from sqlalchemy import or_, func, and_
 from sqlalchemy.orm import joinedload
@@ -656,7 +657,8 @@ def _serialize_history_stage(stage_entry, meet_type, event_name):
         "meet_id": meet_id,
         "event": event_name,
         "meet_type": meet_type,
-        "has_detail": bool(meet_id and not is_relay and result_type),
+        "has_detail": bool(meet_id and result_type),
+        "is_relay": is_relay,
     }
 
 
@@ -788,6 +790,9 @@ def get_athlete_result_rankings(athlete_id: int, meet_id: int, event_name: str, 
     )
 
     if not base_row:
+        event_model = Event.query.filter_by(event=event_name).one_or_none()
+        if event_model and event_model.event_type == "Relay":
+            return _get_relay_result_rankings(athlete_id, meet_id, event_name, result_type)
         return None
 
     athlete_result, athlete, meet, event, school = base_row
@@ -953,6 +958,185 @@ def get_athlete_result_rankings(athlete_id: int, meet_id: int, event_name: str, 
             "overall": overall_info,
             "like_schools": like_info,
             "same_grade": grade_info,
+        },
+        "where_do_i_rank": where_do_i_rank,
+    }
+
+
+def _get_relay_result_rankings(athlete_id: int, meet_id: int, event_name: str, result_type: Optional[str]):
+    athlete = (
+        Athlete.query.options(joinedload(Athlete.school))
+        .filter_by(athlete_id=athlete_id)
+        .one_or_none()
+    )
+    if not athlete or athlete.school_id is None:
+        return None
+
+    relay_payload = (
+        db.session.query(RelayResult, Meet, School, Event)
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .outerjoin(School, RelayResult.school_id == School.school_id)
+        .join(Event, RelayResult.event == Event.event)
+        .filter(
+            RelayResult.school_id == athlete.school_id,
+            RelayResult.meet_id == meet_id,
+            RelayResult.event == event_name,
+        )
+        .one_or_none()
+    )
+    if not relay_payload:
+        return None
+
+    relay_result, meet, school, event_model = relay_payload
+
+    if relay_result.result2 is None or meet.year is None or not meet.meet_type or not meet.gender:
+        return None
+
+    year = meet.year
+    gender = meet.gender
+    meet_type = meet.meet_type
+    event_type = event_model.event_type or "Relay"
+    school_obj = school or athlete.school
+
+    enrollment_value = None
+    if year is not None:
+        enrollment_record = (
+            SchoolEnrollment.query.filter_by(
+                school_id=athlete.school_id,
+                year=year,
+            ).one_or_none()
+        )
+        if enrollment_record:
+            enrollment_value = enrollment_record.enrollment
+
+    rows = (
+        db.session.query(
+            RelayResult.school_id.label("team_id"),
+            RelayResult.meet_id.label("meet_id"),
+            RelayResult.result.label("result"),
+            RelayResult.result2.label("result_value"),
+            RelayResult.place.label("place"),
+            RelayResult.athlete_names.label("athlete_names"),
+            School.school_name.label("school_name"),
+            SchoolEnrollment.enrollment.label("enrollment"),
+            Meet.host.label("meet_host"),
+            Meet.meet_num.label("meet_num"),
+        )
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .outerjoin(School, RelayResult.school_id == School.school_id)
+        .outerjoin(
+            SchoolEnrollment,
+            and_(
+                SchoolEnrollment.school_id == RelayResult.school_id,
+                SchoolEnrollment.year == year,
+            ),
+        )
+        .filter(
+            RelayResult.event == event_name,
+            Meet.year == year,
+            Meet.meet_type == meet_type,
+            Meet.gender == gender,
+            RelayResult.result2.isnot(None),
+        )
+        .all()
+    )
+
+    entries = []
+    for row in rows:
+        if row.result_value is None:
+            continue
+        display_name = row.athlete_names or row.school_name or "Relay Team"
+        entries.append(
+            {
+                "athlete_id": row.team_id,
+                "meet_id": row.meet_id,
+                "result": row.result,
+                "result_value": row.result_value,
+                "grade": None,
+                "place": row.place,
+                "full_name": display_name,
+                "school_id": row.team_id,
+                "school_name": row.school_name,
+                "enrollment": row.enrollment,
+                "meet_host": row.meet_host,
+                "meet_num": row.meet_num,
+            }
+        )
+
+    if not entries:
+        return None
+
+    target_key = {"athlete_id": athlete.school_id, "meet_id": meet_id}
+    lower_is_better = _is_lower_better(event_type)
+
+    overall_info = _compute_cohort_ranking(entries, target_key, lower_is_better)
+    if not overall_info:
+        return None
+
+    like_info = None
+    if enrollment_value is not None:
+        lower_bound = int(round(enrollment_value * 0.75))
+        upper_bound = int(round(enrollment_value * 1.25))
+        like_info = _compute_cohort_ranking(
+            entries,
+            target_key,
+            lower_is_better,
+            filter_fn=lambda item: item["enrollment"] is not None
+            and lower_bound <= item["enrollment"] <= upper_bound,
+        )
+
+        if like_info:
+            like_info["criteria"] = {
+                "enrollment": enrollment_value,
+                "min_enrollment": lower_bound,
+                "max_enrollment": upper_bound,
+            }
+
+    performance_input = relay_result.result2 if relay_result.result2 is not None else relay_result.result
+    where_do_i_rank = None
+    if performance_input is not None:
+        try:
+            where_do_i_rank = _estimate_relay_rank(
+                event_name=event_name,
+                performance_value=performance_input,
+                gender=gender,
+                year=year,
+                meet_type=meet_type,
+                event_type=event_type,
+            )
+        except Exception:
+            where_do_i_rank = None
+
+    return {
+        "context": {
+            "year": year,
+            "gender": gender,
+            "event": event_name,
+            "meet_type": meet_type,
+            "result_type": result_type or "Final",
+            "event_type": event_type or "Relay",
+        },
+        "target_result": {
+            "athlete_id": athlete.athlete_id,
+            "athlete_name": relay_result.athlete_names
+            or (school_obj.school_name if school_obj else None),
+            "result": relay_result.result,
+            "result_value": relay_result.result2,
+            "grade": None,
+            "school_id": athlete.school_id,
+            "school_name": school_obj.school_name if school_obj else None,
+            "enrollment": enrollment_value,
+            "place": relay_result.place,
+            "meet_id": meet.meet_id,
+            "meet_host": meet.host,
+            "meet_num": meet.meet_num,
+            "year": year,
+            "relay_team": relay_result.athlete_names,
+        },
+        "rankings": {
+            "overall": overall_info,
+            "like_schools": like_info,
+            "same_grade": None,
         },
         "where_do_i_rank": where_do_i_rank,
     }
@@ -1370,6 +1554,125 @@ def estimate_event_rank(
     return {
         "event": event_name,
         "event_type": event_type,
+        "gender": gender,
+        "year": year,
+        "meet_type": meet_type,
+        "comparison_count": len(all_values_sorted),
+        "projected_place": raw_overall_place,
+        "projected_place_label": _format_place_label(raw_overall_place),
+        "input_value": normalized_value,
+        "sectional_results": sectional_results,
+    }
+
+
+def _estimate_relay_rank(
+    event_name: str,
+    performance_value,
+    *,
+    gender: str,
+    year: int,
+    meet_type: str = "Sectional",
+    event_type: Optional[str] = None,
+):
+    event_type_value = event_type
+    if not event_type_value:
+        event = Event.query.filter_by(event=event_name).one_or_none()
+        if not event or not event.event_type:
+            return None
+        event_type_value = event.event_type
+
+    normalized_value = _normalize_performance_input(performance_value, event_type_value)
+
+    gender_filter = func.lower(Meet.gender) == (gender or "").strip().lower()
+    raw_results = (
+        db.session.query(
+            RelayResult.school_id.label("team_id"),
+            RelayResult.meet_id.label("meet_id"),
+            RelayResult.result2.label("result_value"),
+            RelayResult.result.label("result_text"),
+            RelayResult.place.label("place"),
+            RelayResult.athlete_names.label("athlete_names"),
+            Meet.host.label("meet_host"),
+            Meet.meet_num.label("meet_num"),
+        )
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .filter(
+            RelayResult.event == event_name,
+            RelayResult.result2.isnot(None),
+            Meet.meet_type == meet_type,
+            gender_filter,
+            Meet.year == year,
+        )
+    ).all()
+
+    if not raw_results:
+        return None
+
+    lower_is_better = _is_lower_better(event_type_value)
+    per_meet = {}
+    for row in raw_results:
+        meet_entry = per_meet.setdefault(
+            row.meet_id,
+            {
+                "meet_id": row.meet_id,
+                "host": row.meet_host,
+                "meet_num": row.meet_num,
+                "results": {},
+            },
+        )
+        team_bucket = meet_entry["results"]
+        candidate = {
+            "athlete_id": row.team_id,
+            "result_value": row.result_value,
+            "result_text": row.result_text,
+            "result_type": "Final",
+            "place": row.place,
+        }
+        team_bucket[row.team_id] = _choose_result_entry(
+            team_bucket.get(row.team_id), candidate, lower_is_better
+        )
+
+    sectional_results = []
+    all_result_values = []
+    for meet_data in per_meet.values():
+        entries = list(meet_data["results"].values())
+        if not entries:
+            continue
+        values = sorted(
+            (entry["result_value"] for entry in entries),
+            reverse=not lower_is_better,
+        )
+        all_result_values.extend(values)
+        raw_place = _project_place(values, normalized_value, event_type_value, event_name)
+        numeric_place = _safe_int(raw_place)
+        sectional_results.append(
+            {
+                "meet_id": meet_data["meet_id"],
+                "meet_num": meet_data["meet_num"],
+                "sectional_name": _format_sectional_name(meet_data["host"], meet_data["meet_num"]),
+                "projected_place": numeric_place,
+                "projected_place_label": _format_place_label(raw_place),
+                "field_size": len(values),
+                "result_type_counts": _count_result_types(entries),
+            }
+        )
+
+    if not sectional_results:
+        return None
+
+    sectional_results.sort(
+        key=lambda item: (
+            item["meet_num"] if item.get("meet_num") is not None else float("inf"),
+            item.get("sectional_name") or "",
+        )
+    )
+
+    all_values_sorted = sorted(all_result_values, reverse=not lower_is_better)
+    raw_overall_place = _project_place(all_values_sorted, normalized_value, event_type_value, event_name)
+
+    return {
+        "event": event_name,
+        "event_type": event_type_value,
         "gender": gender,
         "year": year,
         "meet_type": meet_type,
