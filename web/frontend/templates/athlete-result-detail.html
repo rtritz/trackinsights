@@ -237,8 +237,9 @@
       whereRankTableBody.innerHTML = '';
       sectionalResults.forEach(row => {
         const tr = document.createElement('tr');
+        tr.className = 'transition-colors duration-150 hover:bg-primary/5';
         if (Number(row.meet_id) === meetId) {
-          tr.className = 'bg-primary/5';
+          tr.classList.add('bg-primary/5');
         }
 
         const nameTd = document.createElement('td');
@@ -408,7 +409,10 @@
       const tbody = document.createElement('tbody');
       entries.forEach(entry => {
         const tr = document.createElement('tr');
-        tr.className = entry.is_target ? 'bg-primary/10 text-primary font-semibold' : '';
+        const rowBaseClass = 'transition-colors duration-150 hover:bg-primary/5';
+        tr.className = entry.is_target
+          ? `${rowBaseClass} bg-primary/10 text-primary font-semibold`
+          : rowBaseClass;
 
         const rankTd = document.createElement('td');
         rankTd.textContent = entry.rank;
