@@ -3,19 +3,18 @@
 {% block content %}
 <div class="min-h-screen bg-white pt-20 sm:pt-24 pb-24 sm:pb-32 px-2 sm:px-4">
   <div class="max-w-5xl mx-auto">
-    <a href="{{ url_for('main.athlete_dashboard', athlete_id=athlete_id) }}" class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-6 transition-colors">
+    <a href="{{ url_for('main.athlete_dashboard', athlete_id=athlete_id) }}"
+      class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-6 transition-colors">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-        <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+        <path fill-rule="evenodd"
+          d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+          clip-rule="evenodd" />
       </svg>
       Back to Athlete Dashboard
     </a>
 
-    <div id="detail-root"
-         class="hidden"
-         data-athlete-id="{{ athlete_id }}"
-         data-meet-id="{{ meet_id }}"
-         data-event-name="{{ event_name }}"
-         data-result-type="{{ result_type }}"></div>
+    <div id="detail-root" class="hidden" data-athlete-id="{{ athlete_id }}" data-meet-id="{{ meet_id }}"
+      data-event-name="{{ event_name }}" data-result-type="{{ result_type }}"></div>
 
     <div id="loading-state" class="flex flex-col items-center justify-center min-h-[50vh]">
       <div class="loading loading-spinner loading-lg text-primary"></div>
@@ -28,13 +27,14 @@
           Result Not Available
         </h2>
         <p class="text-lg text-gray-600 mb-6">We couldn't generate rankings for this performance.</p>
-        <a href="{{ url_for('main.athlete_dashboard', athlete_id=athlete_id) }}" class="btn btn-primary rounded-full">Return to Dashboard</a>
+        <a href="{{ url_for('main.athlete_dashboard', athlete_id=athlete_id) }}"
+          class="btn btn-primary rounded-full">Return to Dashboard</a>
       </div>
     </div>
 
     <div id="detail-content" class="hidden space-y-8">
       <div class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-lg">
-  <h1 id="result-title" class="font-impact italic text-primary text-3xl sm:text-4xl font-bold mb-2"></h1>
+        <h1 id="result-title" class="font-impact italic text-primary text-3xl sm:text-4xl font-bold mb-2"></h1>
         <p id="result-subtitle" class="text-lg sm:text-xl text-gray-700 mb-3"></p>
         <div class="flex flex-wrap gap-2 text-sm sm:text-base text-gray-600" id="result-tags"></div>
       </div>
@@ -48,17 +48,21 @@
           </div>
           <div class="flex items-center gap-3 text-sm font-medium text-gray-700">
             <span id="where-rank-summary">No data yet</span>
-            <svg id="where-rank-chevron" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11l3.71-3.77a.75.75 0 111.08 1.04l-4.25 4.32a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+            <svg id="where-rank-chevron" xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5 text-gray-500 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd"
+                d="M5.23 7.21a.75.75 0 011.06.02L10 11l3.71-3.77a.75.75 0 111.08 1.04l-4.25 4.32a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z"
+                clip-rule="evenodd" />
             </svg>
           </div>
         </button>
         <div id="where-rank-panel" class="card-body space-y-4 hidden">
-          <p class="text-sm text-gray-600" id="where-rank-description">See how this performance would place at every sectional statewide.</p>
+          <p class="text-sm text-gray-600" id="where-rank-description">See how this performance would place at every
+            sectional statewide.</p>
           <div class="overflow-x-auto">
             <table class="table w-full text-sm" id="where-rank-table">
               <thead>
-                <tr class="text-xs uppercase tracking-wide text-gray-500">
+                <tr class="text-primary text-xs sm:text-sm uppercase">
                   <th class="w-1/3" data-column="projection-location">Sectional</th>
                   <th class="w-28">Projected Place</th>
                   <th class="w-24">Field Size</th>
@@ -124,9 +128,9 @@
 
       const isRelayEvent = data?.context?.event_type === 'Relay';
 
-  renderSummary(data, isRelayEvent);
-  renderWhereDoIRank(data.where_do_i_rank, data.context, isRelayEvent);
-  renderRankings(data.rankings, rankingsContainer, isRelayEvent, data.context);
+      renderSummary(data, isRelayEvent);
+      renderWhereDoIRank(data.where_do_i_rank, data.context, isRelayEvent);
+      renderRankings(data.rankings, rankingsContainer, isRelayEvent, data.context);
     } catch (error) {
       console.error('Error loading ranking detail:', error);
       loadingState.classList.add('hidden');
@@ -142,7 +146,7 @@
       });
     }
 
-  function renderWhereDoIRank(whereData, context = {}, isRelay = false) {
+    function renderWhereDoIRank(whereData, context = {}, isRelay = false) {
       if (!whereRankCard) {
         return;
       }
@@ -188,7 +192,7 @@
       if (whereRankChevron) {
         whereRankChevron.classList.remove('rotate-180');
       }
-    const sectionalResults = [...whereData.sectional_results];
+      const sectionalResults = [...whereData.sectional_results];
       sectionalResults.sort((a, b) => {
         const aNum = Number(a?.meet_num);
         const bNum = Number(b?.meet_num);
@@ -228,32 +232,38 @@
 
       const descriptionEl = document.getElementById('where-rank-description');
       if (descriptionEl) {
-        const baseDescription = `See how this performance would place at every ${stageLabelLower} statewide`;
+        const baseDescription = `See how this performance would place at every ${stageLabelLower}s statewide`;
         descriptionEl.textContent = combinedLabel
-          ? `${baseDescription} for ${combinedLabel}.`
+          ? `${baseDescription} for ${combinedLabel}s.`
           : `${baseDescription}.`;
       }
 
       whereRankTableBody.innerHTML = '';
       sectionalResults.forEach(row => {
+        const isOwnMeet = Number(row.meet_id) === meetId;
         const tr = document.createElement('tr');
         tr.className = 'transition-colors duration-150 hover:bg-primary/5';
-        if (Number(row.meet_id) === meetId) {
-          tr.classList.add('bg-primary/5');
+        if (isOwnMeet) {
+          tr.classList.add('bg-primary/10');
         }
 
-        const nameTd = document.createElement('td');
-        nameTd.className = 'text-sm font-semibold text-gray-800';
+        const promoteCell = (element, baseClass) => {
+          element.className = baseClass;
+          if (isOwnMeet) {
+            element.classList.add('text-primary', 'font-semibold');
+          }
+          return element;
+        };
+
+        const nameTd = promoteCell(document.createElement('td'), 'text-sm ');
         nameTd.textContent = row.sectional_name || 'Sectional';
         tr.appendChild(nameTd);
 
-        const placeTd = document.createElement('td');
-        placeTd.className = 'text-sm';
+        const placeTd = promoteCell(document.createElement('td'), 'text-sm');
         placeTd.textContent = row.projected_place_label || ordinal(row.projected_place);
         tr.appendChild(placeTd);
 
-        const fieldTd = document.createElement('td');
-        fieldTd.className = 'text-sm text-gray-600';
+        const fieldTd = promoteCell(document.createElement('td'), 'text-sm');
         if (row.field_size) {
           const unitLabel = isRelay ? 'relays' : 'athletes';
           fieldTd.textContent = `${row.field_size} ${unitLabel}`;
@@ -286,7 +296,8 @@
         tagsEl.appendChild(buildTag(`Enrollment: ${target.enrollment}`));
       }
       if (isRelay && target.relay_team) {
-        tagsEl.appendChild(buildTag(`Relay Team: ${target.relay_team}`));
+        const cleanedRelayTeam = target.relay_team.replace(/\s+,/g, ',');
+        tagsEl.appendChild(buildTag(`Relay Team: ${cleanedRelayTeam}`));
       }
       if (target.meet_host) {
         const host = target.meet_host + (target.meet_num ? ` (Meet ${target.meet_num})` : '');
@@ -298,9 +309,9 @@
       container.innerHTML = '';
 
       const configs = [
-        { key: 'overall', title: 'Overall Rank', description: 'See how your performance ranks among all participants.' },
-        { key: 'like_schools', title: 'Similar Enrollment Rank', description: 'See how your performance ranks among participants from schools of similar size to yours.' },
-        { key: 'same_grade', title: 'Grade-Level Rank', description: 'See how your performance ranks among participants in your grade level.' },
+        { key: 'overall', title: 'Overall Rank', description: 'See how your performance ranks among all participants for ' },
+        { key: 'like_schools', title: 'Similar Enrollment Rank', description: 'See how your performance ranks among participants from schools of similar size to yours for' },
+        { key: 'same_grade', title: 'Grade-Level Rank', description: 'See how your performance ranks among participants in your grade level for' },
       ];
 
       const activeConfigs = isRelay
@@ -316,15 +327,15 @@
 
         const summaryButton = document.createElement('button');
         summaryButton.type = 'button';
-    summaryButton.className = 'flex w-full items-center justify-between px-5 py-4 text-left bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary border-b border-base-200 cursor-pointer';
+        summaryButton.className = 'flex w-full items-center justify-between px-5 py-4 text-left bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary border-b border-base-200 cursor-pointer';
         summaryButton.setAttribute('aria-controls', detailId);
         summaryButton.setAttribute('aria-expanded', 'false');
 
         const summaryInfo = document.createElement('div');
         const title = document.createElement('h2');
         title.className = 'text-lg sm:text-xl font-semibold text-primary';
-  const contextPrefix = context?.year && context?.meet_type ? `${context.year} ${context.meet_type} • ` : '';
-  title.textContent = `${contextPrefix}${config.title}`;
+        const contextPrefix = context?.year && context?.meet_type ? `${context.year} ${context.meet_type} • ` : '';
+        title.textContent = `${contextPrefix}${config.title}`;
         summaryInfo.appendChild(title);
         summaryButton.appendChild(summaryInfo);
 
@@ -349,7 +360,7 @@
         const description = document.createElement('p');
         description.className = 'text-sm text-gray-600';
         const descriptor = context?.year && context?.meet_type
-          ? `${config.description} (${context.year} ${context.meet_type}).`
+          ? `${config.description} ${context.year} ${context.meet_type}s.`
           : config.description;
         description.textContent = descriptor;
         detail.appendChild(description);
@@ -458,7 +469,7 @@
         return entries;
       }
 
-      const enrollmentOrder = ['enrollment','min_enrollment', 'max_enrollment'];
+      const enrollmentOrder = ['enrollment', 'min_enrollment', 'max_enrollment'];
       const ordered = enrollmentOrder
         .filter(key => key in criteria)
         .map(key => [key, criteria[key]]);

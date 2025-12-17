@@ -67,7 +67,7 @@
         <!-- Badges Section -->
         <div class="mb-6 sm:mb-8">
             <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
-                Achievements
+                Achievements <span class="text-sm">(Final Results Only)</span>
             </h2>
             <div id="badges-container"
                 class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 auto-rows-fr">
@@ -78,8 +78,9 @@
         <div class="mb-6 sm:mb-8">
             <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
                 Playoff History
+                <span class="text-sm">(2023 to Present)</span>
             </h2>
-            <div id="playoff-history-container" class="space-y-4 overflow-x-auto">
+            <div id="playoff-history-container" class="space-y-4 overflow-x-auto overflow-y-visible">
                 <!-- Playoff history will be inserted here -->
             </div>
         </div>
@@ -178,7 +179,7 @@
 
         function createStageCell(stageData) {
             const td = document.createElement('td');
-            td.className = 'text-xs sm:text-sm lg:text-base leading-relaxed';
+            td.className = 'text-xs sm:text-sm lg:text-base leading-relaxed overflow-visible';
 
             if (!stageData) {
                 td.textContent = '–';
@@ -188,7 +189,7 @@
 
             const createPrelimMarker = () => {
                 const tooltip = document.createElement('span');
-                tooltip.className = 'tooltip tooltip-bottom tooltip-error ml-1 align-middle';
+                tooltip.className = 'tooltip tooltip-bottom tooltip-error ml-1 align-middle overflow-visible';
                 tooltip.dataset.tip = prelimTooltipMessage;
 
                 const marker = document.createElement('span');
@@ -236,7 +237,9 @@
                 title: 'Sectional Spotlight',
                 accent: 'text-rose-700',
                 encouragements: [
-                    'You shouldn\'t see this if you\'ve appeared on this website!'
+                    'A finals appearance is within reach. Keep pushing!',
+                    'Your next PR will land you in the sectional finals.',
+                    'Stay focused and keep training hard!'
                 ],
             },
             regional: {
@@ -422,7 +425,7 @@
             if (data.playoff_history && data.playoff_history.length > 0) {
                 // Create table
                 const table = document.createElement('div');
-                table.className = 'overflow-x-auto -mx-2 sm:mx-0';
+                table.className = 'overflow-x-auto overflow-y-visible -mx-2 sm:mx-0';
                 table.innerHTML = `
                         <table class="table table-compact sm:table-normal w-full min-w-full">
                             <thead>

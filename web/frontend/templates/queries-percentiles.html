@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="min-h-screen bg-white pt-5 pb-5 px-3 sm:px-6">
-  <div class="pt-15 relative max-w-6xl mx-auto">
+  <div class="pt-5 relative max-w-6xl mx-auto">
     <div
       class="absolute inset-0 -z-10 mx-0 sm:mx-[-40px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none">
     </div>
@@ -44,7 +44,7 @@
               <fieldset class="space-y-2">
                 <legend class="sr-only">Meet types</legend>
                 <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
-                  <span>Meet Types</span>
+                  <span class="mt-3">Meet Types</span>
                 </div>
                 <div id="meet-chip-group" class="flex flex-wrap gap-1.5"></div>
               </fieldset>
@@ -52,7 +52,7 @@
               <fieldset class="space-y-2">
                 <legend class="sr-only">Grade levels</legend>
                 <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
-                  <span>Grade Levels</span>
+                  <span class="mt-3">Grade Levels</span>
                 </div>
                 <div id="grade-chip-group" class="flex flex-wrap gap-1.5"></div>
               </fieldset>
@@ -60,7 +60,7 @@
               <fieldset class="space-y-2">
                 <legend class="sr-only">Seasons</legend>
                 <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
-                  <span>Seasons</span>
+                  <span class="mt-3">Seasons</span>
                 </div>
                 <div id="year-chip-group" class="flex flex-wrap gap-1.5"></div>
               </fieldset>
@@ -86,7 +86,7 @@
                     <p class="mt-3 text-sm text-gray-500">Crunching numbers…</p>
                   </div>
                 </div>
-                <div class="overflow-x-auto border border-base-200 rounded-lg flex-1">
+                <div class="overflow-x-auto overflow-y-auto max-h-[25rem] border border-base-200 rounded-lg flex-1">
                   <table class="table table-zebra text-sm">
                     <thead id="results-head"></thead>
                     <tbody id="results-body"></tbody>
@@ -240,7 +240,7 @@
 
     const insertGroupDividers = (container) => {
       const divider = document.createElement('div');
-      divider.className = 'col-span-full border-t border border-1 border-base-200/80 ';
+      divider.className = 'col-span-full border-t border border-1 border-base-200/80';
       container.appendChild(divider);
     };
 
