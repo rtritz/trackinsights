@@ -580,7 +580,7 @@ def _build_playoff_history(athlete_id: int):
         .filter(
             AthleteResult.athlete_id == athlete_id,
             Meet.meet_type.in_(("Sectional", "Regional", "State")),
-            AthleteResult.result_type == "Final",
+            AthleteResult.result_type.in_(("Final", "Prelim")),
             Event.event_type != "Relay",
         )
         .all()
