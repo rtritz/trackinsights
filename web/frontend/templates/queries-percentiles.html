@@ -45,8 +45,6 @@
                 <legend class="sr-only">Meet types</legend>
                 <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
                   <span>Meet Types</span>
-                  <button type="button" id="meet-select-all" class="btn btn-ghost btn-xs text-[10px] px-2"
-                    aria-label="Select all meet types">Select all meet types</button>
                 </div>
                 <div id="meet-chip-group" class="flex flex-wrap gap-1.5"></div>
               </fieldset>
@@ -55,8 +53,6 @@
                 <legend class="sr-only">Grade levels</legend>
                 <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
                   <span>Grade Levels</span>
-                  <button type="button" id="grade-select-all" class="btn btn-ghost btn-xs text-[10px] px-2"
-                    aria-label="Select all grade levels">Select all grades</button>
                 </div>
                 <div id="grade-chip-group" class="flex flex-wrap gap-1.5"></div>
               </fieldset>
@@ -65,8 +61,6 @@
                 <legend class="sr-only">Seasons</legend>
                 <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
                   <span>Seasons</span>
-                  <button type="button" id="year-select-all" class="btn btn-ghost btn-xs text-[10px] px-2"
-                    aria-label="Select all seasons">Select all seasons</button>
                 </div>
                 <div id="year-chip-group" class="flex flex-wrap gap-1.5"></div>
               </fieldset>
@@ -135,9 +129,6 @@
     const yearChipGroup = document.getElementById('year-chip-group');
     const percentileSlider = document.getElementById('percentile-slider');
     const percentileSliderValue = document.getElementById('percentile-slider-value');
-  const meetSelectAllBtn = document.getElementById('meet-select-all');
-  const gradeSelectAllBtn = document.getElementById('grade-select-all');
-  const yearSelectAllBtn = document.getElementById('year-select-all');
     const clearAllBtn = document.getElementById('clear-all');
     const resultsLoading = document.getElementById('results-loading');
     const resultsError = document.getElementById('results-error');
@@ -148,11 +139,9 @@
     const resultsBody = document.getElementById('results-body');
     const copyQueryBtn = document.getElementById('copy-query');
 
-    const chipBaseClasses = 'chip-btn btn btn-xs border border-base-300 text-sm whitespace-nowrap px-3 py-1.5 transition-colors justify-center text-center shadow-none hover:shadow-none focus:shadow-none';
-    const eventChipClasses = 'chip-btn btn btn-xs border border-base-300 text-sm w-full px-3 py-2 transition-colors justify-center text-center shadow-none hover:shadow-none focus:shadow-none';
-    const DEFAULT_MEET_TYPE_SELECTIONS = ['Sectional', 'Regional', 'State'];
-    const DEFAULT_GRADE_SELECTIONS = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'FR', 'SO', 'JR', 'SR'];
-    let defaultYearSelections = [];
+  const chipBaseClasses = 'chip-btn btn btn-xs border border-base-300 text-sm whitespace-nowrap px-3 py-1.5 transition-colors justify-center text-center shadow-none hover:shadow-none focus:shadow-none';
+  const eventChipClasses = 'chip-btn btn btn-xs border border-base-300 text-sm w-full px-3 py-2 transition-colors justify-center text-center shadow-none hover:shadow-none focus:shadow-none';
+  const ALL_OPTION_VALUE = '__ALL__';
     const EVENT_GROUPS = [
       {
         label: 'Sprints & Distance',
@@ -375,14 +364,26 @@
     };
 
     const createChip = (value, container, options = {}) => {
-      const { enforceMinOne = false } = options;
+      const { enforceMinOne = false, selectionMode = 'multi', label, isAll = false } = options;
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = chipBaseClasses;
       chip.dataset.value = value;
       chip.dataset.selected = 'false';
-      chip.textContent = value;
+      chip.dataset.isAll = isAll ? 'true' : 'false';
+      chip.textContent = label ?? value;
       chip.addEventListener('click', () => {
+        if (selectionMode === 'single') {
+          if (chip.dataset.selected === 'true') {
+            return;
+          }
+          Array.from(container.querySelectorAll('.chip-btn')).forEach(other => {
+            setChipSelected(other, other === chip);
+          });
+          queueFetch();
+          return;
+        }
+
         const isSelected = chip.dataset.selected === 'true';
         if (enforceMinOne && isSelected && getSelectedChipCount(container) <= 1) {
           return;
@@ -447,25 +448,36 @@
       if (!container) {
         return;
       }
+      const { includeAll = false, allLabel = 'All' } = options;
       container.innerHTML = '';
+      if (includeAll) {
+        createChip(ALL_OPTION_VALUE, container, { ...options, label: allLabel, isAll: true });
+      }
       values.forEach(value => {
         createChip(value, container, options);
       });
     };
 
-    const applyDefaultSelections = (container, defaults = []) => {
-      if (!container || !defaults.length) {
+    const setSingleSelection = (container, targetValue, fallbackValue = ALL_OPTION_VALUE) => {
+      if (!container) {
         return;
       }
-      const normalized = defaults
-        .map(value => value?.toString().trim().toLowerCase())
-        .filter(Boolean);
-      Array.from(container.querySelectorAll('.chip-btn')).forEach(chip => {
-        const chipValue = chip.dataset.value?.toString().trim().toLowerCase();
-        if (chipValue && normalized.includes(chipValue)) {
-          setChipSelected(chip, true);
+      const chips = Array.from(container.querySelectorAll('.chip-btn'));
+      if (!chips.length) {
+        return;
+      }
+      let matched = false;
+      chips.forEach(chip => {
+        const isMatch = chip.dataset.value === targetValue;
+        setChipSelected(chip, isMatch);
+        if (isMatch) {
+          matched = true;
         }
       });
+      if (!matched) {
+        const fallbackChip = chips.find(chip => chip.dataset.value === fallbackValue) || chips[0];
+        chips.forEach(chip => setChipSelected(chip, chip === fallbackChip));
+      }
     };
 
     const getEventQueryList = () => {
@@ -487,13 +499,20 @@
       return Array.from(container.querySelectorAll('.chip-btn[data-selected="true"]')).map(chip => chip.dataset.value);
     };
 
+    const normalizeSingleSelection = (values = []) => {
+      if (!Array.isArray(values) || !values.length || values.includes(ALL_OPTION_VALUE)) {
+        return [];
+      }
+      return [values[0]];
+    };
+
     const collectQueryParams = () => {
       return {
         events: getEventQueryList(),
         genders: (state.options?.genders || []).filter(Boolean),
-        meet_types: getSelectedChips(meetChipGroup),
-        grade_levels: getSelectedChips(gradeChipGroup),
-        years: getSelectedChips(yearChipGroup),
+        meet_types: normalizeSingleSelection(getSelectedChips(meetChipGroup)),
+        grade_levels: normalizeSingleSelection(getSelectedChips(gradeChipGroup)),
+        years: normalizeSingleSelection(getSelectedChips(yearChipGroup)),
         percentiles: state.percentiles,
       };
     };
@@ -697,75 +716,19 @@
       });
     };
 
-    const selectAllChips = (container) => {
-      if (!container) {
-        return false;
-      }
-      let changed = false;
-      Array.from(container.querySelectorAll('.chip-btn')).forEach(chip => {
-        if (chip.dataset.selected !== 'true') {
-          setChipSelected(chip, true);
-          changed = true;
-        }
-      });
-      return changed;
-    };
-
-    const ensureAtLeastOneSelected = (container) => {
-      if (!container) {
-        return;
-      }
-      if (getSelectedChipCount(container) === 0) {
-        const firstChip = container.querySelector('.chip-btn');
-        if (firstChip) {
-          setChipSelected(firstChip, true);
-        }
-      }
-    };
-
     const resetFilters = () => {
       clearChips(meetChipGroup);
       clearChips(gradeChipGroup);
       clearChips(yearChipGroup);
       state.selectedEvent = state.options?.events?.[0] || null;
       syncEventSelection();
-      applyDefaultSelections(meetChipGroup, DEFAULT_MEET_TYPE_SELECTIONS);
-      ensureAtLeastOneSelected(meetChipGroup);
-      applyDefaultSelections(gradeChipGroup, DEFAULT_GRADE_SELECTIONS);
-      ensureAtLeastOneSelected(gradeChipGroup);
-      applyDefaultSelections(yearChipGroup, defaultYearSelections);
-      ensureAtLeastOneSelected(yearChipGroup);
+      setSingleSelection(meetChipGroup, ALL_OPTION_VALUE);
+      setSingleSelection(gradeChipGroup, ALL_OPTION_VALUE);
+      setSingleSelection(yearChipGroup, ALL_OPTION_VALUE);
       applyPercentileStep(DEFAULT_PERCENTILE_STEP);
       syncPercentileSlider();
       queueFetch();
     };
-
-    if (meetSelectAllBtn) {
-      meetSelectAllBtn.addEventListener('click', () => {
-        const changed = selectAllChips(meetChipGroup);
-        if (changed) {
-          queueFetch();
-        }
-      });
-    }
-
-    if (gradeSelectAllBtn) {
-      gradeSelectAllBtn.addEventListener('click', () => {
-        const changed = selectAllChips(gradeChipGroup);
-        if (changed) {
-          queueFetch();
-        }
-      });
-    }
-
-    if (yearSelectAllBtn) {
-      yearSelectAllBtn.addEventListener('click', () => {
-        const changed = selectAllChips(yearChipGroup);
-        if (changed) {
-          queueFetch();
-        }
-      });
-    }
 
     clearAllBtn.addEventListener('click', resetFilters);
 
@@ -804,23 +767,17 @@
           state.selectedEvent = orderedEvents[0];
         }
         renderEventChips(orderedEvents);
-  renderChipGroup(options.meet_types || [], meetChipGroup, { enforceMinOne: true });
-        const meetDefaults = initialFilters.meet_types.length ? initialFilters.meet_types : DEFAULT_MEET_TYPE_SELECTIONS;
-        applyDefaultSelections(meetChipGroup, meetDefaults);
-        ensureAtLeastOneSelected(meetChipGroup);
-  renderChipGroup(options.grade_levels || [], gradeChipGroup, { enforceMinOne: true });
-        const gradeDefaults = initialFilters.grade_levels.length ? initialFilters.grade_levels : DEFAULT_GRADE_SELECTIONS;
-        applyDefaultSelections(gradeChipGroup, gradeDefaults);
-        ensureAtLeastOneSelected(gradeChipGroup);
+    renderChipGroup(options.meet_types || [], meetChipGroup, { selectionMode: 'single', includeAll: true });
+    const meetDefaultValue = initialFilters.meet_types.length ? initialFilters.meet_types[0] : ALL_OPTION_VALUE;
+    setSingleSelection(meetChipGroup, meetDefaultValue, ALL_OPTION_VALUE);
+
+    renderChipGroup(options.grade_levels || [], gradeChipGroup, { selectionMode: 'single', includeAll: true });
+    const gradeDefaultValue = initialFilters.grade_levels.length ? initialFilters.grade_levels[0] : ALL_OPTION_VALUE;
+    setSingleSelection(gradeChipGroup, gradeDefaultValue, ALL_OPTION_VALUE);
         const orderedYears = orderYears(options.years || []);
-  renderChipGroup(orderedYears, yearChipGroup, { enforceMinOne: true });
-        defaultYearSelections = YEAR_DISPLAY_ORDER.filter(year => orderedYears.includes(year));
-        if (!defaultYearSelections.length) {
-          defaultYearSelections = [...orderedYears];
-        }
-        const yearDefaults = initialFilters.years.length ? initialFilters.years : defaultYearSelections;
-        applyDefaultSelections(yearChipGroup, yearDefaults);
-        ensureAtLeastOneSelected(yearChipGroup);
+    renderChipGroup(orderedYears, yearChipGroup, { selectionMode: 'single', includeAll: true });
+    const yearDefaultValue = initialFilters.years.length ? initialFilters.years[0] : ALL_OPTION_VALUE;
+    setSingleSelection(yearChipGroup, yearDefaultValue, ALL_OPTION_VALUE);
         const hadCustomPercentiles = applyPercentilesFromQuery(initialFilters.percentiles);
         if (!hadCustomPercentiles) {
           applyPercentileStep(DEFAULT_PERCENTILE_STEP);
