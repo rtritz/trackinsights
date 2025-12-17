@@ -125,7 +125,7 @@
       const isRelayEvent = data?.context?.event_type === 'Relay';
 
   renderSummary(data, isRelayEvent);
-  renderWhereDoIRank(data.where_do_i_rank, data.context);
+  renderWhereDoIRank(data.where_do_i_rank, data.context, isRelayEvent);
   renderRankings(data.rankings, rankingsContainer, isRelayEvent, data.context);
     } catch (error) {
       console.error('Error loading ranking detail:', error);
@@ -142,7 +142,7 @@
       });
     }
 
-    function renderWhereDoIRank(whereData, context = {}) {
+  function renderWhereDoIRank(whereData, context = {}, isRelay = false) {
       if (!whereRankCard) {
         return;
       }
@@ -254,7 +254,12 @@
 
         const fieldTd = document.createElement('td');
         fieldTd.className = 'text-sm text-gray-600';
-        fieldTd.textContent = row.field_size ? `${row.field_size} athletes` : '—';
+        if (row.field_size) {
+          const unitLabel = isRelay ? 'relays' : 'athletes';
+          fieldTd.textContent = `${row.field_size} ${unitLabel}`;
+        } else {
+          fieldTd.textContent = '—';
+        }
         tr.appendChild(fieldTd);
         whereRankTableBody.appendChild(tr);
       });
