@@ -41,12 +41,12 @@
 
       <div id="where-rank-card" class="card bg-white border border-base-200 shadow-sm overflow-hidden">
         <button id="where-rank-toggle" type="button"
-          class="flex w-full items-center justify-between px-5 py-4 text-left bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary border-b border-base-200 cursor-pointer"
+          class="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-5 py-4 text-left bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary border-b border-base-200 cursor-pointer"
           aria-controls="where-rank-panel" aria-expanded="false">
           <div>
             <h2 class="text-lg sm:text-xl font-semibold text-primary">Sectional Projections</h2>
           </div>
-          <div class="flex items-center gap-3 text-sm font-medium text-gray-700">
+          <div class="flex items-center justify-between gap-2 sm:gap-3 text-sm font-medium text-gray-700 w-full sm:w-auto">
             <span id="where-rank-summary">No data yet</span>
             <svg id="where-rank-chevron" xmlns="http://www.w3.org/2000/svg"
               class="h-5 w-5 text-gray-500 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor">
@@ -60,9 +60,9 @@
           <p class="text-sm text-gray-600" id="where-rank-description">See how this performance would place at every
             sectional statewide.</p>
           <div class="overflow-x-auto">
-            <table class="table w-full text-sm" id="where-rank-table">
+            <table class="table w-full text-sm sm:text-base" id="where-rank-table">
               <thead>
-                <tr class="text-primary text-xs sm:text-sm uppercase">
+                <tr class="text-primary text-sm sm:text-base uppercase">
                   <th class="w-1/3" data-column="projection-location">Sectional</th>
                   <th class="w-28">Projected Place</th>
                   <th class="w-24">Field Size</th>
@@ -255,15 +255,15 @@
           return element;
         };
 
-        const nameTd = promoteCell(document.createElement('td'), 'text-sm ');
+        const nameTd = promoteCell(document.createElement('td'), 'text-sm sm:text-base');
         nameTd.textContent = row.sectional_name || 'Sectional';
         tr.appendChild(nameTd);
 
-        const placeTd = promoteCell(document.createElement('td'), 'text-sm');
+        const placeTd = promoteCell(document.createElement('td'), 'text-sm sm:text-base');
         placeTd.textContent = row.projected_place_label || ordinal(row.projected_place);
         tr.appendChild(placeTd);
 
-        const fieldTd = promoteCell(document.createElement('td'), 'text-sm');
+        const fieldTd = promoteCell(document.createElement('td'), 'text-sm sm:text-base');
         if (row.field_size) {
           const unitLabel = isRelay ? 'relays' : 'athletes';
           fieldTd.textContent = `${row.field_size} ${unitLabel}`;
@@ -327,7 +327,7 @@
 
         const summaryButton = document.createElement('button');
         summaryButton.type = 'button';
-        summaryButton.className = 'flex w-full items-center justify-between px-5 py-4 text-left bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary border-b border-base-200 cursor-pointer';
+        summaryButton.className = 'flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-5 py-4 text-left bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary border-b border-base-200 cursor-pointer';
         summaryButton.setAttribute('aria-controls', detailId);
         summaryButton.setAttribute('aria-expanded', 'false');
 
@@ -340,7 +340,7 @@
         summaryButton.appendChild(summaryInfo);
 
         const summaryRight = document.createElement('div');
-        summaryRight.className = 'flex items-center gap-3 text-sm font-medium text-gray-700';
+        summaryRight.className = 'flex items-center justify-between gap-2 sm:gap-3 text-sm font-medium text-gray-700 w-full sm:w-auto';
 
         const summaryRank = document.createElement('span');
         summaryRank.textContent = getSummaryText(rankingData);
@@ -406,13 +406,13 @@
       wrapper.className = 'overflow-x-auto';
 
       const table = document.createElement('table');
-      table.className = 'table table-compact w-full';
+      table.className = 'table table-compact w-full text-sm sm:text-base';
 
       const nameHeader = isRelay ? 'Relay Team' : 'Athlete';
 
       const thead = document.createElement('thead');
       thead.innerHTML = `
-        <tr class="text-primary text-xs sm:text-sm uppercase">
+        <tr class="text-primary text-sm sm:text-base uppercase">
           <th class="w-16">Rank</th>
           <th>${nameHeader}</th>
           <th class="hidden sm:table-cell">School</th>
@@ -423,6 +423,11 @@
       table.appendChild(thead);
 
       const tbody = document.createElement('tbody');
+      const normalizeRelayText = (text) => {
+        if (!text || !isRelay) return text;
+        return text.replace(/\s+,/g, ',');
+      };
+
       entries.forEach(entry => {
         const tr = document.createElement('tr');
         const rowBaseClass = 'transition-colors duration-150 hover:bg-primary/5';
@@ -432,26 +437,26 @@
 
         const rankTd = document.createElement('td');
         rankTd.textContent = entry.rank;
-        rankTd.className = 'text-xs sm:text-sm';
+        rankTd.className = 'text-sm sm:text-base';
         tr.appendChild(rankTd);
 
         const nameTd = document.createElement('td');
-        nameTd.className = 'text-xs sm:text-sm';
-        nameTd.textContent = entry.name || '—';
+        nameTd.className = 'text-sm sm:text-base';
+        nameTd.textContent = normalizeRelayText(entry.name) || '—';
         tr.appendChild(nameTd);
 
         const schoolTd = document.createElement('td');
-        schoolTd.className = 'hidden sm:table-cell text-xs sm:text-sm';
+        schoolTd.className = 'hidden sm:table-cell text-sm sm:text-base';
         schoolTd.textContent = entry.school || '—';
         tr.appendChild(schoolTd);
 
         const resultTd = document.createElement('td');
-        resultTd.className = 'text-xs sm:text-sm';
+        resultTd.className = 'text-sm sm:text-base';
         resultTd.textContent = entry.result || '—';
         tr.appendChild(resultTd);
 
         const placeTd = document.createElement('td');
-        placeTd.className = 'hidden md:table-cell text-xs sm:text-sm';
+        placeTd.className = 'hidden md:table-cell text-sm sm:text-base';
         placeTd.textContent = entry.place != null ? ordinal(entry.place) : '—';
         tr.appendChild(placeTd);
 
@@ -503,7 +508,7 @@
 
     function buildTag(text) {
       const span = document.createElement('span');
-      span.className = 'badge badge-outline rounded-full px-3 py-2';
+      span.className = 'badge badge-outline rounded-full px-3 py-2 h-auto min-h-[2.25rem] whitespace-normal break-words text-left';
       span.textContent = text;
       return span;
     }
