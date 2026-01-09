@@ -1,0 +1,439 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="min-h-screen bg-white pt-5 pb-5 px-3 sm:px-6">
+  <div class="pt-5 relative max-w-6xl mx-auto">
+    <div
+      class="absolute inset-0 -z-10 mx-0 sm:mx-[-40px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none">
+    </div>
+    <div class="relative space-y-8">
+      <a href="{{ url_for('main.queries_page') }}"
+        class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-4 mt-4 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+            clip-rule="evenodd" />
+        </svg>
+        Back
+      </a>
+      <header class="text-center space-y-4">
+        <h1 class="font-impact italic text-4xl sm:text-5xl text-primary">
+          Sectional Event Trends
+        </h1>
+        <p class="text-base-content/70 max-w-2xl mx-auto">
+          Analyze how event depth and qualification standards change over time. See median marks, cutoff performances, and difficulty rankings.
+        </p>
+      </header>
+
+      <div class="rounded-[32px] bg-white/90 ring-1 ring-base-200 shadow-[0_25px_70px_rgba(15,23,42,0.08)] p-4 sm:p-6">
+        <div class="flex flex-wrap lg:flex-nowrap gap-6 items-stretch">
+          <!-- Filter Panel -->
+          <section
+            class="bg-white border border-base-200/80 rounded-2xl shadow-lg shadow-base-300/40 w-full lg:w-[20rem] shrink-0 flex flex-col">
+            <div class="gap-4 p-4 flex-1 flex flex-col" id="filter-card">
+              <h2 class="text-lg font-semibold text-base-content">Filters</h2>
+
+              <fieldset class="space-y-2">
+                <legend class="text-[11px] uppercase tracking-wide text-gray-500">Gender</legend>
+                <div id="gender-chip-group" class="flex flex-wrap gap-2"></div>
+              </fieldset>
+
+              <fieldset class="space-y-2">
+                <legend class="text-[11px] uppercase tracking-wide text-gray-500">Event</legend>
+                <select id="event-select" class="select select-bordered select-sm w-full">
+                  <option value="">Select an event...</option>
+                </select>
+              </fieldset>
+
+              <div class="mt-auto pt-4">
+                <button type="button" id="load-data-btn" class="btn btn-primary btn-sm w-full">
+                  Load Trends
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Results Panel -->
+          <section
+            class="bg-white border border-base-200/80 rounded-2xl shadow-xl shadow-base-300/30 min-h-[520px] flex-1 min-w-0 flex flex-col">
+            <div class="space-y-4 p-4 flex-1 flex flex-col">
+              <div id="results-header" class="hidden">
+                <h2 id="results-title" class="text-xl font-semibold text-primary"></h2>
+              </div>
+
+              <div id="results-error" class="hidden alert alert-error">
+                <span id="results-error-message">Something went wrong.</span>
+              </div>
+
+              <div id="results-loading" class="hidden">
+                <div class="flex flex-col items-center justify-center h-48 text-center">
+                  <span class="loading loading-spinner loading-lg text-primary"></span>
+                  <p class="mt-3 text-sm text-gray-500">Loading trends data…</p>
+                </div>
+              </div>
+
+              <div id="results-empty" class="flex flex-col items-center justify-center h-48 text-center text-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <p>Select a gender and event to view trends</p>
+              </div>
+
+              <div id="results-content" class="hidden flex-1 flex flex-col gap-6">
+                <!-- Chart Container -->
+                <div class="bg-base-100 border border-base-200 rounded-xl p-4">
+                  <canvas id="trends-chart" height="280"></canvas>
+                </div>
+
+                <!-- Data Table -->
+                <div class="overflow-x-auto border border-base-200 rounded-lg">
+                  <table class="table table-zebra text-sm">
+                    <thead id="results-head" class="bg-base-200">
+                      <tr>
+                        <th>Season</th>
+                        <th>Median Mark</th>
+                        <th>Cutoff Performance</th>
+                        <th>Difficulty Rank</th>
+                      </tr>
+                    </thead>
+                    <tbody id="results-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tooltip for difficulty rankings -->
+<div id="difficulty-tooltip" class="hidden fixed z-50 bg-white border border-base-300 rounded-lg shadow-xl p-4 max-w-xs max-h-80 overflow-y-auto">
+  <h4 class="font-semibold text-sm text-primary mb-2">Event Difficulty Rankings</h4>
+  <ol id="difficulty-tooltip-list" class="text-xs space-y-1"></ol>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const genderChipGroup = document.getElementById('gender-chip-group');
+  const eventSelect = document.getElementById('event-select');
+  const loadDataBtn = document.getElementById('load-data-btn');
+  const resultsHeader = document.getElementById('results-header');
+  const resultsTitle = document.getElementById('results-title');
+  const resultsLoading = document.getElementById('results-loading');
+  const resultsError = document.getElementById('results-error');
+  const resultsErrorMessage = document.getElementById('results-error-message');
+  const resultsEmpty = document.getElementById('results-empty');
+  const resultsContent = document.getElementById('results-content');
+  const resultsBody = document.getElementById('results-body');
+  const difficultyTooltip = document.getElementById('difficulty-tooltip');
+  const difficultyTooltipList = document.getElementById('difficulty-tooltip-list');
+
+  const chipBaseClasses = 'chip-btn btn btn-sm border border-base-300 text-sm px-4 py-2 transition-colors shadow-none hover:shadow-none focus:shadow-none';
+
+  let state = {
+    options: null,
+    selectedGender: null,
+    selectedEvent: null,
+    trendsData: null,
+    chart: null,
+  };
+
+  // Fetch filter options
+  const fetchOptions = async () => {
+    try {
+      const response = await fetch('/api/sectional-trends/options');
+      if (!response.ok) throw new Error('Failed to load options');
+      state.options = await response.json();
+      renderFilters();
+    } catch (error) {
+      console.error('Error fetching options:', error);
+    }
+  };
+
+  const renderFilters = () => {
+    if (!state.options) return;
+
+    // Render gender chips
+    genderChipGroup.innerHTML = '';
+    for (const gender of state.options.genders || []) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = chipBaseClasses;
+      chip.textContent = gender;
+      chip.dataset.value = gender;
+      chip.addEventListener('click', () => selectGender(gender));
+      genderChipGroup.appendChild(chip);
+    }
+
+    // Render event options
+    eventSelect.innerHTML = '<option value="">Select an event...</option>';
+    for (const event of state.options.events || []) {
+      const option = document.createElement('option');
+      option.value = event;
+      option.textContent = event;
+      eventSelect.appendChild(option);
+    }
+  };
+
+  const selectGender = (gender) => {
+    state.selectedGender = gender;
+    updateChipSelection(genderChipGroup, gender);
+  };
+
+  const updateChipSelection = (container, selectedValue) => {
+    for (const chip of container.querySelectorAll('.chip-btn')) {
+      const isSelected = chip.dataset.value === selectedValue;
+      chip.classList.toggle('btn-primary', isSelected);
+      chip.classList.toggle('btn-ghost', !isSelected);
+    }
+  };
+
+  eventSelect.addEventListener('change', (e) => {
+    state.selectedEvent = e.target.value;
+  });
+
+  loadDataBtn.addEventListener('click', async () => {
+    if (!state.selectedGender || !state.selectedEvent) {
+      showError('Please select both a gender and an event.');
+      return;
+    }
+    await fetchTrendsData();
+  });
+
+  const fetchTrendsData = async () => {
+    showLoading(true);
+    hideError();
+
+    const params = new URLSearchParams({
+      gender: state.selectedGender,
+      event: state.selectedEvent,
+    });
+
+    try {
+      const response = await fetch(`/api/sectional-trends?${params}`);
+      if (!response.ok) throw new Error('Failed to load trends data');
+      
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      
+      state.trendsData = data;
+      renderResults();
+    } catch (error) {
+      console.error('Error fetching trends:', error);
+      showError(error.message || 'Failed to load trends data.');
+    } finally {
+      showLoading(false);
+    }
+  };
+
+  const showLoading = (show) => {
+    resultsLoading.classList.toggle('hidden', !show);
+    if (show) {
+      resultsEmpty.classList.add('hidden');
+      resultsContent.classList.add('hidden');
+    }
+  };
+
+  const showError = (message) => {
+    resultsErrorMessage.textContent = message;
+    resultsError.classList.remove('hidden');
+  };
+
+  const hideError = () => {
+    resultsError.classList.add('hidden');
+  };
+
+  const renderResults = () => {
+    const data = state.trendsData;
+    if (!data || !data.rows || data.rows.length === 0) {
+      resultsEmpty.classList.remove('hidden');
+      resultsContent.classList.add('hidden');
+      resultsHeader.classList.add('hidden');
+      return;
+    }
+
+    resultsEmpty.classList.add('hidden');
+    resultsContent.classList.remove('hidden');
+    resultsHeader.classList.remove('hidden');
+    resultsTitle.textContent = `${data.gender}'s ${data.event}`;
+
+    // Render table
+    resultsBody.innerHTML = '';
+    for (const row of data.rows) {
+      const tr = document.createElement('tr');
+      
+      const seasonTd = document.createElement('td');
+      seasonTd.textContent = row.season;
+      tr.appendChild(seasonTd);
+
+      const medianTd = document.createElement('td');
+      medianTd.textContent = row.median_mark || '—';
+      tr.appendChild(medianTd);
+
+      const cutoffTd = document.createElement('td');
+      cutoffTd.textContent = row.cutoff_performance || '—';
+      tr.appendChild(cutoffTd);
+
+      const difficultyTd = document.createElement('td');
+      if (row.difficulty_rank && row.total_events) {
+        const badge = document.createElement('span');
+        badge.className = 'badge badge-outline cursor-pointer hover:badge-primary transition-colors';
+        badge.textContent = `${row.difficulty_rank} / ${row.total_events}`;
+        badge.dataset.season = row.season;
+        badge.addEventListener('mouseenter', (e) => showDifficultyTooltip(e, row.season));
+        badge.addEventListener('mouseleave', hideDifficultyTooltip);
+        difficultyTd.appendChild(badge);
+      } else {
+        difficultyTd.textContent = '—';
+      }
+      tr.appendChild(difficultyTd);
+
+      resultsBody.appendChild(tr);
+    }
+
+    // Render chart
+    renderChart(data);
+  };
+
+  const renderChart = (data) => {
+    const ctx = document.getElementById('trends-chart').getContext('2d');
+    
+    // Destroy existing chart
+    if (state.chart) {
+      state.chart.destroy();
+    }
+
+    const labels = data.rows.map(r => r.season);
+    const medianData = data.rows.map(r => r.median_raw);
+    const cutoffData = data.rows.map(r => r.cutoff_raw);
+
+    // Determine if we should reverse the Y-axis (for track events, lower is better)
+    const isLowerBetter = data.event_type !== 'Field';
+
+    state.chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Median Mark',
+            data: medianData,
+            borderColor: 'rgb(59, 130, 246)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            fill: false,
+            tension: 0.3,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+          },
+          {
+            label: 'Cutoff Performance',
+            data: cutoffData,
+            borderColor: 'rgb(239, 68, 68)',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            fill: false,
+            tension: 0.3,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const row = data.rows[context.dataIndex];
+                if (context.dataset.label === 'Median Mark') {
+                  return `Median: ${row.median_mark}`;
+                } else {
+                  return `Cutoff: ${row.cutoff_performance}`;
+                }
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: 'Season'
+            }
+          },
+          y: {
+            reverse: isLowerBetter,
+            title: {
+              display: true,
+              text: data.event_type === 'Field' ? 'Distance' : 'Time (seconds)'
+            },
+            ticks: {
+              callback: function(value) {
+                if (data.event_type === 'Field') {
+                  // Format as feet-inches (approximate)
+                  const feet = Math.floor(value / 12);
+                  const inches = Math.round(value % 12);
+                  return `${feet}'${inches}"`;
+                } else {
+                  // Format as time
+                  const minutes = Math.floor(value / 60);
+                  const seconds = (value % 60).toFixed(2);
+                  return minutes > 0 ? `${minutes}:${seconds.padStart(5, '0')}` : `${seconds}s`;
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+  };
+
+  const showDifficultyTooltip = (e, season) => {
+    const rankings = state.trendsData?.difficulty_rankings?.[season];
+    if (!rankings || rankings.length === 0) return;
+
+    difficultyTooltipList.innerHTML = '';
+    rankings.forEach((item, index) => {
+      const li = document.createElement('li');
+      li.className = 'flex justify-between gap-4';
+      if (item.event === state.selectedEvent) {
+        li.className += ' font-bold text-primary';
+      }
+      li.innerHTML = `
+        <span>${index + 1}. ${item.event}</span>
+        <span class="text-gray-500">${item.difficulty.toFixed(1)}%</span>
+      `;
+      difficultyTooltipList.appendChild(li);
+    });
+
+    // Position tooltip
+    const rect = e.target.getBoundingClientRect();
+    difficultyTooltip.style.left = `${rect.left + window.scrollX}px`;
+    difficultyTooltip.style.top = `${rect.bottom + window.scrollY + 8}px`;
+    difficultyTooltip.classList.remove('hidden');
+  };
+
+  const hideDifficultyTooltip = () => {
+    difficultyTooltip.classList.add('hidden');
+  };
+
+  // Close tooltip when clicking elsewhere
+  document.addEventListener('click', (e) => {
+    if (!difficultyTooltip.contains(e.target) && !e.target.closest('[data-season]')) {
+      hideDifficultyTooltip();
+    }
+  });
+
+  // Initialize
+  fetchOptions();
+});
+</script>
+{% endblock %}
