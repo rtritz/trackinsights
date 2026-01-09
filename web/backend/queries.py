@@ -1771,3 +1771,289 @@ def _count_result_types(entries):
         counts[label] = counts.get(label, 0) + 1
     return counts
 
+
+# -----------------------------------------------------------------------------
+# Sectional Event Trends
+# -----------------------------------------------------------------------------
+
+# Fallback constants in case CONST is not available
+_FALLBACK_EVENTS = {
+    "ALL_TRACK": ["100 Meters", "200 Meters", "400 Meters", "800 Meters", "1600 Meters", "3200 Meters"],
+    "ALL_FIELD": ["High Jump", "Long Jump", "Pole Vault", "Shot Put", "Discus"],
+    "ALL_GIRLS_HURDLES": ["100 Hurdles", "300 Hurdles"],
+    "ALL_BOYS_HURDLES": ["110 Hurdles", "300 Hurdles"],
+}
+_FALLBACK_GENDERS = ["Boys", "Girls"]
+
+
+def _get_sectional_events():
+    """Get all events for sectional trends, with fallback if CONST not available."""
+    all_events = []
+    try:
+        groups = [
+            getattr(CONST.EVENT, "ALL_TRACK", _FALLBACK_EVENTS["ALL_TRACK"]),
+            getattr(CONST.EVENT, "ALL_FIELD", _FALLBACK_EVENTS["ALL_FIELD"]),
+            getattr(CONST.EVENT, "ALL_GIRLS_HURDLES", _FALLBACK_EVENTS["ALL_GIRLS_HURDLES"]),
+            getattr(CONST.EVENT, "ALL_BOYS_HURDLES", _FALLBACK_EVENTS["ALL_BOYS_HURDLES"]),
+        ]
+    except NameError:
+        groups = list(_FALLBACK_EVENTS.values())
+    
+    for group in groups:
+        for name in group:
+            if name not in all_events:
+                all_events.append(name)
+    return all_events
+
+
+def _get_sectional_years():
+    """Get available years from the database for sectional trends."""
+    years_query = (
+        db.session.query(Meet.year)
+        .filter(Meet.meet_type == "Sectional", Meet.year.isnot(None))
+        .distinct()
+        .order_by(Meet.year.desc())
+        .limit(10)
+        .all()
+    )
+    return [row[0] for row in years_query if row[0] is not None]
+
+
+def get_sectional_event_trends_options():
+    """Return filter options for the sectional event trends page."""
+    all_events = _get_sectional_events()
+    
+    try:
+        genders = list(getattr(CONST.GENDER, "ALL", _FALLBACK_GENDERS))
+    except NameError:
+        genders = _FALLBACK_GENDERS
+    
+    return {
+        "events": sorted(all_events),
+        "genders": genders,
+        "years": _get_sectional_years(),
+    }
+
+
+def get_sectional_event_trends(gender: str, event: str):
+    """
+    Compute sectional event trends for a given gender and event.
+    
+    Returns data for each season including:
+    - Median mark
+    - Cutoff performance (top 8 qualifier threshold)
+    - Difficulty rank among all events for that season
+    - All events ranked by difficulty for tooltip
+    """
+    if not gender or not event:
+        return {"error": "Gender and event are required", "rows": [], "difficulty_rankings": {}}
+
+    # Query all sectional results for this gender/event across years
+    results_query = (
+        db.session.query(
+            Meet.year,
+            AthleteResult.result2,
+            AthleteResult.place,
+        )
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .filter(
+            Meet.meet_type == "Sectional",
+            Meet.gender == gender,
+            AthleteResult.event == event,
+            AthleteResult.result_type == "Final",
+            AthleteResult.result2.isnot(None),
+        )
+        .order_by(Meet.year)
+        .all()
+    )
+    
+    # Group results by year
+    year_results = {}
+    for year, result2, place in results_query:
+        if year not in year_results:
+            year_results[year] = []
+        year_results[year].append({"result2": result2, "place": place})
+    
+    # Determine if lower is better (track events) or higher is better (field events)
+    event_obj = Event.query.filter_by(event=event).first()
+    event_type = event_obj.event_type if event_obj else "Track"
+    lower_is_better = event_type != "Field"
+    
+    rows = []
+    for year in sorted(year_results.keys()):
+        results = year_results[year]
+        all_values = [r["result2"] for r in results if r["result2"] is not None]
+        
+        if not all_values:
+            continue
+        
+        # Calculate median
+        sorted_values = sorted(all_values, reverse=not lower_is_better)
+        n = len(sorted_values)
+        if n % 2 == 1:
+            median = sorted_values[n // 2]
+        else:
+            median = (sorted_values[n // 2 - 1] + sorted_values[n // 2]) / 2
+        
+        # Calculate cutoff (8th place qualifier threshold)
+        # For track: 8th fastest (lower is better, so 8th from the start of sorted ascending)
+        # For field: 8th best (higher is better, so 8th from the start of sorted descending)
+        ascending_values = sorted(all_values) if lower_is_better else sorted(all_values, reverse=True)
+        cutoff_index = min(7, len(ascending_values) - 1)  # 0-indexed, so 7 = 8th place
+        cutoff = ascending_values[cutoff_index] if ascending_values else None
+        
+        # Format the values
+        median_formatted = _format_sectional_result(median, event_type)
+        cutoff_formatted = _format_sectional_result(cutoff, event_type) if cutoff else None
+        
+        rows.append({
+            "season": year,
+            "median_mark": median_formatted,
+            "median_raw": median,
+            "cutoff_performance": cutoff_formatted,
+            "cutoff_raw": cutoff,
+            "event_type": event_type,
+        })
+    
+    # Calculate difficulty rankings for each season
+    difficulty_rankings = _compute_all_event_difficulties(gender, [r["season"] for r in rows])
+    
+    # Add difficulty rank to each row
+    for row in rows:
+        season = row["season"]
+        if season in difficulty_rankings:
+            rankings = difficulty_rankings[season]
+            for rank, item in enumerate(rankings, 1):
+                if item["event"] == event:
+                    row["difficulty_rank"] = rank
+                    row["total_events"] = len(rankings)
+                    break
+    
+    return {
+        "gender": gender,
+        "event": event,
+        "event_type": event_type,
+        "rows": rows,
+        "difficulty_rankings": difficulty_rankings,
+    }
+
+
+def _compute_all_event_difficulties(gender: str, years: list):
+    """
+    Compute difficulty rankings for all events in each season.
+    
+    Difficulty = |Cutoff - Median| / Median * 100
+    
+    Returns a dict mapping year -> list of events sorted by difficulty (descending).
+    """
+    all_events = []
+    try:
+        track_events = getattr(CONST.EVENT, "ALL_TRACK", _FALLBACK_EVENTS["ALL_TRACK"])
+        field_events = getattr(CONST.EVENT, "ALL_FIELD", _FALLBACK_EVENTS["ALL_FIELD"])
+    except NameError:
+        track_events = _FALLBACK_EVENTS["ALL_TRACK"]
+        field_events = _FALLBACK_EVENTS["ALL_FIELD"]
+    
+    for name in track_events + field_events:
+        if name not in all_events:
+            all_events.append(name)
+    
+    # Add gender-specific hurdles
+    try:
+        if gender == "Girls":
+            hurdles = getattr(CONST.EVENT, "ALL_GIRLS_HURDLES", _FALLBACK_EVENTS["ALL_GIRLS_HURDLES"])
+        else:
+            hurdles = getattr(CONST.EVENT, "ALL_BOYS_HURDLES", _FALLBACK_EVENTS["ALL_BOYS_HURDLES"])
+    except NameError:
+        if gender == "Girls":
+            hurdles = _FALLBACK_EVENTS["ALL_GIRLS_HURDLES"]
+        else:
+            hurdles = _FALLBACK_EVENTS["ALL_BOYS_HURDLES"]
+    
+    for name in hurdles:
+        if name not in all_events:
+            all_events.append(name)
+    
+    difficulty_rankings = {}
+    
+    for year in years:
+        event_difficulties = []
+        
+        for event_name in all_events:
+            # Query results for this event/year
+            results_query = (
+                db.session.query(AthleteResult.result2)
+                .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+                .filter(
+                    Meet.meet_type == "Sectional",
+                    Meet.gender == gender,
+                    Meet.year == year,
+                    AthleteResult.event == event_name,
+                    AthleteResult.result_type == "Final",
+                    AthleteResult.result2.isnot(None),
+                )
+                .all()
+            )
+            
+            all_values = [r[0] for r in results_query if r[0] is not None]
+            
+            if len(all_values) < 8:
+                continue
+            
+            # Get event type
+            event_obj = Event.query.filter_by(event=event_name).first()
+            event_type = event_obj.event_type if event_obj else "Track"
+            lower_is_better = event_type != "Field"
+            
+            # Calculate median
+            sorted_values = sorted(all_values, reverse=not lower_is_better)
+            n = len(sorted_values)
+            if n % 2 == 1:
+                median = sorted_values[n // 2]
+            else:
+                median = (sorted_values[n // 2 - 1] + sorted_values[n // 2]) / 2
+            
+            # Calculate cutoff (8th place)
+            ascending_values = sorted(all_values) if lower_is_better else sorted(all_values, reverse=True)
+            cutoff = ascending_values[min(7, len(ascending_values) - 1)]
+            
+            # Calculate relative difficulty
+            if median and median != 0:
+                difficulty = abs(cutoff - median) / abs(median) * 100
+            else:
+                difficulty = 0
+            
+            event_difficulties.append({
+                "event": event_name,
+                "difficulty": round(difficulty, 2),
+                "median": _format_sectional_result(median, event_type),
+                "cutoff": _format_sectional_result(cutoff, event_type),
+            })
+        
+        # Sort by difficulty descending (higher difficulty = harder to qualify)
+        event_difficulties.sort(key=lambda x: x["difficulty"], reverse=True)
+        difficulty_rankings[year] = event_difficulties
+    
+    return difficulty_rankings
+
+
+def _format_sectional_result(value, event_type: str) -> str:
+    """Format a result value for display."""
+    if value is None:
+        return ""
+    
+    if event_type == "Field":
+        # Convert inches to feet-inches format
+        feet = int(value // 12)
+        inches = value % 12
+        if inches == int(inches):
+            return f"{feet}'{int(inches)}\""
+        return f"{feet}'{inches:.2f}\""
+    else:
+        # Convert seconds to time format
+        if value >= 60:
+            minutes = int(value // 60)
+            seconds = value % 60
+            return f"{minutes}:{seconds:05.2f}"
+        return f"{value:.2f}"
+
