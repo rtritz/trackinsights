@@ -156,10 +156,10 @@
   </style>
 
   
-  <nav class="navbar fixed top-0 md:top-3 left-0 right-0 px-3 sm:px-5 md:px-10 z-50 bg-white shadow-md md:bg-transparent md:shadow-none navbar-mobile-pad" aria-label="Primary">
-    <div class="flex w-full items-center justify-between gap-3 md:hidden">
-      <a href="{{ url_for('main.home') }}" class="font-impact italic text-primary text-2xl font-bold tracking-wide">Track Insights</a>
-      <div class="flex items-center gap-2">
+  <nav class="navbar fixed top-0 md:top-3 left-0 right-0 w-screen max-w-screen px-3 sm:px-5 md:px-10 z-50 bg-white shadow-md md:bg-transparent md:shadow-none navbar-mobile-pad" aria-label="Primary">
+    <div class="flex w-full items-center justify-between gap-3 md:hidden min-w-0">
+      <a href="{{ url_for('main.home') }}" class="font-impact italic text-primary text-2xl font-bold tracking-wide truncate max-w-[60vw]">Track Insights</a>
+      <div class="flex items-center gap-2 shrink-0">
         <a href="{{ url_for('main.search_page') }}" class="btn btn-circle btn-sm border-primary/50 text-primary bg-white/70 shadow-md"
           aria-label="Go to search">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
