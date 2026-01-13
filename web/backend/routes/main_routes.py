@@ -23,6 +23,11 @@ def percentiles_query_page():
     return render_template('queries-percentiles.html')
 
 
+@main_bp.route('/queries/sectional-trends')
+def sectional_trends_page():
+    return render_template('queries-sectional-trends.html')
+
+
 @main_bp.route('/athlete-dashboard/<int:athlete_id>')
 def athlete_dashboard(athlete_id):
     return render_template('athlete-dashboard.html', athlete_id=athlete_id)

@@ -72,6 +72,7 @@ def get_percentiles(
     percentile_decimals = [p / 100.0 for p in percentiles]
     
     all_rows = []
+    sample_counts = {}  # Track sample sizes per gender/event
     for event_gender in gender_list:
         for event_name in event_list:
             # Girls 110 Hurdles is actually 100 Hurdles
@@ -101,6 +102,8 @@ def get_percentiles(
             df2 = df_source[conditions]
             if df2.empty:
                 continue
+            # Store sample count for this gender/event
+            sample_counts[(event_gender, display_event)] = len(df2)
             if current_event[0].isdigit():
                 event_type = CONST.EVENT_TYPE.TRACK
                 track_percentiles = [1 - x for x in percentile_decimals]
@@ -117,6 +120,10 @@ def get_percentiles(
     # Sort: Boys first, then Girls, then by event name
     final_df['Gender_sort'] = final_df['Gender'].apply(lambda g: 0 if g == CONST.GENDER.BOYS else 1)
     final_df = final_df.sort_values(['Gender_sort', 'Event']).drop(columns=['Gender_sort']).reset_index(drop=True)
+    # Add sample_count column to the dataframe
+    final_df['sample_count'] = final_df.apply(
+        lambda row: sample_counts.get((row['Gender'], row['Event']), 0), axis=1
+    )
     return final_df
 
 

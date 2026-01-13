@@ -9,6 +9,8 @@ from ..queries import (
     get_athlete_result_rankings,
     get_percentile_options,
     get_percentiles_report,
+    get_sectional_event_trends_options,
+    get_sectional_event_trends,
 )
 
 
@@ -137,4 +139,30 @@ def api_percentiles():
         return jsonify({'error': str(exc)}), 500
 
     return jsonify(payload)
+
+
+@api_bp.route('/sectional-trends/options')
+def api_sectional_trends_options():
+    """Return filter options for sectional event trends."""
+    try:
+        data = get_sectional_event_trends_options()
+        return jsonify(data)
+    except RuntimeError as exc:
+        return jsonify({'error': str(exc)}), 500
+
+
+@api_bp.route('/sectional-trends')
+def api_sectional_trends():
+    """Return sectional event trends data for a given gender and event."""
+    gender = request.args.get('gender', '').strip()
+    event = request.args.get('event', '').strip()
+    
+    if not gender or not event:
+        return jsonify({'error': 'gender and event are required'}), 400
+    
+    try:
+        payload = get_sectional_event_trends(gender, event)
+        return jsonify(payload)
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
 
