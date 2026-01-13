@@ -4,7 +4,7 @@
 <div class="min-h-screen bg-white pt-20 sm:pt-24 pb-24 sm:pb-32 px-2 sm:px-4">
   <div class="max-w-5xl mx-auto">
     <a href="{{ url_for('main.athlete_dashboard', athlete_id=athlete_id) }}"
-      class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-6 transition-colors">
+      class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-6 transition-colors relative z-[60]">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
         <path fill-rule="evenodd"
           d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
@@ -414,10 +414,10 @@
       thead.innerHTML = `
         <tr class="text-primary text-xs sm:text-sm uppercase">
           <th class="w-16">Rank</th>
-          <th>${nameHeader}</th>
-          <th class="hidden sm:table-cell">School</th>
+          <th class="whitespace-nowrap">${nameHeader}</th>
+          <th class="whitespace-nowrap">School</th>
           <th>Result</th>
-          <th class="hidden md:table-cell">Place</th>
+          <th>Place</th>
         </tr>
       `;
       table.appendChild(thead);
@@ -436,12 +436,12 @@
         tr.appendChild(rankTd);
 
         const nameTd = document.createElement('td');
-        nameTd.className = 'text-xs sm:text-sm';
+        nameTd.className = 'text-xs sm:text-sm whitespace-nowrap';
         nameTd.textContent = entry.name || '—';
         tr.appendChild(nameTd);
 
         const schoolTd = document.createElement('td');
-        schoolTd.className = 'hidden sm:table-cell text-xs sm:text-sm';
+        schoolTd.className = 'text-xs sm:text-sm whitespace-nowrap';
         schoolTd.textContent = entry.school || '—';
         tr.appendChild(schoolTd);
 
@@ -451,7 +451,7 @@
         tr.appendChild(resultTd);
 
         const placeTd = document.createElement('td');
-        placeTd.className = 'hidden md:table-cell text-xs sm:text-sm';
+        placeTd.className = 'text-xs sm:text-sm';
         placeTd.textContent = entry.place != null ? ordinal(entry.place) : '—';
         tr.appendChild(placeTd);
 

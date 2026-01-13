@@ -8,7 +8,7 @@
     </div>
     <div class="relative space-y-8">
       <a href="{{ url_for('main.queries_page') }}"
-        class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-4 mt-4 transition-colors">
+        class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-4 mt-4 transition-colors relative z-[60]">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-5" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd"
             d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
@@ -21,7 +21,7 @@
           Sectional Event Trends
         </h1>
         <p class="text-base-content/70 max-w-2xl mx-auto">
-          Analyze how event depth and qualification standards change over time. See median marks, cutoff performances, and difficulty rankings.
+          Analyze how event depth and qualification standards change over time. See median marks, cutoff performances, and the percent difference between the two.
         </p>
       </header>
 
@@ -40,14 +40,15 @@
 
               <fieldset class="space-y-2">
                 <legend class="text-[11px] uppercase tracking-wide text-gray-500">Event</legend>
-                <select id="event-select" class="select select-bordered select-sm w-full">
-                  <option value="">Select an event...</option>
-                </select>
+                <div id="event-chip-group" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5"></div>
               </fieldset>
 
               <div class="mt-auto pt-4">
-                <button type="button" id="load-data-btn" class="btn btn-primary btn-sm w-full">
-                  Load Trends
+                <button type="button" id="download-pdf-btn" class="btn btn-primary w-full">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download Summary PDF
                 </button>
               </div>
             </div>
@@ -87,13 +88,13 @@
 
                 <!-- Data Table -->
                 <div class="overflow-x-auto border border-base-200 rounded-lg">
-                  <table class="table table-zebra text-sm">
-                    <thead id="results-head" class="bg-base-200">
+                  <table class="table text-sm bg-white">
+                    <thead id="results-head">
                       <tr>
                         <th>Season</th>
                         <th>Median Mark</th>
                         <th>Cutoff Performance</th>
-                        <th>Difficulty Rank</th>
+                        <th>Cutoff % Above Median</th>
                       </tr>
                     </thead>
                     <tbody id="results-body"></tbody>
@@ -120,8 +121,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const genderChipGroup = document.getElementById('gender-chip-group');
-  const eventSelect = document.getElementById('event-select');
-  const loadDataBtn = document.getElementById('load-data-btn');
+  const eventChipGroup = document.getElementById('event-chip-group');
   const resultsHeader = document.getElementById('results-header');
   const resultsTitle = document.getElementById('results-title');
   const resultsLoading = document.getElementById('results-loading');
@@ -132,15 +132,91 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsBody = document.getElementById('results-body');
   const difficultyTooltip = document.getElementById('difficulty-tooltip');
   const difficultyTooltipList = document.getElementById('difficulty-tooltip-list');
+  const downloadPdfBtn = document.getElementById('download-pdf-btn');
+
+  // Download PDF button handler
+  if (downloadPdfBtn) {
+    downloadPdfBtn.addEventListener('click', () => {
+      alert("Sorry, this feature hasn't been implemented. It's coming soon!");
+    });
+  }
 
   const chipBaseClasses = 'chip-btn btn btn-sm border border-base-300 text-sm px-4 py-2 transition-colors shadow-none hover:shadow-none focus:shadow-none';
+  const eventChipClasses = 'chip-btn btn btn-xs border border-base-300 text-sm w-full px-3 py-2 transition-colors justify-center text-center shadow-none hover:shadow-none focus:shadow-none';
+
+  const EVENT_GROUPS = [
+    {
+      label: 'Sprints & Distance',
+      events: ['100 Meters', '200 Meters', '400 Meters', '800 Meters', '1600 Meters', '3200 Meters'],
+    },
+    {
+      label: 'Hurdles',
+      events: ['100 Hurdles', '110 Hurdles', '300 Hurdles'],
+    },
+    {
+      label: 'Relays',
+      events: ['4 x 100 Relay', '4 x 400 Relay', '4 x 800 Relay'],
+    },
+    {
+      label: 'Field Events',
+      events: ['High Jump', 'Long Jump', 'Pole Vault', 'Shot Put', 'Discus'],
+    },
+  ];
+
+  // Events that are gender-specific
+  const GENDER_LOCKED_EVENTS = {
+    '100 Hurdles': 'Girls',
+    '110 Hurdles': 'Boys',
+  };
+
+  const orderEvents = (events = []) => {
+    const priorityEntries = EVENT_GROUPS.flatMap((group, groupIndex) =>
+      group.events.map((name, eventIndex) => [name, groupIndex * 100 + eventIndex])
+    );
+    const priority = new Map(priorityEntries);
+    return [...events].sort((a = '', b = '') => {
+      const aRank = priority.has(a) ? priority.get(a) : Number.MAX_SAFE_INTEGER;
+      const bRank = priority.has(b) ? priority.get(b) : Number.MAX_SAFE_INTEGER;
+      if (aRank !== bRank) {
+        return aRank - bRank;
+      }
+      return a.localeCompare(b);
+    });
+  };
+
+  const insertGroupDividers = (container) => {
+    const divider = document.createElement('div');
+    divider.className = 'col-span-full border-t border border-1 border-base-200/80';
+    container.appendChild(divider);
+  };
+
+  const setChipSelected = (chip, isSelected) => {
+    chip.dataset.selected = isSelected ? 'true' : 'false';
+    chip.classList.toggle('btn-primary', isSelected);
+    chip.classList.toggle('btn-outline', !isSelected);
+    chip.classList.toggle('btn-ghost', !isSelected);
+    chip.classList.toggle('text-white', isSelected);
+    chip.classList.toggle('text-base-content', !isSelected);
+  };
 
   let state = {
     options: null,
-    selectedGender: null,
-    selectedEvent: null,
+    selectedGender: 'Boys',
+    selectedEvent: '100 Meters',
     trendsData: null,
     chart: null,
+    fetchTimeout: null,
+  };
+
+  const queueFetch = () => {
+    if (state.fetchTimeout) {
+      clearTimeout(state.fetchTimeout);
+    }
+    state.fetchTimeout = setTimeout(() => {
+      if (state.selectedGender && state.selectedEvent) {
+        fetchTrendsData();
+      }
+    }, 150);
   };
 
   // Fetch filter options
@@ -170,19 +246,93 @@ document.addEventListener('DOMContentLoaded', () => {
       genderChipGroup.appendChild(chip);
     }
 
-    // Render event options
-    eventSelect.innerHTML = '<option value="">Select an event...</option>';
-    for (const event of state.options.events || []) {
-      const option = document.createElement('option');
-      option.value = event;
-      option.textContent = event;
-      eventSelect.appendChild(option);
-    }
+    // Apply default gender selection
+    updateChipSelection(genderChipGroup, state.selectedGender);
+
+    // Render event chips
+    renderEventChips(state.options.events || []);
+
+    // Trigger initial fetch with defaults
+    queueFetch();
+  };
+
+  const syncEventSelection = () => {
+    Array.from(eventChipGroup.querySelectorAll('.chip-btn')).forEach(chip => {
+      const isSelected = chip.dataset.value === state.selectedEvent;
+      setChipSelected(chip, isSelected);
+    });
+  };
+
+  const renderEventChips = (events) => {
+    eventChipGroup.innerHTML = '';
+    const orderedEvents = orderEvents(events);
+    const groupsLookup = new Map();
+    EVENT_GROUPS.forEach(group => {
+      group.events.forEach(eventName => {
+        groupsLookup.set(eventName, group.label);
+      });
+    });
+
+    let previousGroupLabel = null;
+    orderedEvents.forEach(eventName => {
+      const currentLabel = groupsLookup.get(eventName) || null;
+      if (previousGroupLabel !== null && currentLabel && currentLabel !== previousGroupLabel) {
+        insertGroupDividers(eventChipGroup);
+      }
+
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = eventChipClasses;
+      chip.dataset.value = eventName;
+      chip.textContent = eventName;
+      chip.addEventListener('click', () => {
+        state.selectedEvent = eventName;
+        syncEventSelection();
+        
+        // If this event is gender-locked, force that gender
+        const lockedGender = GENDER_LOCKED_EVENTS[eventName];
+        if (lockedGender && state.selectedGender !== lockedGender) {
+          state.selectedGender = lockedGender;
+          updateChipSelection(genderChipGroup, lockedGender);
+        }
+        
+        // Update gender chip disabled states
+        updateGenderChipStates();
+        queueFetch();
+      });
+      eventChipGroup.appendChild(chip);
+      setChipSelected(chip, state.selectedEvent === eventName);
+
+      previousGroupLabel = currentLabel || previousGroupLabel;
+    });
   };
 
   const selectGender = (gender) => {
+    // Check if current event is locked to a different gender
+    const lockedGender = GENDER_LOCKED_EVENTS[state.selectedEvent];
+    if (lockedGender && lockedGender !== gender) {
+      return; // Don't allow switching if event is gender-locked
+    }
+    
     state.selectedGender = gender;
     updateChipSelection(genderChipGroup, gender);
+    queueFetch();
+  };
+
+  const updateGenderChipStates = () => {
+    const lockedGender = GENDER_LOCKED_EVENTS[state.selectedEvent];
+    
+    for (const chip of genderChipGroup.querySelectorAll('.chip-btn')) {
+      const chipGender = chip.dataset.value;
+      const isDisabled = !!(lockedGender && lockedGender !== chipGender);
+      
+      chip.disabled = isDisabled;
+      if (isDisabled) {
+        chip.classList.add('opacity-40', 'cursor-not-allowed');
+      } else {
+        chip.classList.remove('opacity-40', 'cursor-not-allowed');
+      }
+    }
   };
 
   const updateChipSelection = (container, selectedValue) => {
@@ -192,18 +342,6 @@ document.addEventListener('DOMContentLoaded', () => {
       chip.classList.toggle('btn-ghost', !isSelected);
     }
   };
-
-  eventSelect.addEventListener('change', (e) => {
-    state.selectedEvent = e.target.value;
-  });
-
-  loadDataBtn.addEventListener('click', async () => {
-    if (!state.selectedGender || !state.selectedEvent) {
-      showError('Please select both a gender and an event.');
-      return;
-    }
-    await fetchTrendsData();
-  });
 
   const fetchTrendsData = async () => {
     showLoading(true);
@@ -262,10 +400,66 @@ document.addEventListener('DOMContentLoaded', () => {
     resultsHeader.classList.remove('hidden');
     resultsTitle.textContent = `${data.gender}'s ${data.event}`;
 
+    // For field events, higher is better; for track events, lower is better
+    const isFieldEvent = data.event_type === 'Field';
+
+    // Helper to format a raw value difference
+    const formatDiff = (diff) => {
+      const absDiff = Math.abs(diff);
+      if (isFieldEvent) {
+        // Format as feet-inches
+        const feet = Math.floor(absDiff / 12);
+        const inches = (absDiff % 12).toFixed(1);
+        if (feet > 0) {
+          return `${feet}'${inches}"`;
+        }
+        return `${inches}"`;
+      } else {
+        // Format as time
+        const minutes = Math.floor(absDiff / 60);
+        const seconds = (absDiff % 60).toFixed(2);
+        if (minutes > 0) {
+          return `${minutes}:${seconds.padStart(5, '0')}`;
+        }
+        return `${seconds}s`;
+      }
+    };
+
+    // Helper to create trend badge
+    const createTrendBadge = (currentVal, previousVal) => {
+      if (previousVal == null || currentVal == null) return null;
+      
+      const diff = currentVal - previousVal;
+      if (Math.abs(diff) < 0.001) return null; // No meaningful change
+      
+      // Up arrow = increase in value (higher time or higher distance)
+      // Down arrow = decrease in value (lower time or lower distance)
+      const isIncrease = diff > 0;
+      
+      // Green = improvement: lower time (track) or higher distance (field)
+      // Red = regression: higher time (track) or lower distance (field)
+      const isImprovement = isFieldEvent ? diff > 0 : diff < 0;
+      const formattedDiff = formatDiff(diff);
+      
+      const badge = document.createElement('span');
+      badge.className = `ml-1 inline-flex items-center gap-0.5 text-xs font-semibold px-1.5 py-0.5 rounded-full border ${isImprovement ? 'text-green-600 border-green-600' : 'text-red-500 border-red-500'}`;
+      
+      const arrow = isIncrease 
+        ? '<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>'
+        : '<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>';
+      
+      badge.innerHTML = `${arrow}<span>${formattedDiff}</span>`;
+      
+      return badge;
+    };
+
     // Render table
     resultsBody.innerHTML = '';
+    let previousRow = null;
+    
     for (const row of data.rows) {
       const tr = document.createElement('tr');
+      tr.className = 'transition-colors duration-150 hover:bg-primary/5';
       
       const seasonTd = document.createElement('td');
       seasonTd.textContent = row.season;
@@ -273,27 +467,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const medianTd = document.createElement('td');
       medianTd.textContent = row.median_mark || '—';
+      if (previousRow) {
+        const medianBadge = createTrendBadge(row.median_raw, previousRow.median_raw);
+        if (medianBadge) medianTd.appendChild(medianBadge);
+      }
       tr.appendChild(medianTd);
 
       const cutoffTd = document.createElement('td');
       cutoffTd.textContent = row.cutoff_performance || '—';
+      if (previousRow) {
+        const cutoffBadge = createTrendBadge(row.cutoff_raw, previousRow.cutoff_raw);
+        if (cutoffBadge) cutoffTd.appendChild(cutoffBadge);
+      }
       tr.appendChild(cutoffTd);
 
-      const difficultyTd = document.createElement('td');
-      if (row.difficulty_rank && row.total_events) {
-        const badge = document.createElement('span');
-        badge.className = 'badge badge-outline cursor-pointer hover:badge-primary transition-colors';
-        badge.textContent = `${row.difficulty_rank} / ${row.total_events}`;
-        badge.dataset.season = row.season;
-        badge.addEventListener('mouseenter', (e) => showDifficultyTooltip(e, row.season));
-        badge.addEventListener('mouseleave', hideDifficultyTooltip);
-        difficultyTd.appendChild(badge);
+      const pctAboveMedianTd = document.createElement('td');
+      if (row.median_raw && row.cutoff_raw && row.median_raw !== 0) {
+        const pctAbove = ((row.cutoff_raw - row.median_raw) / row.median_raw) * 100;
+        pctAboveMedianTd.textContent = `${pctAbove >= 0 ? '+' : ''}${pctAbove.toFixed(1)}%`;
       } else {
-        difficultyTd.textContent = '—';
+        pctAboveMedianTd.textContent = '—';
       }
-      tr.appendChild(difficultyTd);
+      tr.appendChild(pctAboveMedianTd);
 
       resultsBody.appendChild(tr);
+      previousRow = row;
     }
 
     // Render chart
@@ -312,9 +510,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const medianData = data.rows.map(r => r.median_raw);
     const cutoffData = data.rows.map(r => r.cutoff_raw);
 
-    // Determine if we should reverse the Y-axis (for track events, lower is better)
-    const isLowerBetter = data.event_type !== 'Field';
-
     state.chart = new Chart(ctx, {
       type: 'line',
       data: {
@@ -329,6 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tension: 0.3,
             pointRadius: 6,
             pointHoverRadius: 8,
+            hidden: true,
           },
           {
             label: 'Cutoff Performance',
@@ -370,7 +566,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
           },
           y: {
-            reverse: isLowerBetter,
             title: {
               display: true,
               text: data.event_type === 'Field' ? 'Distance' : 'Time (seconds)'
