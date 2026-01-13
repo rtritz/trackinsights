@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="min-h-screen bg-white pt-5 pb-5 px-3 sm:px-6">
+<div class="min-h-screen bg-white pt-20 sm:pt-24 pb-5 px-3 sm:px-6">
   <div class="pt-5 relative max-w-6xl mx-auto">
     <div
       class="absolute inset-0 -z-10 mx-0 sm:mx-[-40px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none">
     </div>
     <div class="relative space-y-8">
       <a href="{{ url_for('main.queries_page') }}"
-        class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-4 mt-4 transition-colors">
+        class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-4 mt-4 transition-colors relative z-[60]">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-5" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd"
             d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
@@ -87,10 +87,14 @@
                   </div>
                 </div>
                 <div class="overflow-x-auto overflow-y-auto max-h-[25rem] border border-base-200 rounded-lg flex-1">
-                  <table class="table table-zebra text-sm">
+                  <table class="table text-sm bg-white">
                     <thead id="results-head"></thead>
                     <tbody id="results-body"></tbody>
                   </table>
+                </div>
+                <div id="sample-size-display" class="hidden mt-3 p-3 bg-base-100 border border-base-200 rounded-lg">
+                  <p class="text-sm text-gray-600 font-medium">Sample Size</p>
+                  <div id="sample-size-content" class="text-sm text-gray-500 mt-1"></div>
                 </div>
                 <div class="mt-4 space-y-2">
                   <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-gray-500">
@@ -138,6 +142,8 @@
     const resultsHead = document.getElementById('results-head');
     const resultsBody = document.getElementById('results-body');
     const copyQueryBtn = document.getElementById('copy-query');
+    const sampleSizeDisplay = document.getElementById('sample-size-display');
+    const sampleSizeContent = document.getElementById('sample-size-content');
 
   const chipBaseClasses = 'chip-btn btn btn-xs border border-base-300 text-sm whitespace-nowrap px-3 py-1.5 transition-colors justify-center text-center shadow-none hover:shadow-none focus:shadow-none';
   const eventChipClasses = 'chip-btn btn btn-xs border border-base-300 text-sm w-full px-3 py-2 transition-colors justify-center text-center shadow-none hover:shadow-none focus:shadow-none';
@@ -578,6 +584,9 @@
         if (resultsStatus) {
           resultsStatus.textContent = 'Select an event on the left to view Boys vs. Girls percentiles. Use the filters to narrow by meet type, grade level, and season.';
         }
+        if (sampleSizeDisplay) {
+          sampleSizeDisplay.classList.add('hidden');
+        }
         return;
       }
 
@@ -586,7 +595,7 @@
         state.columns = columns;
       }
 
-      const metricColumns = state.columns.filter(column => !['Gender', 'Event'].includes(column));
+      const metricColumns = state.columns.filter(column => !['Gender', 'Event', 'sample_count'].includes(column));
       const activeMetrics = metricColumns.length ? metricColumns : ['25', '50', '75'];
       const genders = deriveGenderOrder(rows);
       const rowByGender = new Map();
@@ -621,6 +630,9 @@
 
       if (!genders.length || !rows.length) {
         resultsBody.innerHTML = `<tr><td colspan="${headers.length}" class="text-center text-gray-400 py-8">No results matched these filters.</td></tr>`;
+        if (sampleSizeDisplay) {
+          sampleSizeDisplay.classList.add('hidden');
+        }
       } else {
         resultsBody.innerHTML = activeMetrics
           .map(metric => {
@@ -630,9 +642,24 @@
                 return `<td>${source && source[metric] ? source[metric] : '—'}</td>`;
               })
               .join('');
-            return `<tr><td class="font-semibold text-xs uppercase tracking-wide">${metric}</td>${cells}</tr>`;
+            return `<tr class="transition-colors duration-150 hover:bg-primary/5"><td class="font-semibold text-xs uppercase tracking-wide">${metric}</td>${cells}</tr>`;
           })
           .join('');
+
+        // Display sample sizes
+        if (sampleSizeDisplay && sampleSizeContent) {
+          const sampleParts = genders.map(gender => {
+            const source = rowByGender.get(gender);
+            const count = source?.sample_count || 0;
+            return `<span class="inline-block"><strong>${gender}:</strong> ${count.toLocaleString()} results</span>`;
+          });
+          if (sampleParts.length) {
+            sampleSizeContent.innerHTML = sampleParts.join('<span class="mx-2 text-gray-300">|</span>');
+            sampleSizeDisplay.classList.remove('hidden');
+          } else {
+            sampleSizeDisplay.classList.add('hidden');
+          }
+        }
       }
 
       const normalizedFilters = { ...filters };
