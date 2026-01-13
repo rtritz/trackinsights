@@ -8,7 +8,7 @@
     </div>
     <div class="relative space-y-10">
       <a href="{{ url_for('main.home') }}"
-        class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-4 mt-4 transition-colors">
+        class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-4 mt-4 transition-colors relative z-[60]">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-5" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd"
             d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
@@ -41,7 +41,22 @@
             <span class="text-xs uppercase tracking-[0.3em] text-primary/70">Available now</span>
           </a>
 
-          {% for card in range(3) %}
+          <a href="{{ url_for('main.sectional_trends_page') }}"
+            class="bg-gradient-to-br from-primary/5 via-white to-white border border-primary/20 rounded-2xl shadow-lg p-6 flex flex-col items-center text-center gap-4 hover:-translate-y-1 hover:shadow-2xl hover:border-primary transition-all focus-visible:outline-2 focus-visible:outline-primary">
+            <div
+              class="w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center text-2xl font-semibold shadow-lg shadow-primary/40">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+              </svg>
+            </div>
+            <div class="space-y-1">
+              <h2 class="text-2xl font-semibold">Sectional Event Trends</h2>
+              <p class="text-sm text-base-content/70">Analyze event depth and qualification standards over time.</p>
+            </div>
+            <span class="text-xs uppercase tracking-[0.3em] text-primary/70">Available now</span>
+          </a>
+
+          {% for card in range(2) %}
           <div
             class="bg-white/80 border border-dashed border-base-300 rounded-2xl p-6 flex flex-col items-center text-center gap-3 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.2)]">
             <span class="text-lg font-semibold tracking-wide text-base-content/70">Coming Soon!</span>
