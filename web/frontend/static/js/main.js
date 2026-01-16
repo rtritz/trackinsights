@@ -6,6 +6,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let abortController = null;
     let searchTimeout = null;
+    let currentResults = []; // Track current search results
+
+    const navigateToResult = (item) => {
+      if (item.type === 'school') {
+        window.location.href = `/school-dashboard/${item.id}`;
+      } else if (item.type === 'athlete') {
+        window.location.href = `/athlete-dashboard/${item.id}`;
+      }
+    };
 
     const performSearch = async (query) => {
       if (abortController) {
@@ -20,6 +29,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!query) {
         resultsDiv.innerHTML = '';
         resultsDiv.classList.remove('open');
+        currentResults = [];
         return;
       }
 
@@ -34,6 +44,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         if (!res.ok) throw new Error('Search request failed');
         const data = await res.json();
+        currentResults = data; // Store results for Enter key handling
         if (data.length === 0) {
           resultsDiv.innerHTML = '<div class="no-results">No results found for "' + escapeHtml(query) + '"</div>';
           resultsDiv.classList.add('open');
@@ -102,8 +113,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const query = searchInput.value.trim();
-      await performSearch(query);
+      // If there are any results, navigate to the first one on Enter
+      if (currentResults.length > 0) {
+        navigateToResult(currentResults[0]);
+        return;
+      }
     });
 
     searchInput.addEventListener('input', function () {
@@ -115,6 +129,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!query) {
         resultsDiv.innerHTML = '';
         resultsDiv.classList.remove('open');
+        currentResults = [];
         return;
       }
 
