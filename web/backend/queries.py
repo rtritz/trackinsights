@@ -419,6 +419,149 @@ def _calculate_combined_score(name: str, school: str, query_words: list) -> floa
     return score / len(query_words)
 
 
+def _compute_state_rankings_by_year(athlete_id: int, gender: str, min_year: int = 2022):
+    """Compute the athlete's best statewide ranking for each year.
+    
+    For each year, finds the athlete's best event (excluding relays) based on
+    their personal best, then ranks that result against all other athletes'
+    personal bests in the same event for that year.
+    
+    Returns a list of rankings sorted by year (most recent first).
+    """
+    if not gender:
+        return []
+    
+    # Get all results for this athlete by year (non-relay only)
+    athlete_results = (
+        db.session.query(
+            AthleteResult.result2,
+            AthleteResult.event,
+            Meet.year,
+            Event.event_type,
+        )
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .join(Event, AthleteResult.event == Event.event)
+        .filter(
+            AthleteResult.athlete_id == athlete_id,
+            AthleteResult.result2.isnot(None),
+            Event.event_type != "Relay",
+            Meet.year.isnot(None),
+            Meet.year >= min_year,
+        )
+        .all()
+    )
+    
+    if not athlete_results:
+        return []
+    
+    # Group results by year and find best result per event per year
+    year_event_bests = {}
+    for result_value, event_name, year, event_type in athlete_results:
+        key = (year, event_name)
+        lower_is_better = _is_lower_better(event_type)
+        
+        if key not in year_event_bests:
+            year_event_bests[key] = {
+                "result_value": result_value,
+                "event": event_name,
+                "event_type": event_type,
+                "year": year,
+                "lower_is_better": lower_is_better,
+            }
+        else:
+            existing = year_event_bests[key]["result_value"]
+            if lower_is_better:
+                if result_value < existing:
+                    year_event_bests[key]["result_value"] = result_value
+            else:
+                if result_value > existing:
+                    year_event_bests[key]["result_value"] = result_value
+    
+    # Get all unique years
+    years = set(year for (year, _) in year_event_bests.keys())
+    
+    rankings = []
+    
+    for year in years:
+        # Get this athlete's best event for this year based on state ranking
+        year_entries = [
+            entry for (y, _), entry in year_event_bests.items() if y == year
+        ]
+        
+        best_ranking = None
+        
+        for entry in year_entries:
+            event_name = entry["event"]
+            event_type = entry["event_type"]
+            athlete_best = entry["result_value"]
+            lower_is_better = entry["lower_is_better"]
+            
+            # Get all athletes' personal bests for this event in this year
+            aggregator = func.min if lower_is_better else func.max
+            
+            all_pbs = (
+                db.session.query(
+                    AthleteResult.athlete_id,
+                    aggregator(AthleteResult.result2).label("best_value"),
+                )
+                .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+                .join(Event, AthleteResult.event == Event.event)
+                .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+                .filter(
+                    AthleteResult.result2.isnot(None),
+                    Event.event == event_name,
+                    Event.event_type != "Relay",
+                    Meet.year == year,
+                    Athlete.gender == gender,
+                )
+                .group_by(AthleteResult.athlete_id)
+                .all()
+            )
+            
+            if not all_pbs:
+                continue
+            
+            # Build leaderboard
+            leaderboard = [
+                (row.athlete_id, row.best_value)
+                for row in all_pbs
+                if row.best_value is not None
+            ]
+            
+            if not leaderboard:
+                continue
+            
+            leaderboard.sort(key=lambda item: item[1], reverse=not lower_is_better)
+            
+            # Find this athlete's rank
+            rank = None
+            for index, (ath_id, _value) in enumerate(leaderboard, start=1):
+                if ath_id == athlete_id:
+                    rank = index
+                    break
+            
+            if rank is None:
+                continue
+            
+            total = len(leaderboard)
+            
+            # Check if this is a better ranking than current best for this year
+            if best_ranking is None or rank < best_ranking["rank"]:
+                best_ranking = {
+                    "year": year,
+                    "event": event_name,
+                    "rank": rank,
+                    "total": total,
+                }
+        
+        if best_ranking:
+            rankings.append(best_ranking)
+    
+    # Sort by year (most recent first)
+    rankings.sort(key=lambda r: -r["year"])
+    return rankings
+
+
 def get_athlete_dashboard_data(athlete_id: int):
     """Aggregate the data needed to power the athlete dashboard."""
 
@@ -433,6 +576,7 @@ def get_athlete_dashboard_data(athlete_id: int):
     badges = _compute_badges(athlete_id)
     playoff_history = _build_playoff_history(athlete_id)
     personal_bests = get_athlete_personal_bests(athlete_id, athlete_obj=athlete)
+    state_rankings = _compute_state_rankings_by_year(athlete_id, athlete.gender)
 
     return {
         "athlete": {
@@ -447,6 +591,7 @@ def get_athlete_dashboard_data(athlete_id: int):
         "badges": badges,
         "playoff_history": playoff_history,
         "personal_bests": personal_bests,
+        "state_rankings": state_rankings,
     }
 
 

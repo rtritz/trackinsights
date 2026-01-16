@@ -41,8 +41,8 @@
         <!-- Header Section -->
         <div
             class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 mb-6 sm:mb-8 shadow-lg">
-            <div class="flex flex-col gap-4">
-                <div class="w-full">
+            <div class="flex flex-col md:flex-row gap-4 md:justify-between md:items-start">
+                <div class="flex-1">
                     <h1 id="athlete-name"
                         class="font-impact italic text-primary text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2 break-words">
                         Loading...
@@ -60,6 +60,10 @@
                         </button>
                         <span id="share-dashboard-status" class="text-xs text-gray-600" aria-live="polite"></span>
                     </div>
+                </div>
+                <!-- State Rankings Section -->
+                <div id="state-rankings-container" class="hidden flex flex-wrap items-end justify-end gap-4 sm:gap-5 md:gap-6 mt-4 md:mt-0 pl-0 md:pl-4">
+                    <!-- Rankings badges will be inserted here by JavaScript -->
                 </div>
             </div>
         </div>
@@ -377,6 +381,94 @@
                 classBadge.textContent = `Class of ${data.athlete.graduation_year}`;
             } else {
                 classBadge.classList.add('hidden');
+            }
+
+            // Populate state rankings
+            const rankingsContainer = document.getElementById('state-rankings-container');
+            if (data.state_rankings && data.state_rankings.length > 0) {
+                rankingsContainer.innerHTML = '';
+                rankingsContainer.classList.remove('hidden');
+
+                // Get ranking circle class - matches medal circle styling from achievements
+                const getRankingCircleClass = (rank) => {
+                    if (rank === 1) {
+                        // Gold/Prismatic for #1
+                        return 'bg-yellow-300 text-yellow-900 shadow-lg shadow-yellow-500/50 ring-2 ring-white/60';
+                    }
+                    if (rank === 2) {
+                        // Silver for #2
+                        return 'bg-slate-200 text-slate-800 shadow-md shadow-slate-400/40 ring-2 ring-white/50';
+                    }
+                    if (rank === 3) {
+                        // Bronze for #3
+                        return 'bg-amber-600 text-white shadow-lg shadow-amber-700/40 ring-2 ring-white/40';
+                    }
+                    if (rank <= 10) {
+                        // Rose/Primary tier for top 10
+                        return 'bg-rose-100 text-rose-700 shadow-md shadow-rose-300/40 ring-2 ring-white/50';
+                    }
+                    if (rank <= 25) {
+                        // Sky blue tier for top 25
+                        return 'bg-sky-100 text-sky-700 shadow-inner ring-2 ring-white/30';
+                    }
+                    if (rank <= 50) {
+                        // Teal tier for top 50
+                        return 'bg-teal-50 text-teal-700 shadow-inner ring-2 ring-white/30';
+                    }
+                    // Default gray for 50+
+                    return 'bg-slate-100 text-slate-600 shadow-inner ring-2 ring-white/30';
+                };
+
+                data.state_rankings.forEach((ranking, index) => {
+                    const circleClass = getRankingCircleClass(ranking.rank);
+                    const isLatest = index === 0; // First item is most recent year
+                    
+                    const wrapper = document.createElement('div');
+                    const wrapperPadding = isLatest ? 'px-1 pb-1' : 'px-0.5 pb-0.5';
+                    wrapper.className = `group relative flex flex-col items-center transition-transform hover:scale-105 cursor-default ${wrapperPadding}`;
+                    wrapper.title = `#${ranking.rank} in ${ranking.event} (${ranking.year}) out of ${ranking.total} athletes`;
+                    
+                    // Main circle with rank - larger for latest year
+                    const circle = document.createElement('div');
+                    const circleSize = isLatest 
+                        ? 'w-18 h-18 sm:w-20 sm:h-20 text-lg sm:text-xl' 
+                        : 'w-12 h-12 sm:w-14 sm:h-14 text-sm sm:text-base';
+                    circle.className = `${circleSize} rounded-full flex items-center justify-center font-extrabold tracking-tight ${circleClass}`;
+                    circle.textContent = `#${ranking.rank}`;
+                    
+                    // Year and event label below circle
+                    const label = document.createElement('div');
+                    const labelSize = isLatest
+                        ? 'mt-1.5 text-center'
+                        : 'mt-1 text-center';
+                    label.className = labelSize;
+                    const yearClass = isLatest 
+                        ? 'text-xs sm:text-sm font-bold text-gray-800' 
+                        : 'text-[9px] sm:text-[10px] font-semibold text-gray-600';
+                    const eventClass = isLatest
+                        ? 'text-[10px] sm:text-xs text-gray-500 truncate max-w-[70px] sm:max-w-[85px]'
+                        : 'text-[8px] sm:text-[9px] text-gray-400 truncate max-w-[50px] sm:max-w-[60px]';
+                    label.innerHTML = `
+                        <div class="${yearClass}">${ranking.year}</div>
+                        <div class="${eventClass}" title="${ranking.event}">${ranking.event}</div>
+                    `;
+                    
+                    // Hover detail panel (similar to medal elements)
+                    const detailPanel = document.createElement('div');
+                    detailPanel.className = 'absolute top-full left-1/2 -translate-x-1/2 mt-2 w-40 sm:w-48 rounded-2xl bg-white shadow-2xl border border-gray-100 p-3 text-[11px] sm:text-xs text-gray-700 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition z-20';
+                    detailPanel.innerHTML = `
+                        <p class="font-bold text-gray-900 text-sm">${ranking.event}</p>
+                        <div class="mt-1 space-y-0.5">
+                            <p>Year: ${ranking.year}</p>
+                            <p>State Rank: #${ranking.rank} of ${ranking.total}</p>
+                        </div>
+                    `;
+                    
+                    wrapper.appendChild(circle);
+                    wrapper.appendChild(label);
+                    wrapper.appendChild(detailPanel);
+                    rankingsContainer.appendChild(wrapper);
+                });
             }
 
             // Populate badges
