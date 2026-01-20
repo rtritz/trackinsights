@@ -41,15 +41,6 @@
                 <legend class="text-[11px] uppercase tracking-wide text-gray-500">Event</legend>
                 <div id="event-chip-group" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5"></div>
               </fieldset>
-
-              <div class="mt-auto pt-4">
-                <button type="button" id="download-pdf-btn" class="btn btn-primary w-full">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Download Summary PDF
-                </button>
-              </div>
             </div>
           </section>
 
@@ -81,7 +72,9 @@
 
               <div id="results-content" class="hidden flex-1 flex flex-col gap-6">
                 <!-- Chart Container -->
+                <!-- Chart Container -->
                 <div class="bg-white border border-base-200 rounded-xl p-4">
+                  <div id="chart-legend-container" class="flex flex-wrap justify-center gap-4 mb-3"></div>
                   <canvas id="trends-chart" height="280"></canvas>
                 </div>
 
@@ -92,8 +85,8 @@
                       <tr>
                         <th>Season</th>
                         <th>Median Mark</th>
-                        <th>Cutoff Performance</th>
-                        <th>Cutoff % Above Median</th>
+                        <th>Cutoff Mark</th>
+                        <th>% Diff. Between Median and Cutoff</th>
                       </tr>
                     </thead>
                     <tbody id="results-body"></tbody>
@@ -397,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resultsEmpty.classList.add('hidden');
     resultsContent.classList.remove('hidden');
     resultsHeader.classList.remove('hidden');
-    resultsTitle.textContent = `${data.gender}'s ${data.event}`;
+    resultsTitle.textContent = `${data.gender} ${data.event}`;
 
     // For field events, higher is better; for track events, lower is better
     const isFieldEvent = data.event_type === 'Field';
@@ -429,7 +422,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (previousVal == null || currentVal == null) return null;
       
       const diff = currentVal - previousVal;
-      if (Math.abs(diff) < 0.001) return null; // No meaningful change
+      // Use 0.01 threshold for track events (times), 0.1 inches for field events
+      const threshold = isFieldEvent ? 0.1 : 0.01;
+      if (Math.abs(diff) < threshold) return null; // No meaningful change
       
       // Up arrow = increase in value (higher time or higher distance)
       // Down arrow = decrease in value (lower time or lower distance)
@@ -499,6 +494,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const renderChart = (data) => {
     const ctx = document.getElementById('trends-chart').getContext('2d');
+    const legendContainer = document.getElementById('chart-legend-container');
     
     // Destroy existing chart
     if (state.chart) {
@@ -508,6 +504,42 @@ document.addEventListener('DOMContentLoaded', () => {
     const labels = data.rows.map(r => r.season);
     const medianData = data.rows.map(r => r.median_raw);
     const cutoffData = data.rows.map(r => r.cutoff_raw);
+
+    // Create custom HTML legend
+    const createLegend = (chart) => {
+      legendContainer.innerHTML = '';
+      chart.data.datasets.forEach((dataset, index) => {
+        const meta = chart.getDatasetMeta(index);
+        const isHidden = meta.hidden;
+        
+        const item = document.createElement('label');
+        item.className = 'flex items-center gap-2 cursor-pointer select-none px-3 py-1.5 rounded-lg hover:bg-base-100 transition-colors';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = !isHidden;
+        checkbox.className = 'checkbox checkbox-sm';
+        checkbox.style.borderColor = dataset.borderColor;
+        checkbox.style.setProperty('--chkbg', dataset.borderColor);
+        checkbox.addEventListener('change', () => {
+          meta.hidden = !checkbox.checked;
+          chart.update();
+        });
+        
+        const colorBox = document.createElement('span');
+        colorBox.className = 'w-4 h-1 rounded-full';
+        colorBox.style.backgroundColor = dataset.borderColor;
+        
+        const labelText = document.createElement('span');
+        labelText.className = 'text-sm font-medium text-base-content';
+        labelText.textContent = dataset.label;
+        
+        item.appendChild(checkbox);
+        item.appendChild(colorBox);
+        item.appendChild(labelText);
+        legendContainer.appendChild(item);
+      });
+    };
 
     state.chart = new Chart(ctx, {
       type: 'line',
@@ -526,7 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
             hidden: true,
           },
           {
-            label: 'Cutoff Performance',
+            label: 'Cutoff Mark',
             data: cutoffData,
             borderColor: 'rgb(239, 68, 68)',
             backgroundColor: 'rgba(239, 68, 68, 0.1)',
@@ -542,7 +574,7 @@ document.addEventListener('DOMContentLoaded', () => {
         maintainAspectRatio: false,
         plugins: {
           legend: {
-            position: 'top',
+            display: false
           },
           tooltip: {
             callbacks: {
@@ -588,6 +620,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
     });
+
+    // Create the custom HTML legend after chart is created
+    createLegend(state.chart);
   };
 
   const showDifficultyTooltip = (e, season) => {
