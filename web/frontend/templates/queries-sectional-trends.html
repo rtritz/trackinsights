@@ -72,10 +72,11 @@
 
               <div id="results-content" class="hidden flex-1 flex flex-col gap-6">
                 <!-- Chart Container -->
-                <!-- Chart Container -->
                 <div class="bg-white border border-base-200 rounded-xl p-4">
                   <div id="chart-legend-container" class="flex flex-wrap justify-center gap-4 mb-3"></div>
-                  <canvas id="trends-chart" height="280"></canvas>
+                  <div style="height: 280px; position: relative;">
+                    <canvas id="trends-chart"></canvas>
+                  </div>
                 </div>
 
                 <!-- Data Table -->
@@ -510,7 +511,8 @@ document.addEventListener('DOMContentLoaded', () => {
       legendContainer.innerHTML = '';
       chart.data.datasets.forEach((dataset, index) => {
         const meta = chart.getDatasetMeta(index);
-        const isHidden = meta.hidden;
+        // Check both meta.hidden and dataset.hidden for initial state
+        const isHidden = meta.hidden === true || dataset.hidden === true;
         
         const item = document.createElement('label');
         item.className = 'flex items-center gap-2 cursor-pointer select-none px-3 py-1.5 rounded-lg hover:bg-base-100 transition-colors';
@@ -572,6 +574,9 @@ document.addEventListener('DOMContentLoaded', () => {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: {
+          duration: 600
+        },
         plugins: {
           legend: {
             display: false
