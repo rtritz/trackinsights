@@ -1,16 +1,15 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<section class="min-h-screen bg-white text-base-content pt-28 pb-16 px-4 sm:px-6">
+<section class="min-h-screen bg-white text-base-content pt-20 sm:pt-24 pb-16 px-4 sm:px-6">
   <div class="max-w-3xl mx-auto space-y-10">
     <a href="{{ url_for('main.home') }}"
-      class="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline font-semibold mb-2 mt-2 sm:mt-0 transition-colors relative z-[60]">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-5" viewBox="0 0 20 20" fill="currentColor">
+      class="fixed top-4 md:top-7 left-4 sm:left-5 md:left-10 z-[70] h-10 w-10 inline-flex items-center justify-center rounded-full border-2 border-[#8c0327] text-white bg-[#8c0327] shadow-md hover:bg-[#6b0220] transition-colors">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
         <path fill-rule="evenodd"
           d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
           clip-rule="evenodd" />
       </svg>
-      Back
     </a>
 
     <header class="space-y-4 text-center">
