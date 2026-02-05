@@ -2043,10 +2043,12 @@ def get_sectional_event_trends(gender: str, event: str):
 
     # OPTIMIZATION: Fetch ALL results for ALL events in ONE query
     # This eliminates the N+1 query problem that was causing slowness
+    # Include athlete_id to group by athlete and get best time per athlete
     results_query = (
         db.session.query(
             Meet.year,
             AthleteResult.event,
+            AthleteResult.athlete_id,
             AthleteResult.result2,
         )
         .join(Meet, AthleteResult.meet_id == Meet.meet_id)
@@ -2054,18 +2056,30 @@ def get_sectional_event_trends(gender: str, event: str):
             Meet.meet_type == "Sectional",
             Meet.gender == gender,
             AthleteResult.event.in_(all_events),
-            AthleteResult.result_type == "Final",
             AthleteResult.result2.isnot(None),
         )
         .all()
     )
 
-    # Group results by (year, event)
+    # Group results by (year, event, athlete_id) and keep best result per athlete
+    # For track events (lower is better), keep minimum; for field events (higher is better), keep maximum
     from collections import defaultdict
+    year_event_athlete_results = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    for year, evt, athlete_id, result2 in results_query:
+        if year is not None and result2 is not None and athlete_id is not None:
+            year_event_athlete_results[year][evt][athlete_id].append(result2)
+    
+    # Now compute best time per athlete for each (year, event)
     year_event_results = defaultdict(lambda: defaultdict(list))
-    for year, evt, result2 in results_query:
-        if year is not None and result2 is not None:
-            year_event_results[year][evt].append(result2)
+    for year in year_event_athlete_results:
+        for evt in year_event_athlete_results[year]:
+            evt_type = event_types_map.get(evt, "Track")
+            evt_lower_is_better = evt_type != "Field"
+            for athlete_id in year_event_athlete_results[year][evt]:
+                athlete_results = year_event_athlete_results[year][evt][athlete_id]
+                # Get best result for this athlete (min for track, max for field)
+                best_result = min(athlete_results) if evt_lower_is_better else max(athlete_results)
+                year_event_results[year][evt].append(best_result)
 
     # Build rows for the requested event
     rows = []
