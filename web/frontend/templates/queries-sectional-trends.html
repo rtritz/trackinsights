@@ -478,8 +478,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const pctAboveMedianTd = document.createElement('td');
       if (row.median_raw && row.cutoff_raw && row.median_raw !== 0) {
-        const pctAbove = ((row.cutoff_raw - row.median_raw) / row.median_raw) * 100;
-        pctAboveMedianTd.textContent = `${pctAbove >= 0 ? '+' : ''}${pctAbove.toFixed(1)}%`;
+        const pctAbove = Math.abs(((row.cutoff_raw - row.median_raw) / row.median_raw) * 100);
+        pctAboveMedianTd.textContent = `${pctAbove.toFixed(1)}%`;
       } else {
         pctAboveMedianTd.textContent = '—';
       }

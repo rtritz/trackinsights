@@ -102,15 +102,27 @@ def get_percentiles(
             df2 = df_source[conditions]
             if df2.empty:
                 continue
-            # Store sample count for this gender/event
-            sample_counts[(event_gender, display_event)] = len(df2)
+            
+            # Determine if this is a track event (lower is better) or field event (higher is better)
             if current_event[0].isdigit():
                 event_type = CONST.EVENT_TYPE.TRACK
+                # For track events, get the minimum (best) time per athlete
+                if CONST.EVENT_TYPE.RELAY in current_event:
+                    # For relays, group by school_id instead of athlete_id
+                    best_per_athlete = df2.groupby('school_id')['result2'].min()
+                else:
+                    best_per_athlete = df2.groupby('athlete_id')['result2'].min()
                 track_percentiles = [1 - x for x in percentile_decimals]
-                df3 = df2['result2'].quantile(track_percentiles)
+                df3 = best_per_athlete.quantile(track_percentiles)
             else:
                 event_type = CONST.EVENT_TYPE.FIELD
-                df3 = df2['result2'].quantile(percentile_decimals)
+                # For field events, get the maximum (best) distance/height per athlete
+                best_per_athlete = df2.groupby('athlete_id')['result2'].max()
+                df3 = best_per_athlete.quantile(percentile_decimals)
+            
+            # Store sample count (unique athletes/teams, not total records)
+            sample_counts[(event_gender, display_event)] = len(best_per_athlete)
+            
             percentile_values = [convert_back(event_type, df3.iloc[i]) for i in range(len(percentiles))]
             # Add a row for each event/gender
             all_rows.append([event_gender, display_event] + percentile_values)
