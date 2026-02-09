@@ -55,7 +55,21 @@
             <span class="text-xs uppercase tracking-[0.3em] text-primary/70">Available now</span>
           </a>
 
-          {% for card in range(2) %}
+          <a href="{{ url_for('main.hypothetical_query_page') }}"
+            class="bg-gradient-to-br from-primary/5 via-white to-white border border-primary/20 rounded-2xl shadow-lg p-6 flex flex-col items-center text-center gap-4 hover:-translate-y-1 hover:shadow-2xl hover:border-primary transition-all focus-visible:outline-2 focus-visible:outline-primary">
+            <div
+              class="w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center text-2xl font-semibold shadow-lg shadow-primary/40">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <div class="space-y-1">
+              <h2 class="text-2xl font-semibold">Hypothetical Athlete</h2>
+              <p class="text-sm text-base-content/70">Enter a performance and see how it would rank against real competition.</p>
+            </div>
+            <span class="text-xs uppercase tracking-[0.3em] text-primary/70">Available now</span>
+          </a>
+
           <div
             class="bg-white/80 border border-dashed border-base-300 rounded-2xl p-6 flex flex-col items-center text-center gap-3 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.2)]">
             <span class="text-lg font-semibold tracking-wide text-base-content/70">Coming Soon!</span>
@@ -65,7 +79,6 @@
               Stay tuned
             </span>
           </div>
-          {% endfor %}
         </div>
       </section>
     </div>
