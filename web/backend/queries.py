@@ -575,7 +575,7 @@ def get_athlete_dashboard_data(athlete_id: int):
     personal_bests = get_athlete_personal_bests(athlete_id, athlete_obj=athlete)
     state_rankings = _compute_state_rankings_by_year(athlete_id, athlete.gender)
 
-    # Look up school logo from School_Logos.db
+    # Look up school logo from schools.db
     school_logo_url = None
     if athlete.school:
         logo_path = _get_school_logo_path(athlete.school.school_name)
