@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (item.type === 'school') {
               btn.innerHTML = `
                             <span class="result-text">${escapeHtml(item.name)}</span>
-                            <span class="result-badge font-bold border-2 border-green-500 text-green-600 rounded-full" style="margin-right:4px;">School</span>
+                            <span class="result-badge font-bold border-2 border-green-500 text-green-600 rounded-full px-3 py-0.5 text-sm whitespace-nowrap" style="margin-right:4px;">School</span>
                         `.trim();
               btn.addEventListener('click', () => {
                 window.location.href = `/school-dashboard/${item.id}`;

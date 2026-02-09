@@ -2,7 +2,7 @@ import re
 import sys
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from sqlalchemy import or_, func, and_
 from sqlalchemy.orm import joinedload
@@ -313,9 +313,6 @@ def _calculate_score(text: str, query_words: list) -> float:
     - Final score divided by length of text
     """
 
-    #remove schools from search results
-    return -999
-
     text_lower = text.lower()
     text_words = text_lower.split()
     
@@ -585,6 +582,7 @@ def get_athlete_dashboard_data(athlete_id: int):
             "last": athlete.last,
             "full_name": f"{athlete.first} {athlete.last}".strip(),
             "school": athlete.school.school_name if athlete.school else None,
+            "school_id": athlete.school.school_id if athlete.school else None,
             "gender": athlete.gender,
             "graduation_year": athlete.graduation_year,
         },
@@ -2482,4 +2480,586 @@ def get_hypothetical_result_rankings(
         },
         "where_do_i_rank": where_do_i_rank,
     }
+
+
+# -----------------------------------------------------------------------------
+# School Dashboard
+# -----------------------------------------------------------------------------
+
+# Points awarded by place for cumulative scoring
+_PLACE_POINTS = {1: 10, 2: 8, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1}
+
+MIN_RECORDS_YEAR = 2023
+
+_SCHOOLS_DB_PATH = str(Path(__file__).resolve().parent.parent / "data" / "schools.db")
+
+
+def _get_school_logo_path(school_name: str) -> Optional[str]:
+    """Look up the local logo path for a school from schools.db."""
+    import sqlite3
+    try:
+        conn = sqlite3.connect(_SCHOOLS_DB_PATH)
+        row = conn.execute(
+            "SELECT logo_path FROM school_logo WHERE school_name = ? AND has_logo = 1",
+            (school_name,),
+        ).fetchone()
+        conn.close()
+        if row and row[0]:
+            return row[0]
+    except Exception:
+        pass
+    return None
+
+
+def get_school_dashboard_data(school_id: int):
+    """Aggregate all data needed for the school dashboard page."""
+
+    school = (
+        School.query.options(joinedload(School.enrollments))
+        .filter_by(school_id=school_id)
+        .one_or_none()
+    )
+    if not school:
+        return None
+
+    # Basic school info
+    latest_enrollment = None
+    if school.enrollments:
+        sorted_enrollments = sorted(school.enrollments, key=lambda e: e.year, reverse=True)
+        latest_enrollment = sorted_enrollments[0].enrollment
+
+    # Look up logo from the separate schools.db
+    logo_path = _get_school_logo_path(school.school_name)
+    # logo_path is stored as "frontend/static/images/…"; Flask serves from
+    # frontend/static so we strip that prefix for the URL.
+    logo_url = None
+    if logo_path:
+        logo_url = "/static/" + logo_path.removeprefix("frontend/static/")
+
+    school_info = {
+        "id": school.school_id,
+        "name": school.school_name,
+        "city": school.city,
+        "school_type": school.school_type,
+        "enrollment": latest_enrollment,
+        "logo_url": logo_url,
+    }
+
+    roster = _build_school_roster(school_id)
+    cumulative_points = _compute_cumulative_points(school_id)
+    school_percentiles = _compute_school_percentiles(school_id)
+    avg_places = _compute_avg_places(school_id)
+    percentile_years = _get_school_percentile_years(school_id)
+
+    return {
+        "school": school_info,
+        "roster": roster,
+        "cumulative_points": cumulative_points,
+        "school_percentiles": school_percentiles,
+        "avg_places": avg_places,
+        "percentile_years": percentile_years,
+    }
+
+
+def _build_school_roster(school_id: int):
+    """Return list of athletes at this school, sorted by graduation year desc then last name."""
+    athletes = (
+        db.session.query(
+            Athlete.athlete_id,
+            Athlete.first,
+            Athlete.last,
+            Athlete.gender,
+            Athlete.graduation_year,
+        )
+        .filter(Athlete.school_id == school_id)
+        .all()
+    )
+
+    roster = []
+    for a in athletes:
+        roster.append({
+            "athlete_id": a.athlete_id,
+            "name": f"{a.first} {a.last}".strip(),
+            "gender": a.gender,
+            "graduation_year": a.graduation_year,
+        })
+
+    roster.sort(key=lambda r: (-(r["graduation_year"] or 0), r["name"]))
+    return roster
+
+
+def _compute_cumulative_points(school_id: int):
+    """
+    Compute cumulative points for a school across playoff meets from 2023+.
+    Points: 1st=10, 2nd=8, 3rd=6, 4th=5, 5th=4, 6th=3, 7th=2, 8th=1.
+    Returns dict keyed by gender, each containing yearly breakdown and totals.
+    """
+
+    individual_rows = (
+        db.session.query(
+            Meet.year,
+            Meet.gender,
+            Meet.meet_type,
+            AthleteResult.place,
+        )
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .filter(
+            Athlete.school_id == school_id,
+            AthleteResult.result_type == "Final",
+            AthleteResult.place.isnot(None),
+            AthleteResult.place > 0,
+            Meet.year >= MIN_RECORDS_YEAR,
+            Meet.meet_type.in_(("Sectional", "Regional", "State")),
+        )
+        .all()
+    )
+
+    relay_rows = (
+        db.session.query(
+            Meet.year,
+            Meet.gender,
+            Meet.meet_type,
+            RelayResult.place,
+        )
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .filter(
+            RelayResult.school_id == school_id,
+            RelayResult.place.isnot(None),
+            RelayResult.place > 0,
+            Meet.year >= MIN_RECORDS_YEAR,
+            Meet.meet_type.in_(("Sectional", "Regional", "State")),
+        )
+        .all()
+    )
+
+    # {gender: {year: {meet_type: points}}}
+    points_data = {}
+    for rows in (individual_rows, relay_rows):
+        for year, gender, meet_type, place in rows:
+            pts = _PLACE_POINTS.get(place, 0)
+            if pts == 0:
+                continue
+            gender_data = points_data.setdefault(gender, {})
+            year_data = gender_data.setdefault(year, {})
+            year_data[meet_type] = year_data.get(meet_type, 0) + pts
+
+    result = {}
+    for gender, years_dict in points_data.items():
+        yearly = []
+        total = 0
+        for year in sorted(years_dict.keys(), reverse=True):
+            meet_types = years_dict[year]
+            year_total = sum(meet_types.values())
+            total += year_total
+            yearly.append({
+                "year": year,
+                "sectional": meet_types.get("Sectional", 0),
+                "regional": meet_types.get("Regional", 0),
+                "state": meet_types.get("State", 0),
+                "total": year_total,
+            })
+        result[gender] = {"yearly": yearly, "grand_total": total}
+
+    return result
+
+
+def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
+    """
+    For each event+gender (individual AND relay), compute the school's
+    best mark percentile relative to all statewide results, and also
+    return the record holder info.
+
+    If *year* is given, only results from that single season are
+    considered (for both the school and statewide comparison).
+    Otherwise all results since MIN_RECORDS_YEAR are used.
+    """
+
+    year_filter = (Meet.year == year) if year else (Meet.year >= MIN_RECORDS_YEAR)
+
+    # ── Individual events ──
+    indiv_rows = (
+        db.session.query(
+            AthleteResult.event,
+            AthleteResult.result2,
+            AthleteResult.athlete_id,
+            Athlete.first,
+            Athlete.last,
+            Athlete.gender,
+            Event.event_type,
+            Meet.year,
+        )
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .join(Event, AthleteResult.event == Event.event)
+        .filter(
+            Athlete.school_id == school_id,
+            AthleteResult.result2.isnot(None),
+            year_filter,
+            Event.event_type != "Relay",
+        )
+        .all()
+    )
+
+    # Find best mark per (event, gender) for individual events
+    indiv_best = {}  # key: (event, gender) -> dict
+    for row in indiv_rows:
+        key = (row.event, row.gender)
+        lower_is_better = _is_lower_better(row.event_type)
+        existing = indiv_best.get(key)
+        if existing is None or (
+            (lower_is_better and row.result2 < existing["raw"])
+            or (not lower_is_better and row.result2 > existing["raw"])
+        ):
+            indiv_best[key] = {
+                "raw": row.result2,
+                "event_type": row.event_type,
+                "holder": "{} {}".format(row.first, row.last).strip(),
+                "holder_id": row.athlete_id,
+                "year": row.year,
+                "is_relay": False,
+            }
+
+    # ── Relay events ──
+    relay_rows = (
+        db.session.query(
+            RelayResult.event,
+            RelayResult.result2,
+            RelayResult.athlete_names,
+            Meet.gender,
+            Meet.year,
+            Event.event_type,
+        )
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .join(Event, RelayResult.event == Event.event)
+        .filter(
+            RelayResult.school_id == school_id,
+            RelayResult.result2.isnot(None),
+            year_filter,
+        )
+        .all()
+    )
+
+    relay_best = {}
+    for row in relay_rows:
+        key = (row.event, row.gender)
+        lower_is_better = _is_lower_better(row.event_type)
+        existing = relay_best.get(key)
+        if existing is None or (
+            (lower_is_better and row.result2 < existing["raw"])
+            or (not lower_is_better and row.result2 > existing["raw"])
+        ):
+            relay_best[key] = {
+                "raw": row.result2,
+                "event_type": row.event_type,
+                "holder": row.athlete_names or "Relay Team",
+                "holder_id": None,
+                "year": row.year,
+                "is_relay": True,
+            }
+
+    # ── Merge individual + relay bests and compute percentiles ──
+    all_bests = {}
+    all_bests.update(indiv_best)
+    all_bests.update(relay_best)  # relay keys won't collide with indiv keys
+
+    if not all_bests:
+        return []
+
+    results = []
+    for (event_name, gender), info in sorted(all_bests.items()):
+        event_type = info["event_type"]
+        lower_is_better = _is_lower_better(event_type)
+        agg = func.min if lower_is_better else func.max
+        school_best_val = info["raw"]
+
+        # Choose comparison table based on relay or individual
+        if info["is_relay"]:
+            statewide_bests = (
+                db.session.query(
+                    RelayResult.school_id,
+                    agg(RelayResult.result2).label("best"),
+                )
+                .join(Meet, RelayResult.meet_id == Meet.meet_id)
+                .filter(
+                    Meet.gender == gender,
+                    RelayResult.event == event_name,
+                    RelayResult.result2.isnot(None),
+                    year_filter,
+                )
+                .group_by(RelayResult.school_id)
+                .all()
+            )
+        else:
+            statewide_bests = (
+                db.session.query(
+                    AthleteResult.athlete_id,
+                    agg(AthleteResult.result2).label("best"),
+                )
+                .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+                .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+                .filter(
+                    Athlete.gender == gender,
+                    AthleteResult.event == event_name,
+                    AthleteResult.result2.isnot(None),
+                    year_filter,
+                )
+                .group_by(AthleteResult.athlete_id)
+                .all()
+            )
+
+        if not statewide_bests:
+            continue
+
+        total = len(statewide_bests)
+        if lower_is_better:
+            better_or_equal = sum(1 for row in statewide_bests if row.best <= school_best_val)
+        else:
+            better_or_equal = sum(1 for row in statewide_bests if row.best >= school_best_val)
+
+        percentile = round((1 - better_or_equal / total) * 100, 1)
+
+        display_result = _format_result_display(school_best_val, event_type)
+
+        results.append({
+            "event": event_name,
+            "gender": gender,
+            "event_type": event_type,
+            "school_best": display_result,
+            "school_best_raw": school_best_val,
+            "state_percentile": max(percentile, 0),
+            "holder": info["holder"],
+            "holder_id": info["holder_id"],
+            "year": info["year"],
+            "is_relay": info["is_relay"],
+        })
+
+    return results
+
+
+def _get_school_percentile_years(school_id: int) -> List[int]:
+    """Return sorted list of years (descending) that a school has results (individual or relay)."""
+    indiv_years = (
+        db.session.query(Meet.year)
+        .join(AthleteResult, AthleteResult.meet_id == Meet.meet_id)
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .filter(
+            Athlete.school_id == school_id,
+            AthleteResult.result2.isnot(None),
+            Meet.year >= MIN_RECORDS_YEAR,
+        )
+        .distinct()
+        .all()
+    )
+    relay_years = (
+        db.session.query(Meet.year)
+        .join(RelayResult, RelayResult.meet_id == Meet.meet_id)
+        .filter(
+            RelayResult.school_id == school_id,
+            RelayResult.result2.isnot(None),
+            Meet.year >= MIN_RECORDS_YEAR,
+        )
+        .distinct()
+        .all()
+    )
+    all_years = set(r.year for r in indiv_years) | set(r.year for r in relay_years)
+    return sorted(all_years, reverse=True)
+
+
+def _format_result_display(raw_value, event_type):
+    """Format a raw numeric result for display."""
+    if raw_value is None:
+        return "—"
+    if event_type == "Field":
+        total_inches = raw_value
+        feet = int(total_inches // 12)
+        inches = total_inches % 12
+        if inches == int(inches):
+            return f"{feet}'{int(inches)}\""
+        return f"{feet}'{inches:.2f}\""
+    else:
+        seconds = raw_value
+        if seconds >= 60:
+            minutes = int(seconds // 60)
+            remaining = seconds % 60
+            return f"{minutes}:{remaining:05.2f}"
+        return f"{seconds:.2f}"
+
+
+def _compute_school_records(school_id: int):
+    """Unofficial school records: best mark per event+gender from 2023 onwards."""
+
+    individual_rows = (
+        db.session.query(
+            AthleteResult.event,
+            AthleteResult.result,
+            AthleteResult.result2,
+            AthleteResult.athlete_id,
+            Athlete.first,
+            Athlete.last,
+            Athlete.gender,
+            Event.event_type,
+            Meet.year,
+        )
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .join(Event, AthleteResult.event == Event.event)
+        .filter(
+            Athlete.school_id == school_id,
+            AthleteResult.result2.isnot(None),
+            Meet.year >= MIN_RECORDS_YEAR,
+            Event.event_type != "Relay",
+        )
+        .all()
+    )
+
+    records_map = {}
+    for row in individual_rows:
+        key = (row.event, row.gender)
+        lower_is_better = _is_lower_better(row.event_type)
+        existing = records_map.get(key)
+        if existing is None:
+            records_map[key] = row
+        elif lower_is_better and row.result2 < existing.result2:
+            records_map[key] = row
+        elif not lower_is_better and row.result2 > existing.result2:
+            records_map[key] = row
+
+    relay_rows = (
+        db.session.query(
+            RelayResult.event,
+            RelayResult.result,
+            RelayResult.result2,
+            RelayResult.athlete_names,
+            Meet.gender,
+            Meet.year,
+            Event.event_type,
+        )
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .join(Event, RelayResult.event == Event.event)
+        .filter(
+            RelayResult.school_id == school_id,
+            RelayResult.result2.isnot(None),
+            Meet.year >= MIN_RECORDS_YEAR,
+        )
+        .all()
+    )
+
+    relay_map = {}
+    for row in relay_rows:
+        key = (row.event, row.gender)
+        lower_is_better = _is_lower_better(row.event_type)
+        existing = relay_map.get(key)
+        if existing is None:
+            relay_map[key] = row
+        elif lower_is_better and row.result2 < existing.result2:
+            relay_map[key] = row
+        elif not lower_is_better and row.result2 > existing.result2:
+            relay_map[key] = row
+
+    records = []
+    for (event, gender), row in sorted(records_map.items()):
+        event_type = row.event_type
+        display_result = row.result or _format_result_display(row.result2, event_type)
+        records.append({
+            "event": event,
+            "gender": gender,
+            "event_type": event_type,
+            "result": display_result,
+            "result_raw": row.result2,
+            "holder": f"{row.first} {row.last}".strip(),
+            "holder_id": row.athlete_id,
+            "year": row.year,
+            "is_relay": False,
+        })
+
+    for (event, gender), row in sorted(relay_map.items()):
+        event_type = row.event_type
+        display_result = row.result or _format_result_display(row.result2, event_type)
+        records.append({
+            "event": event,
+            "gender": gender,
+            "event_type": event_type,
+            "result": display_result,
+            "result_raw": row.result2,
+            "holder": row.athlete_names or "Relay Team",
+            "holder_id": None,
+            "year": row.year,
+            "is_relay": True,
+        })
+
+    records.sort(key=lambda r: (r["gender"], r["event"]))
+    return records
+
+
+def _compute_avg_places(school_id: int):
+    """
+    Average place at Sectional, Regional, and State in the last 3 years.
+    Includes both individual and relay results (Finals only).
+    """
+
+    current_year = db.session.query(func.max(Meet.year)).scalar() or 2025
+    min_year = current_year - 2
+
+    meet_types_list = ("Sectional", "Regional", "State")
+
+    individual_rows = (
+        db.session.query(
+            Meet.gender,
+            Meet.meet_type,
+            AthleteResult.place,
+        )
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .filter(
+            Athlete.school_id == school_id,
+            AthleteResult.result_type == "Final",
+            AthleteResult.place.isnot(None),
+            AthleteResult.place > 0,
+            Meet.year >= min_year,
+            Meet.meet_type.in_(meet_types_list),
+        )
+        .all()
+    )
+
+    relay_rows = (
+        db.session.query(
+            Meet.gender,
+            Meet.meet_type,
+            RelayResult.place,
+        )
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .filter(
+            RelayResult.school_id == school_id,
+            RelayResult.place.isnot(None),
+            RelayResult.place > 0,
+            Meet.year >= min_year,
+            Meet.meet_type.in_(meet_types_list),
+        )
+        .all()
+    )
+
+    # {gender: {meet_type: [places]}}
+    places_data = {}
+    for rows in (individual_rows, relay_rows):
+        for gender, meet_type, place in rows:
+            gender_data = places_data.setdefault(gender, {})
+            type_list = gender_data.setdefault(meet_type, [])
+            type_list.append(place)
+
+    result = {}
+    for gender, types_dict in places_data.items():
+        gender_result = {}
+        for mt in meet_types_list:
+            places = types_dict.get(mt, [])
+            if places:
+                gender_result[mt.lower()] = {
+                    "avg_place": round(sum(places) / len(places), 1),
+                    "count": len(places),
+                }
+            else:
+                gender_result[mt.lower()] = None
+        result[gender] = gender_result
+
+    return result
 
