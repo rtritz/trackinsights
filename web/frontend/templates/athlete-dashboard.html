@@ -60,6 +60,13 @@
                         <span id="share-dashboard-status" class="text-xs text-gray-600" aria-live="polite"></span>
                     </div>
                 </div>
+                <!-- School Logo -->
+                <div id="school-logo-container" class="hidden flex-shrink-0">
+                    <a id="school-logo-link" href="#">
+                        <img id="school-logo" src="" alt="School logo"
+                            class="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 object-contain rounded-xl bg-white p-1 shadow-md" />
+                    </a>
+                </div>
                 <!-- State Rankings Section -->
                 <div id="state-rankings-container" class="hidden flex flex-wrap items-end justify-end gap-4 sm:gap-5 md:gap-6 mt-4 md:mt-0 pl-0 md:pl-4">
                     <!-- Rankings badges will be inserted here by JavaScript -->
@@ -366,6 +373,22 @@
                 schoolEl.removeAttribute('href');
                 schoolEl.style.textDecoration = 'none';
                 schoolEl.style.cursor = 'default';
+            }
+
+            // Show school logo if available
+            if (data.athlete.logo_url) {
+                const logoImg = document.getElementById('school-logo');
+                const logoContainer = document.getElementById('school-logo-container');
+                const logoLink = document.getElementById('school-logo-link');
+                logoImg.src = data.athlete.logo_url;
+                logoImg.alt = (data.athlete.school || 'School') + ' logo';
+                if (data.athlete.school_id) {
+                    logoLink.href = `/school-dashboard/${data.athlete.school_id}`;
+                } else {
+                    logoLink.removeAttribute('href');
+                    logoLink.style.cursor = 'default';
+                }
+                logoContainer.classList.remove('hidden');
             }
 
             // Set gender badge

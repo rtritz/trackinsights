@@ -575,6 +575,13 @@ def get_athlete_dashboard_data(athlete_id: int):
     personal_bests = get_athlete_personal_bests(athlete_id, athlete_obj=athlete)
     state_rankings = _compute_state_rankings_by_year(athlete_id, athlete.gender)
 
+    # Look up school logo from schools.db
+    school_logo_url = None
+    if athlete.school:
+        logo_path = _get_school_logo_path(athlete.school.school_name)
+        if logo_path:
+            school_logo_url = "/static/" + logo_path.removeprefix("frontend/static/")
+
     return {
         "athlete": {
             "id": athlete.athlete_id,
@@ -585,6 +592,7 @@ def get_athlete_dashboard_data(athlete_id: int):
             "school_id": athlete.school.school_id if athlete.school else None,
             "gender": athlete.gender,
             "graduation_year": athlete.graduation_year,
+            "logo_url": school_logo_url,
         },
         "badges": badges,
         "playoff_history": playoff_history,
