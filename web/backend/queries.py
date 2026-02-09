@@ -575,7 +575,7 @@ def get_athlete_dashboard_data(athlete_id: int):
     personal_bests = get_athlete_personal_bests(athlete_id, athlete_obj=athlete)
     state_rankings = _compute_state_rankings_by_year(athlete_id, athlete.gender)
 
-    # Look up school logo from schools.db
+    # Look up school logo from School_Logos.db
     school_logo_url = None
     if athlete.school:
         logo_path = _get_school_logo_path(athlete.school.school_name)
@@ -2499,11 +2499,11 @@ _PLACE_POINTS = {1: 10, 2: 8, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1}
 
 MIN_RECORDS_YEAR = 2023
 
-_SCHOOLS_DB_PATH = str(Path(__file__).resolve().parent.parent / "data" / "schools.db")
+_SCHOOLS_DB_PATH = str(Path(__file__).resolve().parent.parent / "data" / "School_Logos.db")
 
 
 def _get_school_logo_path(school_name: str) -> Optional[str]:
-    """Look up the local logo path for a school from schools.db."""
+    """Look up the local logo path for a school from School_Logos.db."""
     import sqlite3
     try:
         conn = sqlite3.connect(_SCHOOLS_DB_PATH)
@@ -2536,7 +2536,7 @@ def get_school_dashboard_data(school_id: int):
         sorted_enrollments = sorted(school.enrollments, key=lambda e: e.year, reverse=True)
         latest_enrollment = sorted_enrollments[0].enrollment
 
-    # Look up logo from the separate schools.db
+    # Look up logo from the separate School_Logos.db
     logo_path = _get_school_logo_path(school.school_name)
     # logo_path is stored as "frontend/static/images/…"; Flask serves from
     # frontend/static so we strip that prefix for the URL.
