@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="h-screen bg-white pt-20 sm:pt-24 pb-4 px-3 sm:px-6 flex flex-col">
+  <div class="relative max-w-3xl mx-auto w-full flex flex-col min-h-0 flex-1">
+    <div
+      class="absolute inset-0 -z-10 mx-0 sm:mx-[-40px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none">
+    </div>
+    <div class="relative flex flex-col min-h-0 flex-1">
+      <a href="{{ url_for('main.queries_page') }}"
+        class="fixed top-5 md:top-7 left-4 sm:left-5 md:left-10 z-[70] h-8 w-8 md:h-10 md:w-10 inline-flex items-center justify-center rounded-full border-2 border-[#8c0327] text-white bg-[#8c0327] shadow-md hover:bg-[#6b0220] transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+            clip-rule="evenodd" />
+        </svg>
+      </a>
+
+      <header class="text-center space-y-1 shrink-0 pb-3">
+        <h1 class="font-impact italic text-3xl sm:text-4xl text-primary">
+          Hypothetical Athlete
+        </h1>
+        <p class="text-base-content/70 max-w-2xl mx-auto text-sm">
+          Enter a performance for any event and see how it would rank against real competition.
+        </p>
+      </header>
+
+      <div class="rounded-[32px] bg-white/90 ring-1 ring-base-200 shadow-[0_25px_70px_rgba(15,23,42,0.08)] flex flex-col min-h-0 flex-1 overflow-hidden">
+        <div id="loading-options" class="flex flex-col items-center justify-center py-16">
+          <div class="loading loading-spinner loading-lg text-primary"></div>
+          <p class="mt-4 text-gray-600">Loading options...</p>
+        </div>
+
+        <form id="hypothetical-form" class="hidden flex flex-col min-h-0 flex-1" autocomplete="off">
+          <!-- Scrollable form content -->
+          <div class="flex-1 min-h-0 overflow-y-auto px-5 sm:px-7 pt-5 pb-3 space-y-4">
+            <!-- Gender -->
+            <fieldset class="space-y-1.5">
+              <legend class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Gender</legend>
+              <div id="gender-group" class="flex flex-wrap gap-1.5"></div>
+            </fieldset>
+
+            <hr class="border-base-200" />
+
+            <!-- Event -->
+            <fieldset class="space-y-1.5">
+              <legend class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Event</legend>
+              <div id="event-group" class="grid grid-cols-2 sm:grid-cols-3 gap-1.5"></div>
+            </fieldset>
+
+            <hr class="border-base-200" />
+
+            <!-- Season -->
+            <fieldset class="space-y-1.5">
+              <legend class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Season</legend>
+              <div id="year-group" class="flex flex-wrap gap-1.5"></div>
+            </fieldset>
+
+            <!-- Meet Type -->
+            <fieldset class="space-y-1.5">
+              <legend class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Meet Type</legend>
+              <div id="meet-type-group" class="flex flex-wrap gap-1.5"></div>
+            </fieldset>
+
+            <hr class="border-base-200" />
+
+            <!-- Performance Input -->
+            <fieldset class="space-y-1.5">
+              <legend class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Performance</legend>
+              <p id="performance-hint" class="text-xs text-gray-500">Select an event first</p>
+              <input type="text" id="performance-input" placeholder="e.g. 11.24"
+                class="input input-bordered input-sm w-full max-w-xs" disabled />
+            </fieldset>
+
+            <hr class="border-base-200" />
+
+            <!-- Grade Level (optional) -->
+            <fieldset class="space-y-1.5">
+              <legend class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Grade Level <span class="text-[10px] font-normal normal-case tracking-normal text-gray-400">(optional)</span></legend>
+              <div id="grade-group" class="flex flex-wrap gap-1.5"></div>
+            </fieldset>
+
+            <!-- Enrollment (optional) -->
+            <fieldset class="space-y-1.5">
+              <legend class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Enrollment <span class="text-[10px] font-normal normal-case tracking-normal text-gray-400">(optional)</span></legend>
+              <input type="number" id="enrollment-input" placeholder="e.g. 1200" min="1"
+                class="input input-bordered input-sm w-full max-w-xs" />
+            </fieldset>
+          </div>
+
+          <!-- Sticky submit bar at bottom of bubble -->
+          <div class="shrink-0 px-5 sm:px-7 py-3 border-t border-base-200 bg-white/95 rounded-b-[32px]">
+            <div id="form-error" class="hidden alert alert-error text-sm mb-2"></div>
+            <button type="submit" id="submit-btn"
+              class="btn btn-primary rounded-full px-8 shadow-lg shadow-primary/30 transition-all disabled:opacity-50 w-full sm:w-auto"
+              disabled>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              See Where You Rank
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    const loadingEl = document.getElementById('loading-options');
+    const formEl = document.getElementById('hypothetical-form');
+    const genderGroup = document.getElementById('gender-group');
+    const eventGroup = document.getElementById('event-group');
+    const yearGroup = document.getElementById('year-group');
+    const meetTypeGroup = document.getElementById('meet-type-group');
+    const performanceInput = document.getElementById('performance-input');
+    const performanceHint = document.getElementById('performance-hint');
+    const submitBtn = document.getElementById('submit-btn');
+    const formError = document.getElementById('form-error');
+
+    const FIELD_EVENTS = new Set(['High Jump', 'Long Jump', 'Pole Vault', 'Shot Put', 'Discus']);
+    const EVENT_GROUPS = {
+      'Sprints & Distance': ['100 Meters', '200 Meters', '400 Meters', '800 Meters', '1600 Meters', '3200 Meters'],
+      'Hurdles': ['100 Hurdles', '110 Hurdles', '300 Hurdles'],
+      'Field Events': ['High Jump', 'Long Jump', 'Pole Vault', 'Shot Put', 'Discus'],
+    };
+
+    const gradeGroup = document.getElementById('grade-group');
+    const enrollmentInput = document.getElementById('enrollment-input');
+
+    const GRADE_LEVELS = ['FR', 'SO', 'JR', 'SR'];
+
+    let state = { gender: null, event: null, year: null, meetType: null, grade: null };
+
+    const chipBase = 'btn btn-sm border border-base-300 rounded-full px-4 py-1.5 text-sm transition-all shadow-none hover:shadow-none';
+    const chipActive = 'bg-primary text-white border-primary hover:bg-primary/90';
+    const chipInactive = 'bg-white text-gray-700 hover:bg-base-200';
+
+    function createChip(label, value, group, stateKey) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `${chipBase} ${chipInactive}`;
+      btn.textContent = label;
+      btn.dataset.value = value;
+      btn.addEventListener('click', () => {
+        group.querySelectorAll('button').forEach(b => {
+          b.className = `${chipBase} ${chipInactive}`;
+        });
+        btn.className = `${chipBase} ${chipActive}`;
+        state[stateKey] = value;
+        onStateChange(stateKey);
+      });
+      return btn;
+    }
+
+    function onStateChange(changedKey) {
+      // Update performance hint when event changes
+      if (changedKey === 'event') {
+        if (state.event) {
+          const isField = FIELD_EVENTS.has(state.event);
+          performanceInput.disabled = false;
+          performanceInput.value = '';
+          if (isField) {
+            performanceInput.placeholder = "e.g. 5'10\" or 42'3\"";
+            performanceHint.textContent = 'Enter a distance (feet\'inches")';
+          } else {
+            performanceInput.placeholder = 'e.g. 11.24 or 4:32.10';
+            performanceHint.textContent = 'Enter a time (seconds or minutes:seconds)';
+          }
+        } else {
+          performanceInput.disabled = true;
+          performanceInput.value = '';
+          performanceHint.textContent = 'Select an event first';
+        }
+      }
+
+      // Filter events based on gender
+      if (changedKey === 'gender') {
+        renderEvents(state.gender);
+      }
+
+      validateForm();
+    }
+
+    function validateForm() {
+      const hasPerformance = performanceInput.value.trim().length > 0;
+      const allSelected = state.gender && state.event && state.year && state.meetType && hasPerformance;
+      submitBtn.disabled = !allSelected;
+      formError.classList.add('hidden');
+    }
+
+    function renderEvents(gender) {
+      eventGroup.innerHTML = '';
+      state.event = null;
+
+      const skipBoys = new Set(['100 Hurdles']);
+      const skipGirls = new Set(['110 Hurdles']);
+
+      for (const [groupLabel, events] of Object.entries(EVENT_GROUPS)) {
+        const header = document.createElement('div');
+        header.className = 'col-span-2 sm:col-span-3 text-xs uppercase tracking-wide text-gray-400 mt-2 first:mt-0';
+        header.textContent = groupLabel;
+        eventGroup.appendChild(header);
+
+        for (const evt of events) {
+          if (gender === 'Boys' && skipBoys.has(evt)) continue;
+          if (gender === 'Girls' && skipGirls.has(evt)) continue;
+          eventGroup.appendChild(createChip(evt, evt, eventGroup, 'event'));
+        }
+      }
+
+      performanceInput.disabled = true;
+      performanceInput.value = '';
+      performanceHint.textContent = 'Select an event first';
+      validateForm();
+    }
+
+    try {
+      const resp = await fetch('/api/hypothetical-rank/options');
+      if (!resp.ok) throw new Error('Failed to load options');
+      const options = await resp.json();
+
+      // Render gender chips
+      for (const g of options.genders) {
+        const chip = createChip(g, g, genderGroup, 'gender');
+        genderGroup.appendChild(chip);
+        if (g === 'Boys') {
+          chip.click();
+        }
+      }
+
+      // Render year chips
+      for (const y of options.years) {
+        yearGroup.appendChild(createChip(String(y), String(y), yearGroup, 'year'));
+      }
+
+      // Render meet type chips
+      for (const mt of options.meet_types) {
+        meetTypeGroup.appendChild(createChip(mt, mt, meetTypeGroup, 'meetType'));
+      }
+
+      // Render grade level chips (optional, toggleable)
+      for (const gl of GRADE_LEVELS) {
+        const btn = createChip(gl, gl, gradeGroup, 'grade');
+        // Allow deselect by clicking the active chip again
+        btn.addEventListener('click', () => {
+          if (btn.className.includes('bg-primary')) {
+            // already active – check if it was just activated by createChip handler
+            // We rely on the createChip handler running first setting state.grade = gl
+          }
+        });
+        gradeGroup.appendChild(btn);
+      }
+      // Add a "Clear" button for grade
+      const clearGradeBtn = document.createElement('button');
+      clearGradeBtn.type = 'button';
+      clearGradeBtn.className = `${chipBase} bg-base-200 text-gray-500 hover:bg-base-300 text-xs`;
+      clearGradeBtn.textContent = '✕ Clear';
+      clearGradeBtn.addEventListener('click', () => {
+        gradeGroup.querySelectorAll('button').forEach(b => {
+          if (b !== clearGradeBtn) b.className = `${chipBase} ${chipInactive}`;
+        });
+        state.grade = null;
+      });
+      gradeGroup.appendChild(clearGradeBtn);
+
+      loadingEl.classList.add('hidden');
+      formEl.classList.remove('hidden');
+    } catch (err) {
+      loadingEl.innerHTML = '<p class="text-red-600">Failed to load options. Please try again later.</p>';
+      console.error(err);
+      return;
+    }
+
+    performanceInput.addEventListener('input', () => validateForm());
+
+    formEl.addEventListener('submit', (e) => {
+      e.preventDefault();
+      formError.classList.add('hidden');
+
+      if (!state.gender || !state.event || !state.year || !state.meetType || !performanceInput.value.trim()) {
+        formError.textContent = 'Please fill in all fields.';
+        formError.classList.remove('hidden');
+        return;
+      }
+
+      const params = new URLSearchParams({
+        event: state.event,
+        time: performanceInput.value.trim(),
+        gender: state.gender,
+        year: state.year,
+        meet_type: state.meetType,
+      });
+
+      if (state.grade) {
+        params.set('grade_level', state.grade);
+      }
+      const enrollmentVal = enrollmentInput.value.trim();
+      if (enrollmentVal) {
+        params.set('enrollment', enrollmentVal);
+      }
+
+      window.location.href = `/queries/hypothetical/result?${params.toString()}`;
+    });
+  });
+</script>
+{% endblock %}

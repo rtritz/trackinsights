@@ -2124,3 +2124,217 @@ def _format_sectional_result(value, event_type: str) -> str:
             return f"{minutes}:{seconds:05.2f}"
         return f"{value:.2f}"
 
+
+# ---------------------------------------------------------------------------
+# Hypothetical athlete ranking
+# ---------------------------------------------------------------------------
+
+def get_hypothetical_ranking_options():
+    """Return filter options for the hypothetical athlete query page."""
+    all_events = _get_sectional_events()
+    try:
+        genders = list(getattr(CONST.GENDER, "ALL", _FALLBACK_GENDERS))
+    except NameError:
+        genders = _FALLBACK_GENDERS
+
+    try:
+        meet_types = list(getattr(CONST.MEET_TYPE, "ALL", []))
+    except NameError:
+        meet_types = ["Sectional"]
+
+    return {
+        "events": sorted(all_events),
+        "genders": genders,
+        "meet_types": meet_types if meet_types else ["Sectional"],
+        "years": _get_sectional_years(),
+    }
+
+
+def get_hypothetical_result_rankings(
+    event_name: str,
+    performance_input: str,
+    gender: str,
+    year: int,
+    meet_type: str = "Sectional",
+    enrollment: Optional[int] = None,
+    grade_level: Optional[str] = None,
+):
+    """Build ranking data for a hypothetical performance, similar to get_athlete_result_rankings."""
+
+    event = Event.query.filter_by(event=event_name).one_or_none()
+    if not event or not event.event_type:
+        return None
+
+    event_type = event.event_type
+    try:
+        normalized_value = _normalize_performance_input(performance_input, event_type)
+    except (ValueError, TypeError):
+        return None
+
+    lower_is_better = _is_lower_better(event_type)
+    gender_filter = func.lower(Meet.gender) == (gender or "").strip().lower()
+
+    # Format the display string for the input performance
+    display_result = str(performance_input).strip()
+
+    # Fetch all results for this event/year/meet_type/gender
+    rows = (
+        db.session.query(
+            AthleteResult.athlete_id.label("athlete_id"),
+            AthleteResult.meet_id.label("meet_id"),
+            AthleteResult.result.label("result"),
+            AthleteResult.result2.label("result_value"),
+            AthleteResult.grade.label("grade"),
+            AthleteResult.place.label("place"),
+            Athlete.first.label("first"),
+            Athlete.last.label("last"),
+            Athlete.school_id.label("school_id"),
+            School.school_name.label("school_name"),
+            SchoolEnrollment.enrollment.label("enrollment"),
+            Meet.host.label("meet_host"),
+            Meet.meet_num.label("meet_num"),
+        )
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .outerjoin(School, Athlete.school_id == School.school_id)
+        .outerjoin(
+            SchoolEnrollment,
+            and_(
+                SchoolEnrollment.school_id == Athlete.school_id,
+                SchoolEnrollment.year == year,
+            ),
+        )
+        .filter(
+            AthleteResult.event == event_name,
+            AthleteResult.result2.isnot(None),
+            Meet.year == year,
+            Meet.meet_type == meet_type,
+            gender_filter,
+        )
+        .all()
+    )
+
+    # Build entries list including the hypothetical athlete
+    HYPOTHETICAL_ID = -1
+    HYPOTHETICAL_MEET_ID = -1
+
+    entries = [
+        {
+            "athlete_id": HYPOTHETICAL_ID,
+            "meet_id": HYPOTHETICAL_MEET_ID,
+            "result": display_result,
+            "result_value": normalized_value,
+            "grade": grade_level,
+            "place": None,
+            "full_name": "Your Athlete",
+            "school_id": None,
+            "school_name": None,
+            "enrollment": enrollment,
+            "meet_host": None,
+            "meet_num": None,
+        }
+    ]
+
+    for row in rows:
+        if row.result_value is None:
+            continue
+        full_name = " ".join(filter(None, [row.first, row.last])).strip()
+        entries.append(
+            {
+                "athlete_id": row.athlete_id,
+                "meet_id": row.meet_id,
+                "result": row.result,
+                "result_value": row.result_value,
+                "grade": row.grade,
+                "place": row.place,
+                "full_name": full_name,
+                "school_id": row.school_id,
+                "school_name": row.school_name,
+                "enrollment": row.enrollment,
+                "meet_host": row.meet_host,
+                "meet_num": row.meet_num,
+            }
+        )
+
+    if len(entries) < 2:
+        return None
+
+    target_key = {"athlete_id": HYPOTHETICAL_ID, "meet_id": HYPOTHETICAL_MEET_ID}
+
+    overall_info = _compute_cohort_ranking(entries, target_key, lower_is_better)
+
+    like_info = None
+    if enrollment is not None:
+        lower_bound = int(round(enrollment * 0.75))
+        upper_bound = int(round(enrollment * 1.25))
+
+        like_info = _compute_cohort_ranking(
+            entries,
+            target_key,
+            lower_is_better,
+            filter_fn=lambda item: item["enrollment"] is not None
+            and lower_bound <= item["enrollment"] <= upper_bound,
+        )
+        if like_info:
+            like_info["criteria"] = {
+                "enrollment": enrollment,
+                "min_enrollment": lower_bound,
+                "max_enrollment": upper_bound,
+            }
+
+    grade_info = None
+    if grade_level:
+        grade_info = _compute_cohort_ranking(
+            entries,
+            target_key,
+            lower_is_better,
+            filter_fn=lambda item: item["grade"] == grade_level,
+        )
+        if grade_info:
+            grade_info["criteria"] = {"grade": grade_level}
+
+    # Sectional projections
+    where_do_i_rank = None
+    try:
+        where_do_i_rank = estimate_event_rank(
+            event_name=event_name,
+            performance_value=performance_input,
+            gender=gender,
+            year=year,
+            meet_type=meet_type,
+        )
+    except Exception:
+        where_do_i_rank = None
+
+    return {
+        "context": {
+            "year": year,
+            "gender": gender,
+            "event": event_name,
+            "meet_type": meet_type,
+            "result_type": "Final",
+            "event_type": event_type,
+        },
+        "target_result": {
+            "athlete_id": HYPOTHETICAL_ID,
+            "athlete_name": "Your Athlete",
+            "result": display_result,
+            "result_value": normalized_value,
+            "grade": grade_level,
+            "school_id": None,
+            "school_name": None,
+            "enrollment": enrollment,
+            "place": None,
+            "meet_id": HYPOTHETICAL_MEET_ID,
+            "meet_host": None,
+            "meet_num": None,
+            "year": year,
+        },
+        "rankings": {
+            "overall": overall_info,
+            "like_schools": like_info,
+            "same_grade": grade_info,
+        },
+        "where_do_i_rank": where_do_i_rank,
+    }
+

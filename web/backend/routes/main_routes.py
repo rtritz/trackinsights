@@ -28,6 +28,32 @@ def sectional_trends_page():
     return render_template('queries-sectional-trends.html')
 
 
+@main_bp.route('/queries/hypothetical')
+def hypothetical_query_page():
+    return render_template('queries-hypothetical.html')
+
+
+@main_bp.route('/queries/hypothetical/result')
+def hypothetical_result_detail():
+    event = request.args.get('event', '')
+    time = request.args.get('time', '')
+    gender = request.args.get('gender', '')
+    year = request.args.get('year', '')
+    meet_type = request.args.get('meet_type', 'Sectional')
+    enrollment = request.args.get('enrollment', '')
+    grade_level = request.args.get('grade_level', '')
+    return render_template(
+        'hypothetical-result-detail.html',
+        event_name=event,
+        time_input=time,
+        gender=gender,
+        year=year,
+        meet_type=meet_type,
+        enrollment=enrollment,
+        grade_level=grade_level,
+    )
+
+
 @main_bp.route('/athlete-dashboard/<int:athlete_id>')
 def athlete_dashboard(athlete_id):
     return render_template('athlete-dashboard.html', athlete_id=athlete_id)
