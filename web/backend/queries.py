@@ -582,6 +582,13 @@ def get_athlete_dashboard_data(athlete_id: int):
         if logo_path:
             school_logo_url = "/static/" + logo_path.removeprefix("frontend/static/")
 
+    # Look up school logo from schools.db
+    school_logo_url = None
+    if athlete.school:
+        logo_path = _get_school_logo_path(athlete.school.school_name)
+        if logo_path:
+            school_logo_url = "/static/" + logo_path.removeprefix("frontend/static/")
+
     return {
         "athlete": {
             "id": athlete.athlete_id,
