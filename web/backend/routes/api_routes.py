@@ -13,6 +13,8 @@ from ..queries import (
     get_sectional_event_trends,
     get_hypothetical_ranking_options,
     get_hypothetical_result_rankings,
+    get_school_dashboard_data,
+    _compute_school_percentiles,
 )
 
 
@@ -210,4 +212,20 @@ def api_hypothetical_rank():
         return jsonify({'error': 'No data found for the given parameters'}), 404
 
     return jsonify(data)
+
+
+@api_bp.route('/schools/<int:school_id>/dashboard')
+def api_get_school_dashboard(school_id):
+    data = get_school_dashboard_data(school_id)
+    if not data:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(data)
+
+
+@api_bp.route('/schools/<int:school_id>/percentiles')
+def api_get_school_percentiles(school_id):
+    """Return school percentiles, optionally filtered to a single year."""
+    year = request.args.get('year', type=int)
+    results = _compute_school_percentiles(school_id, year=year)
+    return jsonify(results)
 

@@ -54,6 +54,11 @@ def hypothetical_result_detail():
     )
 
 
+@main_bp.route('/school-dashboard/<int:school_id>')
+def school_dashboard(school_id):
+    return render_template('school-dashboard.html', school_id=school_id)
+
+
 @main_bp.route('/athlete-dashboard/<int:athlete_id>')
 def athlete_dashboard(athlete_id):
     return render_template('athlete-dashboard.html', athlete_id=athlete_id)
