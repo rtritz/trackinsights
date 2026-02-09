@@ -15,22 +15,22 @@ def search_page():
 
 @main_bp.route('/queries')
 def queries_page():
-    return render_template('queries.html')
+    return render_template('queries/index.html')
 
 
 @main_bp.route('/queries/percentiles')
 def percentiles_query_page():
-    return render_template('queries-percentiles.html')
+    return render_template('queries/percentiles.html')
 
 
 @main_bp.route('/queries/sectional-trends')
 def sectional_trends_page():
-    return render_template('queries-sectional-trends.html')
+    return render_template('queries/sectional-trends.html')
 
 
 @main_bp.route('/queries/hypothetical')
 def hypothetical_query_page():
-    return render_template('queries-hypothetical.html')
+    return render_template('queries/hypothetical.html')
 
 
 @main_bp.route('/queries/hypothetical/result')
@@ -43,7 +43,7 @@ def hypothetical_result_detail():
     enrollment = request.args.get('enrollment', '')
     grade_level = request.args.get('grade_level', '')
     return render_template(
-        'hypothetical-result-detail.html',
+        'queries/hypothetical-result-detail.html',
         event_name=event,
         time_input=time,
         gender=gender,
