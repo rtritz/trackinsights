@@ -20,7 +20,7 @@ Output
 Usage
 -----
     cd trackinsights
-    python web/backend/scripts/scraping/scrape_myihsaa_schools.py
+    python web/scrape_myihsaa_schools.py
 """
 
 import asyncio
@@ -34,9 +34,8 @@ import httpx
 
 # ── paths & constants ────────────────────────────────────────────────
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-WEB_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", ".."))
-DB_PATH = os.path.join(WEB_DIR, "data", "School_Logos.db")
-LOGO_DIR = os.path.join(WEB_DIR, "frontend", "static", "images", "school_logos")
+DB_PATH = os.path.join(SCRIPT_DIR, "data", "School_Logos.db")
+LOGO_DIR = os.path.join(SCRIPT_DIR, "frontend", "static", "images", "school_logos")
 
 API_BASE = "https://myihsaa-prod-ams.azurewebsites.net/api/school-directory"
 SEARCH_URL = f"{API_BASE}/search"
@@ -161,7 +160,7 @@ async def scrape():
             if has_logo:
                 filename = safe_filename(name) + ".png"
                 full_path = os.path.join(LOGO_DIR, filename)
-                rel_path = os.path.relpath(full_path, WEB_DIR)
+                rel_path = os.path.relpath(full_path, SCRIPT_DIR)
 
                 if os.path.exists(full_path):
                     with open(full_path, "rb") as f:
@@ -187,7 +186,7 @@ async def scrape():
                             ext = ".webp"
                         filename = safe_filename(name) + ext
                         full_path = os.path.join(LOGO_DIR, filename)
-                        rel_path = os.path.relpath(full_path, WEB_DIR)
+                        rel_path = os.path.relpath(full_path, SCRIPT_DIR)
 
                         with open(full_path, "wb") as f:
                             f.write(img_data)
