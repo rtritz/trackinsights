@@ -11,6 +11,8 @@ from ..queries import (
     get_percentiles_report,
     get_sectional_event_trends_options,
     get_sectional_event_trends,
+    get_hypothetical_ranking_options,
+    get_hypothetical_result_rankings,
 )
 
 
@@ -165,4 +167,47 @@ def api_sectional_trends():
         return jsonify(payload)
     except Exception as exc:
         return jsonify({'error': str(exc)}), 500
+
+
+@api_bp.route('/hypothetical-rank/options')
+def api_hypothetical_rank_options():
+    """Return filter options for the hypothetical athlete query."""
+    try:
+        data = get_hypothetical_ranking_options()
+        return jsonify(data)
+    except RuntimeError as exc:
+        return jsonify({'error': str(exc)}), 500
+
+
+@api_bp.route('/hypothetical-rank')
+def api_hypothetical_rank():
+    """Return ranking data for a hypothetical performance."""
+    event = request.args.get('event', '').strip()
+    time = request.args.get('time', '').strip()
+    gender = request.args.get('gender', '').strip()
+    year = request.args.get('year', type=int)
+    meet_type = request.args.get('meet_type', 'Sectional').strip()
+    enrollment = request.args.get('enrollment', type=int)
+    grade_level = request.args.get('grade_level', '').strip() or None
+
+    if not event or not time or not gender or not year:
+        return jsonify({'error': 'event, time, gender, and year are required'}), 400
+
+    try:
+        data = get_hypothetical_result_rankings(
+            event_name=event,
+            performance_input=time,
+            gender=gender,
+            year=year,
+            meet_type=meet_type,
+            enrollment=enrollment,
+            grade_level=grade_level,
+        )
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
+
+    if not data:
+        return jsonify({'error': 'No data found for the given parameters'}), 404
+
+    return jsonify(data)
 
