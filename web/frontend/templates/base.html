@@ -166,7 +166,7 @@
   </style>
 
   
-  <nav class="navbar fixed top-0 md:top-3 left-0 right-0 w-screen max-w-screen px-3 sm:px-5 md:px-10 z-50 bg-white shadow-md md:bg-transparent md:shadow-none navbar-mobile-pad" aria-label="Primary">
+  <nav class="navbar fixed top-0 left-0 right-0 w-screen max-w-screen px-3 sm:px-5 z-50 bg-white shadow-md md:bg-transparent md:shadow-none md:pointer-events-none navbar-mobile-pad" aria-label="Primary" style="--nav-top-desktop: 0.75rem;">
     <div class="flex w-full items-center justify-center relative md:hidden min-w-0">
       <a href="{{ url_for('main.home') }}" class="font-impact italic text-primary text-3xl font-bold tracking-wide truncate">Track Insights</a>
       <div class="flex items-center gap-2 shrink-0 absolute right-0">
@@ -187,8 +187,8 @@
         </button>
       </div>
     </div>
-    <div class="navbar-end hidden md:flex w-full gap-2 sm:gap-3 relative overflow-visible justify-end">
-      <a href="{{ url_for('main.home') }}" aria-label="Home" class="nav-pill">
+    <div class="desktop-nav hidden md:flex w-full gap-2 sm:gap-3 relative overflow-visible justify-end pointer-events-none" style="padding-left: 2.5rem; padding-right: 2.5rem; padding-top: var(--nav-top-desktop);">
+      <a href="{{ url_for('main.home') }}" aria-label="Home" class="nav-pill pointer-events-auto">
         <span class="nav-pill__icon-bubble" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="nav-pill__icon" aria-hidden="true"
             focusable="false">
@@ -198,7 +198,7 @@
         </span>
         <span class="nav-pill__label">Home</span>
       </a>
-      <div id="nav-search-pill" class="search-pill" data-open="false" role="button" tabindex="0"
+      <div id="nav-search-pill" class="search-pill pointer-events-auto" data-open="false" role="button" tabindex="0"
         aria-expanded="false" aria-controls="nav-search-results">
         <span class="search-pill__icon-bubble" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -222,7 +222,7 @@
           </button>
         </div>
       </div>
-      <a href="{{ url_for('main.queries_page') }}" id="queries-toggle" aria-label="Queries" class="nav-pill">
+      <a href="{{ url_for('main.queries_page') }}" id="queries-toggle" aria-label="Queries" class="nav-pill pointer-events-auto">
         <span class="nav-pill__icon-bubble" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" class="nav-pill__icon" fill="currentColor"
             aria-hidden="true" focusable="false">
@@ -232,7 +232,7 @@
         </span>
         <span class="nav-pill__label">Queries</span>
       </a>
-      <a href="{{ url_for('main.about') }}" id="about-toggle" aria-label="About" class="nav-pill">
+      <a href="{{ url_for('main.about') }}" id="about-toggle" aria-label="About" class="nav-pill pointer-events-auto">
         <span class="nav-pill__icon-bubble" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="nav-pill__icon" aria-hidden="true"
             focusable="false">
@@ -243,7 +243,7 @@
         </span>
         <span class="nav-pill__label">About</span>
       </a>
-      <div id="nav-search-results" class="search-results-panel text-base-content"></div>
+      <div id="nav-search-results" class="search-results-panel text-base-content pointer-events-auto"></div>
     </div>
   </nav>
   <div id="mobile-nav-overlay"
@@ -266,20 +266,20 @@
 
   <style>
     /* Shared navbar button sizing */
-    .navbar-end {
+    .desktop-nav {
       --nav-pill-size: 3.2rem;
       --nav-icon-size: 2rem;
     }
 
     @media (min-width: 768px) {
-      .navbar-end {
+      .desktop-nav {
         --nav-pill-size: 3.4rem;
         --nav-icon-size: 2.1rem;
       }
     }
 
     @media (max-width: 640px) {
-      .navbar-end {
+      .desktop-nav {
         --nav-pill-size: 3rem;
         --nav-icon-size: 1.85rem;
       }
@@ -664,7 +664,7 @@
       const resultsPanel = document.getElementById('nav-search-results');
       const queriesButton = document.getElementById('queries-toggle');
       const aboutButton = document.getElementById('about-toggle');
-      const navbarEnd = document.querySelector('.navbar-end');
+      const navbarEnd = document.querySelector('.desktop-nav');
       const mobileNavToggle = document.getElementById('mobile-nav-toggle');
       const mobileNavOverlay = document.getElementById('mobile-nav-overlay');
       const mobileNavClose = document.getElementById('mobile-nav-close');
