@@ -40,7 +40,7 @@
         <!-- Header Section -->
         <div
             class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 mb-6 sm:mb-8 shadow-lg">
-            <div class="flex flex-col gap-4">
+            <div class="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
                 <div class="w-full">
                     <h1 id="athlete-name"
                         class="font-impact italic text-primary text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2 break-words">
@@ -59,6 +59,13 @@
                         </button>
                         <span id="share-dashboard-status" class="text-xs text-gray-600" aria-live="polite"></span>
                     </div>
+                </div>
+                <!-- School Logo -->
+                <div id="school-logo-container" class="hidden flex-shrink-0">
+                    <a id="school-logo-link" href="#">
+                        <img id="school-logo" src="" alt="School logo"
+                            class="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 object-contain rounded-xl bg-white p-1 shadow-md" />
+                    </a>
                 </div>
             </div>
         </div>
@@ -362,6 +369,22 @@
                 schoolEl.removeAttribute('href');
                 schoolEl.style.textDecoration = 'none';
                 schoolEl.style.cursor = 'default';
+            }
+
+            // Show school logo if available
+            if (data.athlete.logo_url) {
+                const logoImg = document.getElementById('school-logo');
+                const logoContainer = document.getElementById('school-logo-container');
+                const logoLink = document.getElementById('school-logo-link');
+                logoImg.src = data.athlete.logo_url;
+                logoImg.alt = (data.athlete.school || 'School') + ' logo';
+                if (data.athlete.school_id) {
+                    logoLink.href = `/school-dashboard/${data.athlete.school_id}`;
+                } else {
+                    logoLink.removeAttribute('href');
+                    logoLink.style.cursor = 'default';
+                }
+                logoContainer.classList.remove('hidden');
             }
 
             // Set gender badge
