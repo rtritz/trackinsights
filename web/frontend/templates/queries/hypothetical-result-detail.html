@@ -295,6 +295,7 @@
 
       configs.forEach((config, index) => {
         const rankingData = rankings[config.key];
+        if (!rankingData && config.key !== 'overall') return;
         const card = document.createElement('div');
         card.className = 'card bg-white border border-base-200 shadow-sm overflow-hidden';
 
@@ -374,8 +375,12 @@
     }
 
     function buildLeaderboardTable(entries) {
+      const INITIAL_LIMIT = 10;
       const wrapper = document.createElement('div');
-      wrapper.className = 'overflow-x-auto';
+      wrapper.className = 'space-y-3';
+
+      const tableWrapper = document.createElement('div');
+      tableWrapper.className = 'overflow-x-auto';
 
       const table = document.createElement('table');
       table.className = 'table table-compact w-full text-sm sm:text-base';
@@ -392,38 +397,96 @@
       table.appendChild(thead);
 
       const tbody = document.createElement('tbody');
-      entries.forEach(entry => {
-        const tr = document.createElement('tr');
-        const rowBaseClass = 'transition-colors duration-150 hover:bg-primary/5';
-        tr.className = entry.is_target
-          ? `${rowBaseClass} bg-primary/10 text-primary font-semibold`
-          : rowBaseClass;
 
-        const rankTd = document.createElement('td');
-        rankTd.textContent = entry.rank;
-        rankTd.className = 'text-sm sm:text-base';
-        tr.appendChild(rankTd);
+      // Find target entry index
+      const targetIndex = entries.findIndex(e => e.is_target);
+      const targetInInitial = targetIndex >= 0 && targetIndex < INITIAL_LIMIT;
 
-        const nameTd = document.createElement('td');
-        nameTd.className = 'text-sm sm:text-base';
-        nameTd.textContent = entry.name || '—';
-        tr.appendChild(nameTd);
+      let showAll = entries.length <= INITIAL_LIMIT;
 
-        const schoolTd = document.createElement('td');
-        schoolTd.className = 'hidden sm:table-cell text-sm sm:text-base';
-        schoolTd.textContent = entry.school || '—';
-        tr.appendChild(schoolTd);
+      const renderRows = () => {
+        tbody.innerHTML = '';
+        const visibleEntries = showAll ? entries : entries.slice(0, INITIAL_LIMIT);
 
-        const resultTd = document.createElement('td');
-        resultTd.className = 'text-sm sm:text-base';
-        resultTd.textContent = entry.result || '—';
-        tr.appendChild(resultTd);
+        // If not showing all and target is outside initial, add it at the end
+        const displayEntries = [...visibleEntries];
+        if (!showAll && !targetInInitial && targetIndex >= 0) {
+          const targetEntry = entries[targetIndex];
+          if (!displayEntries.includes(targetEntry)) {
+            displayEntries.push({ _separator: true });
+            displayEntries.push(targetEntry);
+          }
+        }
 
-        tbody.appendChild(tr);
-      });
+        displayEntries.forEach(entry => {
+          if (entry._separator) {
+            const tr = document.createElement('tr');
+            tr.className = 'border-t-2 border-dashed border-base-300';
+            const td = document.createElement('td');
+            td.colSpan = 4;
+            td.className = 'text-center text-xs text-gray-400 py-1';
+            td.textContent = '···';
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+            return;
+          }
 
+          const tr = document.createElement('tr');
+          const rowBaseClass = 'transition-colors duration-150 hover:bg-primary/5';
+          tr.className = entry.is_target
+            ? `${rowBaseClass} bg-primary/10 text-primary font-semibold`
+            : rowBaseClass;
+
+          const rankTd = document.createElement('td');
+          rankTd.textContent = entry.rank;
+          rankTd.className = 'text-sm sm:text-base';
+          tr.appendChild(rankTd);
+
+          const nameTd = document.createElement('td');
+          nameTd.className = 'text-sm sm:text-base';
+          nameTd.textContent = entry.name || '—';
+          tr.appendChild(nameTd);
+
+          const schoolTd = document.createElement('td');
+          schoolTd.className = 'hidden sm:table-cell text-sm sm:text-base';
+          schoolTd.textContent = entry.school || '—';
+          tr.appendChild(schoolTd);
+
+          const resultTd = document.createElement('td');
+          resultTd.className = 'text-sm sm:text-base';
+          resultTd.textContent = entry.result || '—';
+          tr.appendChild(resultTd);
+
+          tbody.appendChild(tr);
+        });
+      };
+
+      renderRows();
       table.appendChild(tbody);
-      wrapper.appendChild(table);
+      tableWrapper.appendChild(table);
+      wrapper.appendChild(tableWrapper);
+
+      // Add Show More / Show Less button if there are more entries
+      if (entries.length > INITIAL_LIMIT) {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'btn btn-sm btn-ghost text-primary';
+        const updateBtnText = () => {
+          toggleBtn.textContent = showAll
+            ? 'Show top 10'
+            : `Show all ${entries.length} results`;
+        };
+        updateBtnText();
+
+        toggleBtn.addEventListener('click', () => {
+          showAll = !showAll;
+          renderRows();
+          updateBtnText();
+        });
+
+        wrapper.appendChild(toggleBtn);
+      }
+
       return wrapper;
     }
 
