@@ -212,9 +212,9 @@
         }
       }
 
-      performanceInput.disabled = true;
-      performanceInput.value = '';
-      performanceHint.textContent = 'Select an event first';
+      // Auto-select first event
+      const firstEventChip = eventGroup.querySelector('button');
+      if (firstEventChip) firstEventChip.click();
       validateForm();
     }
 
@@ -236,11 +236,17 @@
       for (const y of options.years) {
         yearGroup.appendChild(createChip(String(y), String(y), yearGroup, 'year'));
       }
+      // Auto-select first year
+      const firstYearChip = yearGroup.querySelector('button');
+      if (firstYearChip) firstYearChip.click();
 
       // Render meet type chips
       for (const mt of options.meet_types) {
         meetTypeGroup.appendChild(createChip(mt, mt, meetTypeGroup, 'meetType'));
       }
+      // Auto-select first meet type
+      const firstMeetTypeChip = meetTypeGroup.querySelector('button');
+      if (firstMeetTypeChip) firstMeetTypeChip.click();
 
       // Render grade level chips (optional, toggleable)
       for (const gl of GRADE_LEVELS) {
