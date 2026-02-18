@@ -24,14 +24,14 @@
 
     <!-- Dashboard Content -->
     <div id="dashboard-content" class="hidden max-w-6xl mx-auto" data-school-id="{{ school_id }}">
-        <a href="{{ url_for('main.home') }}"
-            class="fixed top-5 md:top-7 left-4 sm:left-5 md:left-10 z-[70] h-8 w-8 md:h-10 md:w-10 inline-flex items-center justify-center rounded-full border-2 border-[#8c0327] text-white bg-[#8c0327] shadow-md hover:bg-[#6b0220] transition-colors">
+        <button onclick="history.back()"
+            class="fixed top-5 md:top-7 left-4 sm:left-5 md:left-10 z-[70] h-8 w-8 md:h-10 md:w-10 inline-flex items-center justify-center rounded-full border-2 border-[#8c0327] text-white bg-[#8c0327] shadow-md hover:bg-[#6b0220] transition-colors cursor-pointer">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd"
                     d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
                     clip-rule="evenodd" />
             </svg>
-        </a>
+        </button>
 
         <!-- Header Section -->
         <div class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 mb-6 sm:mb-8 shadow-lg">
@@ -62,38 +62,29 @@
             </div>
         </div>
 
-        <!-- Cumulative Points Section -->
-        <div class="mb-6 sm:mb-8">
-            <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
-                Cumulative Points
-                <span class="text-sm">(Playoff Meets, 2023 to Present)</span>
-            </h2>
-            <div id="cumulative-points-container" class="space-y-6">
-            </div>
+        <!-- Global Gender Toggle -->
+        <div class="mb-6 sm:mb-8 flex items-center justify-center">
+            <div id="global-gender-toggle" class="relative inline-flex items-center"></div>
         </div>
 
-        <!-- Avg Place at Meets Section -->
+        <!-- Team Stats Section -->
         <div class="mb-6 sm:mb-8">
             <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
-                Average Place
-                <span class="text-sm">(Last 3 Years, Finals Only)</span>
+                Team Stats
+                <span class="text-sm">(Playoff Meets, 2023 to Present)</span>
             </h2>
-            <div id="avg-places-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <div id="team-stats-container" class="space-y-6">
             </div>
         </div>
 
         <!-- School Percentiles Section (includes records) -->
         <div class="mb-6 sm:mb-8">
             <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
-                School Records & Percentiles
-                <span class="text-sm">(Best Mark vs. State)</span>
+                Best Marks
             </h2>
 
             <!-- Year Toggle -->
-            <div id="percentiles-year-toggle" class="flex flex-wrap gap-2 mb-3"></div>
-
-            <!-- Gender Toggle -->
-            <div id="percentiles-gender-toggle" class="flex gap-2 mb-4"></div>
+            <div id="percentiles-year-toggle" class="flex flex-wrap gap-2 mb-4"></div>
 
             <div id="school-percentiles-container" class="overflow-x-auto">
             </div>
@@ -104,9 +95,6 @@
             <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
                 Roster
             </h2>
-
-            <!-- Gender Toggle -->
-            <div id="roster-gender-toggle" class="flex gap-2 mb-4"></div>
 
             <!-- Search within roster -->
             <div class="mb-4">
@@ -238,6 +226,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     ];
     const eventRank = (e) => { const i = EVENT_ORDER.indexOf(e); return i >= 0 ? i : 999; };
 
+    // ── Global gender state ──
+    let currentGlobalGender = null;
+
     try {
         const resp = await fetch(`/api/schools/${schoolId}/dashboard`);
         if (!resp.ok) throw new Error('School not found');
@@ -268,113 +259,97 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         const enrollBadge = document.getElementById('school-enrollment-badge');
         if (data.school.enrollment) {
-            enrollBadge.textContent = `Enrollment: ${data.school.enrollment.toLocaleString()}`;
+            const yearSuffix = data.school.enrollment_year ? ` (${data.school.enrollment_year})` : '';
+            enrollBadge.textContent = `Enrollment: ${data.school.enrollment.toLocaleString()}${yearSuffix}`;
         } else {
             enrollBadge.classList.add('hidden');
         }
 
-        // ── Cumulative Points ──
-        const pointsContainer = document.getElementById('cumulative-points-container');
+        // ── Collect all genders from the data ──
         const cumulativePoints = data.cumulative_points || {};
-        const pointsGenders = Object.keys(cumulativePoints).sort();
-
-        if (pointsGenders.length === 0) {
-            pointsContainer.innerHTML = '<p class="text-gray-500 italic">No playoff scoring data available.</p>';
-        } else {
-            pointsGenders.forEach(gender => {
-                const gd = cumulativePoints[gender];
-                const card = document.createElement('div');
-                card.className = 'rounded-3xl border border-gray-200 bg-gray-50/80 p-4 sm:p-6 shadow-sm';
-
-                const genderColor = gender === 'Boys' ? 'text-blue-600' : gender === 'Girls' ? 'text-pink-600' : 'text-gray-700';
-
-                let tableHTML = `
-                    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                        <h3 class="text-xl font-black text-gray-900">${esc(gender)}</h3>
-                        <span class="text-2xl font-extrabold ${genderColor}">${gd.grand_total} pts</span>
-                    </div>
-                    <div class="overflow-x-auto">
-                    <table class="table table-compact sm:table-normal w-full text-sm">
-                        <thead>
-                            <tr class="text-primary text-xs sm:text-sm uppercase">
-                                <th>Season</th>
-                                <th>Sectional</th>
-                                <th>Regional</th>
-                                <th>State</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
-
-                gd.yearly.forEach(yr => {
-                    tableHTML += `
-                            <tr class="hover:bg-primary/5">
-                                <td class="font-semibold">${yr.year}</td>
-                                <td>${yr.sectional || '–'}</td>
-                                <td>${yr.regional || '–'}</td>
-                                <td>${yr.state || '–'}</td>
-                                <td class="font-bold">${yr.total}</td>
-                            </tr>`;
-                });
-
-                tableHTML += `</tbody></table></div>`;
-                card.innerHTML = tableHTML;
-                pointsContainer.appendChild(card);
-            });
-        }
-
-        // ── Average Place at Meets ──
-        const avgContainer = document.getElementById('avg-places-container');
-        const avgPlaces = data.avg_places || {};
-        const avgGenders = Object.keys(avgPlaces).sort();
-
-        if (avgGenders.length === 0) {
-            avgContainer.innerHTML = '<p class="text-gray-500 italic col-span-2">No placement data available.</p>';
-        } else {
-            avgGenders.forEach(gender => {
-                const gd = avgPlaces[gender];
-                const card = document.createElement('div');
-                card.className = 'rounded-3xl border border-gray-200 bg-gray-50/80 p-4 sm:p-6 shadow-sm';
-
-                const stages = ['sectional', 'regional', 'state'];
-                let inner = `<h3 class="text-xl font-black text-gray-900 mb-4">${esc(gender)}</h3>`;
-                inner += '<div class="grid grid-cols-3 gap-4">';
-
-                stages.forEach(stage => {
-                    const info = gd[stage];
-                    const label = stage.charAt(0).toUpperCase() + stage.slice(1);
-                    if (info) {
-                        inner += `
-                            <div class="text-center">
-                                <div class="text-3xl font-extrabold text-primary">${info.avg_place}</div>
-                                <div class="text-xs text-gray-500 uppercase tracking-wide mt-1">${label}</div>
-                                <div class="text-[11px] text-gray-400">${info.count} entries</div>
-                            </div>`;
-                    } else {
-                        inner += `
-                            <div class="text-center">
-                                <div class="text-3xl font-extrabold text-gray-300">–</div>
-                                <div class="text-xs text-gray-500 uppercase tracking-wide mt-1">${label}</div>
-                            </div>`;
-                    }
-                });
-
-                inner += '</div>';
-                card.innerHTML = inner;
-                avgContainer.appendChild(card);
-            });
-        }
-
-        // ── School Percentiles (with year selector) ──
-        const percYearToggle = document.getElementById('percentiles-year-toggle');
-        const percToggle = document.getElementById('percentiles-gender-toggle');
-        const percContainer = document.getElementById('school-percentiles-container');
-        const percentileYears = data.percentile_years || [];
+        const roster = data.roster || [];
         let currentPercData = (data.school_percentiles || []).slice().sort((a, b) => eventRank(a.event) - eventRank(b.event));
-        let currentPercGender = null;
+        const percentileYears = data.percentile_years || [];
 
+        const allGenders = new Set([
+            ...Object.keys(cumulativePoints),
+            ...roster.map(a => a.gender),
+            ...currentPercData.map(p => p.gender)
+        ]);
+        const genderOptions = [...allGenders].sort();
+
+        // ── Containers ──
+        const teamStatsContainer = document.getElementById('team-stats-container');
+        const percYearToggle = document.getElementById('percentiles-year-toggle');
+        const percContainer = document.getElementById('school-percentiles-container');
+        const rosterContainer = document.getElementById('roster-container');
+        const rosterSearch = document.getElementById('roster-search');
+
+        // ── Render Team Stats (combined points + avg place) ──
+        const renderTeamStats = (gender) => {
+            teamStatsContainer.innerHTML = '';
+            const gd = cumulativePoints[gender];
+            if (!gd) {
+                teamStatsContainer.innerHTML = '<p class="text-gray-500 italic">No playoff scoring data available.</p>';
+                return;
+            }
+
+            const card = document.createElement('div');
+            card.className = 'rounded-3xl border border-gray-200 bg-gray-50/80 p-4 sm:p-6 shadow-sm';
+
+            const genderColor = gender === 'Boys' ? 'text-blue-600' : gender === 'Girls' ? 'text-pink-600' : 'text-gray-700';
+
+            let tableHTML = `
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <span class="text-2xl font-extrabold ${genderColor}">${gd.grand_total} pts total</span>
+                </div>
+                <div class="overflow-x-auto">
+                <table class="table table-compact sm:table-normal w-full text-sm">
+                    <thead>
+                        <tr class="text-primary text-xs sm:text-sm uppercase border-b-2 border-primary/20">
+                            <th rowspan="2" class="align-bottom">Year</th>
+                            <th colspan="2" class="text-center border-l border-gray-200">Sectional</th>
+                            <th colspan="2" class="text-center border-l border-gray-200">Regional</th>
+                            <th colspan="2" class="text-center border-l border-gray-200">State</th>
+                        </tr>
+                        <tr class="text-gray-500 text-[10px] sm:text-xs uppercase">
+                            <th class="border-l border-gray-200">Points</th>
+                            <th>Team Place</th>
+                            <th class="border-l border-gray-200">Points</th>
+                            <th>Team Place</th>
+                            <th class="border-l border-gray-200">Points</th>
+                            <th>Team Place</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+            gd.yearly.forEach(yr => {
+                const fmtTeamPlace = (data) => {
+                    if (!data || data.team_rank === null || data.team_rank === undefined) return '–';
+                    const avgPlaceStr = data.avg_place !== null ? ` <span class="text-[10px] text-gray-400">(avg ${data.avg_place})</span>` : '';
+                    return `${ordinal(data.team_rank)}/${data.total_teams}${avgPlaceStr}`;
+                };
+                const fmtPts = (data) => (data && data.points) ? data.points : '–';
+
+                tableHTML += `
+                        <tr class="hover:bg-primary/5">
+                            <td class="font-semibold">${yr.year}</td>
+                            <td class="border-l border-gray-100">${fmtPts(yr.sectional)}</td>
+                            <td>${fmtTeamPlace(yr.sectional)}</td>
+                            <td class="border-l border-gray-100">${fmtPts(yr.regional)}</td>
+                            <td>${fmtTeamPlace(yr.regional)}</td>
+                            <td class="border-l border-gray-100">${fmtPts(yr.state)}</td>
+                            <td>${fmtTeamPlace(yr.state)}</td>
+                        </tr>`;
+            });
+
+            tableHTML += `</tbody></table></div>`;
+            card.innerHTML = tableHTML;
+            teamStatsContainer.appendChild(card);
+        };
+
+        // ── Render Percentiles ──
         const renderPercentiles = (gender) => {
-            currentPercGender = gender;
             const filtered = currentPercData.filter(p => p.gender === gender);
             if (filtered.length === 0) {
                 percContainer.innerHTML = '<p class="text-gray-500 italic">No percentile data available.</p>';
@@ -387,17 +362,15 @@ document.addEventListener('DOMContentLoaded', async function () {
                         <tr class="text-primary text-xs sm:text-sm uppercase">
                             <th>Event</th>
                             <th>Mark</th>
-                            <th>Record Holder</th>
-                            <th>Year</th>
+                            <th>Athlete</th>
+                            <th>Season</th>
                             <th>Percentile</th>
-                            <th></th>
                         </tr>
                     </thead>
                     <tbody>`;
 
             filtered.forEach(p => {
-                const pctValue = p.state_percentile;
-                const barColor = pctValue >= 90 ? 'bg-yellow-400' : pctValue >= 70 ? 'bg-green-400' : pctValue >= 40 ? 'bg-blue-400' : 'bg-gray-300';
+                const percentile = p.state_percentile || 0;
                 const relayBadge = p.is_relay ? ' <span class="badge badge-xs badge-outline">Relay</span>' : '';
                 const holderLink = p.holder_id
                     ? `<a href="/athlete-dashboard/${p.holder_id}" class="text-primary font-semibold underline decoration-solid underline-offset-2 hover:text-primary/80">${esc(p.holder)}</a>`
@@ -409,10 +382,14 @@ document.addEventListener('DOMContentLoaded', async function () {
                             <td class="font-mono">${esc(p.school_best)}</td>
                             <td>${holderLink}</td>
                             <td>${p.year || '–'}</td>
-                            <td class="font-bold">${pctValue}%</td>
-                            <td class="w-32">
-                                <div class="h-2 bg-base-200 rounded-full overflow-hidden">
-                                    <div class="h-full ${barColor} rounded-full transition-all" style="width: ${pctValue}%"></div>
+                            <td class="w-36">
+                                <div class="relative group cursor-pointer">
+                                    <div class="h-3 bg-base-200 rounded-full overflow-hidden">
+                                        <div class="h-full rounded-full transition-all" style="width: ${percentile}%; background: linear-gradient(to right, #8c0327, #b0042f);"></div>
+                                    </div>
+                                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                                        ${percentile}%
+                                    </div>
                                 </div>
                             </td>
                         </tr>`;
@@ -431,25 +408,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 const resp = await fetch(url);
                 if (!resp.ok) throw new Error('Failed to load percentiles');
                 currentPercData = (await resp.json()).sort((a, b) => eventRank(a.event) - eventRank(b.event));
-                const newGenders = [...new Set(currentPercData.map(p => p.gender))].sort();
-
-                // Rebuild gender toggle for the new data
-                if (newGenders.length > 0) {
-                    createGenderToggle(percToggle, newGenders, renderPercentiles);
-                    // Re-select previous gender if still available, else first
-                    const selectedGender = newGenders.includes(currentPercGender) ? currentPercGender : newGenders[0];
-                    // Activate the right button
-                    percToggle.querySelectorAll('button').forEach(b => {
-                        const active = b.dataset.gender === selectedGender;
-                        b.classList.toggle('btn-primary', active);
-                        b.classList.toggle('text-white', active);
-                        b.classList.toggle('btn-ghost', !active);
-                    });
-                    renderPercentiles(selectedGender);
-                } else {
-                    percToggle.innerHTML = '';
-                    percContainer.innerHTML = '<p class="text-gray-500 italic">No percentile data available.</p>';
-                }
+                renderPercentiles(currentGlobalGender);
             } catch (err) {
                 percContainer.innerHTML = '<p class="text-red-500 italic">Error loading percentiles.</p>';
             }
@@ -458,7 +417,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Build year toggle: "All" + each individual year
         if (percentileYears.length > 0) {
             const chipBase = 'btn btn-sm border border-base-300 rounded-full px-4 py-1.5 text-sm transition-all shadow-none hover:shadow-none';
-            const yearOptions = ['All', ...percentileYears];
+            const yearOptions = ['All-Time', ...percentileYears];
             let activeYear = 'All';
 
             yearOptions.forEach(yr => {
@@ -476,7 +435,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                         b.classList.toggle('text-white', active);
                         b.classList.toggle('btn-ghost', !active);
                     });
-                    loadPercentilesForYear(yr === 'All' ? 'all' : yr);
+                    loadPercentilesForYear(yr === 'All-Time' ? 'all' : yr);
                 });
                 percYearToggle.appendChild(btn);
             });
@@ -489,24 +448,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
         }
 
-        // Initial render with "All" data (already loaded from dashboard)
-        const percGenders = [...new Set(currentPercData.map(p => p.gender))].sort();
-        if (percGenders.length > 0) {
-            createGenderToggle(percToggle, percGenders, renderPercentiles);
-            renderPercentiles(percGenders[0]);
-        } else {
-            percContainer.innerHTML = '<p class="text-gray-500 italic">No percentile data available.</p>';
-        }
-
-        // ── Roster ──
-        const rosterToggle = document.getElementById('roster-gender-toggle');
-        const rosterContainer = document.getElementById('roster-container');
-        const rosterSearch = document.getElementById('roster-search');
-        const roster = data.roster || [];
-        const rosterGenders = [...new Set(roster.map(a => a.gender))].sort();
-
-        let currentRosterGender = rosterGenders[0] || null;
-
+        // ── Render Roster ──
         const renderRoster = (gender, searchFilter = '') => {
             let filtered = roster.filter(a => a.gender === gender);
             if (searchFilter) {
@@ -553,20 +495,80 @@ document.addEventListener('DOMContentLoaded', async function () {
             rosterContainer.innerHTML = html;
         };
 
-        if (rosterGenders.length > 0) {
-            createGenderToggle(rosterToggle, rosterGenders, (g) => {
-                currentRosterGender = g;
-                renderRoster(g, rosterSearch?.value || '');
-            });
-            renderRoster(rosterGenders[0]);
+        // ── Master render function ──
+        const renderAllSections = (gender) => {
+            currentGlobalGender = gender;
+            renderTeamStats(gender);
+            renderPercentiles(gender);
+            renderRoster(gender, rosterSearch?.value || '');
+        };
+
+        // ── Setup global gender toggle ──
+        const globalToggleContainer = document.getElementById('global-gender-toggle');
+        if (genderOptions.length === 2 && genderOptions.includes('Boys') && genderOptions.includes('Girls')) {
+            // Create minimalist text toggle with underline indicator
+            globalToggleContainer.innerHTML = `
+                <div class="flex items-center gap-1">
+                    <button type="button" data-gender="Boys" id="toggle-boys" 
+                        class="relative px-4 py-1 text-lg font-semibold transition-colors duration-200 text-primary cursor-pointer">
+                        Boys
+                        <span id="underline-boys" class="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 bg-primary rounded-full transition-all duration-300 w-3/4"></span>
+                    </button>
+                    <span class="text-gray-300 text-lg font-light">/</span>
+                    <button type="button" data-gender="Girls" id="toggle-girls"
+                        class="relative px-4 py-1 text-lg font-semibold transition-colors duration-200 text-gray-400 cursor-pointer">
+                        Girls
+                        <span id="underline-girls" class="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 bg-primary rounded-full transition-all duration-300 w-0"></span>
+                    </button>
+                </div>
+            `;
+            
+            const boysBtn = document.getElementById('toggle-boys');
+            const girlsBtn = document.getElementById('toggle-girls');
+            const underlineBoys = document.getElementById('underline-boys');
+            const underlineGirls = document.getElementById('underline-girls');
+            
+            const setGender = (gender) => {
+                if (gender === 'Boys') {
+                    boysBtn.classList.add('text-primary');
+                    boysBtn.classList.remove('text-gray-400');
+                    girlsBtn.classList.add('text-gray-400');
+                    girlsBtn.classList.remove('text-primary');
+                    underlineBoys.classList.remove('w-0');
+                    underlineBoys.classList.add('w-3/4');
+                    underlineGirls.classList.remove('w-3/4');
+                    underlineGirls.classList.add('w-0');
+                } else {
+                    girlsBtn.classList.add('text-primary');
+                    girlsBtn.classList.remove('text-gray-400');
+                    boysBtn.classList.add('text-gray-400');
+                    boysBtn.classList.remove('text-primary');
+                    underlineGirls.classList.remove('w-0');
+                    underlineGirls.classList.add('w-3/4');
+                    underlineBoys.classList.remove('w-3/4');
+                    underlineBoys.classList.add('w-0');
+                }
+                renderAllSections(gender);
+            };
+            
+            boysBtn.addEventListener('click', () => setGender('Boys'));
+            girlsBtn.addEventListener('click', () => setGender('Girls'));
+            
+            currentGlobalGender = 'Boys';
+            renderAllSections('Boys');
+        } else if (genderOptions.length > 0) {
+            createGenderToggle(globalToggleContainer, genderOptions, renderAllSections);
+            currentGlobalGender = genderOptions[0];
+            renderAllSections(genderOptions[0]);
         } else {
-            rosterContainer.innerHTML = '<p class="text-gray-500 italic">No athletes found.</p>';
+            globalToggleContainer.innerHTML = '<span class="text-gray-500 text-sm">No data available</span>';
         }
 
+        // ── Roster search input ──
         if (rosterSearch) {
             rosterSearch.addEventListener('input', () => {
-                if (currentRosterGender) {
-                    renderRoster(currentRosterGender, rosterSearch.value.trim());
+                if (currentGlobalGender) {
+                    renderRoster(currentGlobalGender, rosterSearch.value.trim());
                 }
             });
         }

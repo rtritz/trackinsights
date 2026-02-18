@@ -29,14 +29,14 @@
 
     <!-- Dashboard Content -->
     <div id="dashboard-content" class="hidden max-w-6xl mx-auto" data-athlete-id="{{ athlete_id }}">
-        <a href="{{ url_for('main.home') }}"
-            class="fixed top-5 md:top-7 left-4 sm:left-5 md:left-10 z-[70] h-8 w-8 md:h-10 md:w-10 inline-flex items-center justify-center rounded-full border-2 border-[#8c0327] text-white bg-[#8c0327] shadow-md hover:bg-[#6b0220] transition-colors">
+        <button onclick="history.back()"
+            class="fixed top-5 md:top-7 left-4 sm:left-5 md:left-10 z-[70] h-8 w-8 md:h-10 md:w-10 inline-flex items-center justify-center rounded-full border-2 border-[#8c0327] text-white bg-[#8c0327] shadow-md hover:bg-[#6b0220] transition-colors cursor-pointer">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd"
                     d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
                     clip-rule="evenodd" />
             </svg>
-        </a>
+        </button>
         <!-- Header Section -->
         <div
             class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 mb-6 sm:mb-8 shadow-lg">
