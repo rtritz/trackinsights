@@ -2387,9 +2387,11 @@ def get_school_dashboard_data(school_id: int):
 
     # Basic school info
     latest_enrollment = None
+    enrollment_year = None
     if school.enrollments:
         sorted_enrollments = sorted(school.enrollments, key=lambda e: e.year, reverse=True)
         latest_enrollment = sorted_enrollments[0].enrollment
+        enrollment_year = sorted_enrollments[0].year
 
     # Look up logo from the separate School_Logos.db
     logo_path = _get_school_logo_path(school.school_name)
@@ -2405,13 +2407,13 @@ def get_school_dashboard_data(school_id: int):
         "city": school.city,
         "school_type": school.school_type,
         "enrollment": latest_enrollment,
+        "enrollment_year": enrollment_year,
         "logo_url": logo_url,
     }
 
     roster = _build_school_roster(school_id)
     cumulative_points = _compute_cumulative_points(school_id)
     school_percentiles = _compute_school_percentiles(school_id)
-    avg_places = _compute_avg_places(school_id)
     percentile_years = _get_school_percentile_years(school_id)
 
     return {
@@ -2419,7 +2421,6 @@ def get_school_dashboard_data(school_id: int):
         "roster": roster,
         "cumulative_points": cumulative_points,
         "school_percentiles": school_percentiles,
-        "avg_places": avg_places,
         "percentile_years": percentile_years,
     }
 
@@ -2453,13 +2454,18 @@ def _build_school_roster(school_id: int):
 
 def _compute_cumulative_points(school_id: int):
     """
-    Compute cumulative points for a school across playoff meets from 2023+.
+    Compute cumulative points, team rankings, and average places for a school across playoff meets from 2023+.
     Points: 1st=10, 2nd=8, 3rd=6, 4th=5, 5th=4, 6th=3, 7th=2, 8th=1.
-    Returns dict keyed by gender, each containing yearly breakdown and totals.
+    Returns dict keyed by gender, each containing yearly breakdown with points, team rank, and avg places.
+    Team rank is relative to schools at the same meet (sectional/regional) or statewide (state).
     """
 
-    individual_rows = (
+    # First, get ALL schools' points for ranking purposes
+    # Include meet_id to differentiate between different sectionals/regionals
+    all_individual_rows = (
         db.session.query(
+            Athlete.school_id,
+            Meet.meet_id,
             Meet.year,
             Meet.gender,
             Meet.meet_type,
@@ -2468,18 +2474,20 @@ def _compute_cumulative_points(school_id: int):
         .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
         .join(Meet, AthleteResult.meet_id == Meet.meet_id)
         .filter(
-            Athlete.school_id == school_id,
             AthleteResult.result_type == "Final",
             AthleteResult.place.isnot(None),
             AthleteResult.place > 0,
+            AthleteResult.place <= 8,
             Meet.year >= MIN_RECORDS_YEAR,
             Meet.meet_type.in_(("Sectional", "Regional", "State")),
         )
         .all()
     )
 
-    relay_rows = (
+    all_relay_rows = (
         db.session.query(
+            RelayResult.school_id,
+            Meet.meet_id,
             Meet.year,
             Meet.gender,
             Meet.meet_type,
@@ -2487,41 +2495,84 @@ def _compute_cumulative_points(school_id: int):
         )
         .join(Meet, RelayResult.meet_id == Meet.meet_id)
         .filter(
-            RelayResult.school_id == school_id,
             RelayResult.place.isnot(None),
             RelayResult.place > 0,
+            RelayResult.place <= 8,
             Meet.year >= MIN_RECORDS_YEAR,
             Meet.meet_type.in_(("Sectional", "Regional", "State")),
         )
         .all()
     )
 
-    # {gender: {year: {meet_type: points}}}
-    points_data = {}
-    for rows in (individual_rows, relay_rows):
-        for year, gender, meet_type, place in rows:
+    # Build {meet_id: {school_id: {"points": int, "places": [int]}}}
+    # Also track meet metadata: {meet_id: (year, gender, meet_type)}
+    meet_school_stats = {}
+    meet_metadata = {}
+    for rows in (all_individual_rows, all_relay_rows):
+        for sid, meet_id, year, gender, meet_type, place in rows:
             pts = _PLACE_POINTS.get(place, 0)
-            if pts == 0:
-                continue
-            gender_data = points_data.setdefault(gender, {})
-            year_data = gender_data.setdefault(year, {})
-            year_data[meet_type] = year_data.get(meet_type, 0) + pts
+            if meet_id not in meet_school_stats:
+                meet_school_stats[meet_id] = {}
+                meet_metadata[meet_id] = (year, gender, meet_type)
+            if sid not in meet_school_stats[meet_id]:
+                meet_school_stats[meet_id][sid] = {"points": 0, "places": []}
+            meet_school_stats[meet_id][sid]["points"] += pts
+            meet_school_stats[meet_id][sid]["places"].append(place)
+
+    # Compute rankings for each meet
+    # {meet_id: {school_id: {"rank": int, "total_teams": int}}}
+    meet_rankings = {}
+    for meet_id, schools_data in meet_school_stats.items():
+        # Rank by points descending
+        sorted_schools = sorted(schools_data.items(), key=lambda x: -x[1]["points"])
+        rankings = {}
+        for rank, (sid, _) in enumerate(sorted_schools, start=1):
+            rankings[sid] = {"rank": rank, "total_teams": len(sorted_schools)}
+        meet_rankings[meet_id] = rankings
+
+    # Now extract data for the specific school
+    # Aggregate by (year, gender, meet_type) for display
+    stats_data = {}
+    for meet_id, schools_data in meet_school_stats.items():
+        if school_id not in schools_data:
+            continue
+        year, gender, meet_type = meet_metadata[meet_id]
+        school_stats = schools_data[school_id]
+        ranking_info = meet_rankings[meet_id].get(school_id, {})
+        
+        gender_data = stats_data.setdefault(gender, {})
+        year_data = gender_data.setdefault(year, {})
+        # For a given year/gender/meet_type, store the data
+        # (a school only competes at one sectional/regional per year/gender)
+        year_data[meet_type] = {
+            "points": school_stats["points"],
+            "places": school_stats["places"],
+            "team_rank": ranking_info.get("rank"),
+            "total_teams": ranking_info.get("total_teams"),
+        }
 
     result = {}
-    for gender, years_dict in points_data.items():
+    for gender, years_dict in stats_data.items():
         yearly = []
         total = 0
         for year in sorted(years_dict.keys(), reverse=True):
             meet_types = years_dict[year]
-            year_total = sum(meet_types.values())
+            year_total = sum(mt.get("points", 0) for mt in meet_types.values())
             total += year_total
-            yearly.append({
-                "year": year,
-                "sectional": meet_types.get("Sectional", 0),
-                "regional": meet_types.get("Regional", 0),
-                "state": meet_types.get("State", 0),
-                "total": year_total,
-            })
+            
+            year_entry = {"year": year, "total": year_total}
+            for mt_name in ("Sectional", "Regional", "State"):
+                mt_key = mt_name.lower()
+                mt_data = meet_types.get(mt_name, {})
+                places = mt_data.get("places", [])
+                year_entry[mt_key] = {
+                    "points": mt_data.get("points", 0),
+                    "avg_place": round(sum(places) / len(places), 1) if places else None,
+                    "entries": len(places),
+                    "team_rank": mt_data.get("team_rank"),
+                    "total_teams": mt_data.get("total_teams"),
+                }
+            yearly.append(year_entry)
         result[gender] = {"yearly": yearly, "grand_total": total}
 
     return result
@@ -2691,6 +2742,8 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
             "school_best": display_result,
             "school_best_raw": school_best_val,
             "state_percentile": max(percentile, 0),
+            "rank": better_or_equal,
+            "total_marks": total,
             "holder": info["holder"],
             "holder_id": info["holder_id"],
             "year": info["year"],
