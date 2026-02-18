@@ -7,14 +7,14 @@
       class="absolute inset-0 -z-10 mx-0 sm:mx-[-32px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none">
     </div>
     <div class="relative space-y-10">
-      <a href="{{ url_for('main.home') }}"
-        class="fixed top-5 md:top-7 left-4 sm:left-5 md:left-10 z-[70] h-8 w-8 md:h-10 md:w-10 inline-flex items-center justify-center rounded-full border-2 border-[#8c0327] text-white bg-[#8c0327] shadow-md hover:bg-[#6b0220] transition-colors">
+      <button onclick="history.back()"
+        class="fixed top-5 md:top-7 left-4 sm:left-5 md:left-10 z-[70] h-8 w-8 md:h-10 md:w-10 inline-flex items-center justify-center rounded-full border-2 border-[#8c0327] text-white bg-[#8c0327] shadow-md hover:bg-[#6b0220] transition-colors cursor-pointer">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd"
             d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
             clip-rule="evenodd" />
         </svg>
-      </a>
+      </button>
       <header class="text-center space-y-3">
         <h1 class="font-impact italic text-4xl sm:text-5xl text-primary">
           Explore Queries
