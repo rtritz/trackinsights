@@ -1,0 +1,581 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="min-h-screen bg-white pt-20 sm:pt-24 pb-24 sm:pb-32 px-2 sm:px-4">
+
+    <!-- Loading State -->
+    <div id="loading-state" class="flex flex-col items-center justify-center min-h-[60vh]">
+        <div class="loading loading-spinner loading-lg text-primary"></div>
+        <p class="mt-4 text-lg text-gray-600">Loading school data...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error-state" class="hidden">
+        <div class="flex flex-col items-center justify-center min-h-[60vh]">
+            <div class="text-center">
+                <h2 class="font-impact italic text-primary text-4xl md:text-5xl font-bold mb-4">
+                    School Not Found
+                </h2>
+                <p class="text-lg text-gray-600 mb-6">We couldn't find the school you're looking for.</p>
+                <a href="/" class="btn btn-primary rounded-full">Return Home</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div id="dashboard-content" class="hidden max-w-6xl mx-auto" data-school-id="{{ school_id }}">
+        <a href="{{ url_for('main.home') }}"
+            class="fixed top-5 md:top-7 left-4 sm:left-5 md:left-10 z-[70] h-8 w-8 md:h-10 md:w-10 inline-flex items-center justify-center rounded-full border-2 border-[#8c0327] text-white bg-[#8c0327] shadow-md hover:bg-[#6b0220] transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd"
+                    d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+                    clip-rule="evenodd" />
+            </svg>
+        </a>
+
+        <!-- Header Section -->
+        <div class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 mb-6 sm:mb-8 shadow-lg">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+                <div class="w-full">
+                    <h1 id="school-name"
+                        class="font-impact italic text-primary text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2 break-words">
+                        Loading...
+                    </h1>
+                    <div class="flex flex-wrap gap-2 sm:gap-3 items-center">
+                        <span id="school-city" class="text-base sm:text-lg md:text-xl text-gray-700 font-semibold break-words"></span>
+                        <span id="school-type-badge" class="badge badge-md sm:badge-lg badge-outline"></span>
+                        <span id="school-enrollment-badge" class="badge badge-md sm:badge-lg badge-outline"></span>
+                    </div>
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2 mt-3">
+                        <button type="button" id="copy-dashboard-link"
+                            class="btn btn-outline btn-primary btn-xs sm:btn-sm px-3 w-auto self-start">
+                            Copy share link
+                        </button>
+                        <span id="share-dashboard-status" class="text-xs text-gray-600" aria-live="polite"></span>
+                    </div>
+                </div>
+                <!-- School Logo -->
+                <div id="school-logo-container" class="hidden flex-shrink-0">
+                    <img id="school-logo" src="" alt="School logo"
+                        class="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 object-contain rounded-xl bg-white p-1 shadow-md" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Cumulative Points Section -->
+        <div class="mb-6 sm:mb-8">
+            <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
+                Cumulative Points
+                <span class="text-sm">(Playoff Meets, 2023 to Present)</span>
+            </h2>
+            <div id="cumulative-points-container" class="space-y-6">
+            </div>
+        </div>
+
+        <!-- Avg Place at Meets Section -->
+        <div class="mb-6 sm:mb-8">
+            <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
+                Average Place
+                <span class="text-sm">(Last 3 Years, Finals Only)</span>
+            </h2>
+            <div id="avg-places-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            </div>
+        </div>
+
+        <!-- School Percentiles Section (includes records) -->
+        <div class="mb-6 sm:mb-8">
+            <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
+                School Records & Percentiles
+                <span class="text-sm">(Best Mark vs. State)</span>
+            </h2>
+
+            <!-- Year Toggle -->
+            <div id="percentiles-year-toggle" class="flex flex-wrap gap-2 mb-3"></div>
+
+            <!-- Gender Toggle -->
+            <div id="percentiles-gender-toggle" class="flex gap-2 mb-4"></div>
+
+            <div id="school-percentiles-container" class="overflow-x-auto">
+            </div>
+        </div>
+
+        <!-- Athletes / Roster Section -->
+        <div class="mb-6 sm:mb-8">
+            <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
+                Roster
+            </h2>
+
+            <!-- Gender Toggle -->
+            <div id="roster-gender-toggle" class="flex gap-2 mb-4"></div>
+
+            <!-- Search within roster -->
+            <div class="mb-4">
+                <input type="text" id="roster-search" placeholder="Filter athletes..."
+                    class="input input-bordered input-sm w-full max-w-xs" />
+            </div>
+
+            <div id="roster-container" class="overflow-x-auto">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async function () {
+    const loadingState = document.getElementById('loading-state');
+    const errorState = document.getElementById('error-state');
+    const dashboardContent = document.getElementById('dashboard-content');
+    const schoolId = Number(dashboardContent?.dataset?.schoolId);
+    const shareButton = document.getElementById('copy-dashboard-link');
+    const shareStatus = document.getElementById('share-dashboard-status');
+
+    if (!Number.isFinite(schoolId) || schoolId <= 0) {
+        loadingState.classList.add('hidden');
+        errorState.classList.remove('hidden');
+        return;
+    }
+
+    // ── Clipboard helpers ──
+    const copyTextToClipboard = async (text) => {
+        const fallbackCopy = () => {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', 'true');
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                const ok = document.execCommand('copy');
+                document.body.removeChild(textarea);
+                return ok;
+            } catch { document.body.removeChild(textarea); return false; }
+        };
+        if (navigator?.clipboard?.writeText && window.isSecureContext) {
+            try { await navigator.clipboard.writeText(text); return true; }
+            catch { return fallbackCopy(); }
+        }
+        return fallbackCopy();
+    };
+
+    const setShareStatus = (msg, tone = 'muted') => {
+        if (!shareStatus) return;
+        shareStatus.textContent = msg;
+        shareStatus.classList.remove('text-green-600', 'text-red-600', 'text-gray-600');
+        shareStatus.classList.add('text-xs',
+            tone === 'success' ? 'text-green-600' : tone === 'error' ? 'text-red-600' : 'text-gray-600');
+    };
+
+    const resetShareButton = () => {
+        if (!shareButton) return;
+        shareButton.disabled = false;
+        shareButton.textContent = 'Copy share link';
+    };
+
+    if (shareButton) {
+        shareButton.addEventListener('click', async () => {
+            const url = window.location.href.split('#')[0];
+            shareButton.disabled = true;
+            const ok = await copyTextToClipboard(url);
+            shareButton.textContent = ok ? 'Link copied!' : 'Copy failed';
+            setShareStatus(ok ? 'Copied to clipboard' : 'Unable to copy link', ok ? 'success' : 'error');
+            setTimeout(resetShareButton, 1800);
+        });
+    }
+
+    // ── Escape HTML helper ──
+    const esc = (t) => { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
+
+    // ── Ordinal helper ──
+    const ordinal = (n) => {
+        const s = ['th', 'st', 'nd', 'rd'];
+        const v = n % 100;
+        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    };
+
+    // ── Gender toggle helper ──
+    const createGenderToggle = (container, genders, onSelect) => {
+        container.innerHTML = '';
+        const chipBase = 'btn btn-sm border border-base-300 rounded-full px-4 py-1.5 text-sm transition-all shadow-none hover:shadow-none';
+        let activeGender = genders[0] || null;
+
+        genders.forEach(g => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = chipBase;
+            btn.textContent = g;
+            btn.dataset.gender = g;
+            btn.addEventListener('click', () => {
+                activeGender = g;
+                container.querySelectorAll('button').forEach(b => {
+                    const active = b.dataset.gender === g;
+                    b.classList.toggle('btn-primary', active);
+                    b.classList.toggle('text-white', active);
+                    b.classList.toggle('btn-ghost', !active);
+                });
+                onSelect(g);
+            });
+            container.appendChild(btn);
+        });
+
+        // Auto-select first
+        if (genders.length) {
+            const first = container.querySelector('button');
+            if (first) {
+                first.classList.add('btn-primary', 'text-white');
+                first.classList.remove('btn-ghost');
+            }
+        }
+        return activeGender;
+    };
+
+    // ── EVENT GROUP ordering (consistent with other pages) ──
+    const EVENT_ORDER = [
+        '100 Meters', '200 Meters', '400 Meters', '800 Meters', '1600 Meters', '3200 Meters',
+        '100 Hurdles', '110 Hurdles', '300 Hurdles',
+        '4 x 100 Relay', '4 x 400 Relay', '4 x 800 Relay',
+        'High Jump', 'Long Jump', 'Pole Vault', 'Shot Put', 'Discus',
+    ];
+    const eventRank = (e) => { const i = EVENT_ORDER.indexOf(e); return i >= 0 ? i : 999; };
+
+    try {
+        const resp = await fetch(`/api/schools/${schoolId}/dashboard`);
+        if (!resp.ok) throw new Error('School not found');
+        const data = await resp.json();
+
+        loadingState.classList.add('hidden');
+        dashboardContent.classList.remove('hidden');
+
+        // ── Header ──
+        document.getElementById('school-name').textContent = data.school.name || 'Unknown School';
+        document.getElementById('school-city').textContent = data.school.city || '';
+
+        // Show school logo if available
+        if (data.school.logo_url) {
+            const logoImg = document.getElementById('school-logo');
+            const logoContainer = document.getElementById('school-logo-container');
+            logoImg.src = data.school.logo_url;
+            logoImg.alt = (data.school.name || 'School') + ' logo';
+            logoContainer.classList.remove('hidden');
+        }
+
+        const typeBadge = document.getElementById('school-type-badge');
+        if (data.school.school_type) {
+            typeBadge.textContent = data.school.school_type;
+        } else {
+            typeBadge.classList.add('hidden');
+        }
+
+        const enrollBadge = document.getElementById('school-enrollment-badge');
+        if (data.school.enrollment) {
+            enrollBadge.textContent = `Enrollment: ${data.school.enrollment.toLocaleString()}`;
+        } else {
+            enrollBadge.classList.add('hidden');
+        }
+
+        // ── Cumulative Points ──
+        const pointsContainer = document.getElementById('cumulative-points-container');
+        const cumulativePoints = data.cumulative_points || {};
+        const pointsGenders = Object.keys(cumulativePoints).sort();
+
+        if (pointsGenders.length === 0) {
+            pointsContainer.innerHTML = '<p class="text-gray-500 italic">No playoff scoring data available.</p>';
+        } else {
+            pointsGenders.forEach(gender => {
+                const gd = cumulativePoints[gender];
+                const card = document.createElement('div');
+                card.className = 'rounded-3xl border border-gray-200 bg-gray-50/80 p-4 sm:p-6 shadow-sm';
+
+                const genderColor = gender === 'Boys' ? 'text-blue-600' : gender === 'Girls' ? 'text-pink-600' : 'text-gray-700';
+
+                let tableHTML = `
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                        <h3 class="text-xl font-black text-gray-900">${esc(gender)}</h3>
+                        <span class="text-2xl font-extrabold ${genderColor}">${gd.grand_total} pts</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                    <table class="table table-compact sm:table-normal w-full text-sm">
+                        <thead>
+                            <tr class="text-primary text-xs sm:text-sm uppercase">
+                                <th>Season</th>
+                                <th>Sectional</th>
+                                <th>Regional</th>
+                                <th>State</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+                gd.yearly.forEach(yr => {
+                    tableHTML += `
+                            <tr class="hover:bg-primary/5">
+                                <td class="font-semibold">${yr.year}</td>
+                                <td>${yr.sectional || '–'}</td>
+                                <td>${yr.regional || '–'}</td>
+                                <td>${yr.state || '–'}</td>
+                                <td class="font-bold">${yr.total}</td>
+                            </tr>`;
+                });
+
+                tableHTML += `</tbody></table></div>`;
+                card.innerHTML = tableHTML;
+                pointsContainer.appendChild(card);
+            });
+        }
+
+        // ── Average Place at Meets ──
+        const avgContainer = document.getElementById('avg-places-container');
+        const avgPlaces = data.avg_places || {};
+        const avgGenders = Object.keys(avgPlaces).sort();
+
+        if (avgGenders.length === 0) {
+            avgContainer.innerHTML = '<p class="text-gray-500 italic col-span-2">No placement data available.</p>';
+        } else {
+            avgGenders.forEach(gender => {
+                const gd = avgPlaces[gender];
+                const card = document.createElement('div');
+                card.className = 'rounded-3xl border border-gray-200 bg-gray-50/80 p-4 sm:p-6 shadow-sm';
+
+                const stages = ['sectional', 'regional', 'state'];
+                let inner = `<h3 class="text-xl font-black text-gray-900 mb-4">${esc(gender)}</h3>`;
+                inner += '<div class="grid grid-cols-3 gap-4">';
+
+                stages.forEach(stage => {
+                    const info = gd[stage];
+                    const label = stage.charAt(0).toUpperCase() + stage.slice(1);
+                    if (info) {
+                        inner += `
+                            <div class="text-center">
+                                <div class="text-3xl font-extrabold text-primary">${info.avg_place}</div>
+                                <div class="text-xs text-gray-500 uppercase tracking-wide mt-1">${label}</div>
+                                <div class="text-[11px] text-gray-400">${info.count} entries</div>
+                            </div>`;
+                    } else {
+                        inner += `
+                            <div class="text-center">
+                                <div class="text-3xl font-extrabold text-gray-300">–</div>
+                                <div class="text-xs text-gray-500 uppercase tracking-wide mt-1">${label}</div>
+                            </div>`;
+                    }
+                });
+
+                inner += '</div>';
+                card.innerHTML = inner;
+                avgContainer.appendChild(card);
+            });
+        }
+
+        // ── School Percentiles (with year selector) ──
+        const percYearToggle = document.getElementById('percentiles-year-toggle');
+        const percToggle = document.getElementById('percentiles-gender-toggle');
+        const percContainer = document.getElementById('school-percentiles-container');
+        const percentileYears = data.percentile_years || [];
+        let currentPercData = (data.school_percentiles || []).slice().sort((a, b) => eventRank(a.event) - eventRank(b.event));
+        let currentPercGender = null;
+
+        const renderPercentiles = (gender) => {
+            currentPercGender = gender;
+            const filtered = currentPercData.filter(p => p.gender === gender);
+            if (filtered.length === 0) {
+                percContainer.innerHTML = '<p class="text-gray-500 italic">No percentile data available.</p>';
+                return;
+            }
+
+            let html = `
+                <table class="table table-compact sm:table-normal w-full text-sm">
+                    <thead>
+                        <tr class="text-primary text-xs sm:text-sm uppercase">
+                            <th>Event</th>
+                            <th>Mark</th>
+                            <th>Record Holder</th>
+                            <th>Year</th>
+                            <th>Percentile</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+            filtered.forEach(p => {
+                const pctValue = p.state_percentile;
+                const barColor = pctValue >= 90 ? 'bg-yellow-400' : pctValue >= 70 ? 'bg-green-400' : pctValue >= 40 ? 'bg-blue-400' : 'bg-gray-300';
+                const relayBadge = p.is_relay ? ' <span class="badge badge-xs badge-outline">Relay</span>' : '';
+                const holderLink = p.holder_id
+                    ? `<a href="/athlete-dashboard/${p.holder_id}" class="text-primary font-semibold underline decoration-solid underline-offset-2 hover:text-primary/80">${esc(p.holder)}</a>`
+                    : esc(p.holder || '–');
+
+                html += `
+                        <tr class="hover:bg-primary/5">
+                            <td class="font-semibold">${esc(p.event)}${relayBadge}</td>
+                            <td class="font-mono">${esc(p.school_best)}</td>
+                            <td>${holderLink}</td>
+                            <td>${p.year || '–'}</td>
+                            <td class="font-bold">${pctValue}%</td>
+                            <td class="w-32">
+                                <div class="h-2 bg-base-200 rounded-full overflow-hidden">
+                                    <div class="h-full ${barColor} rounded-full transition-all" style="width: ${pctValue}%"></div>
+                                </div>
+                            </td>
+                        </tr>`;
+            });
+
+            html += '</tbody></table>';
+            percContainer.innerHTML = html;
+        };
+
+        const loadPercentilesForYear = async (year) => {
+            percContainer.innerHTML = '<p class="text-gray-500 italic">Loading…</p>';
+            try {
+                const url = year === 'all'
+                    ? `/api/schools/${schoolId}/percentiles`
+                    : `/api/schools/${schoolId}/percentiles?year=${year}`;
+                const resp = await fetch(url);
+                if (!resp.ok) throw new Error('Failed to load percentiles');
+                currentPercData = (await resp.json()).sort((a, b) => eventRank(a.event) - eventRank(b.event));
+                const newGenders = [...new Set(currentPercData.map(p => p.gender))].sort();
+
+                // Rebuild gender toggle for the new data
+                if (newGenders.length > 0) {
+                    createGenderToggle(percToggle, newGenders, renderPercentiles);
+                    // Re-select previous gender if still available, else first
+                    const selectedGender = newGenders.includes(currentPercGender) ? currentPercGender : newGenders[0];
+                    // Activate the right button
+                    percToggle.querySelectorAll('button').forEach(b => {
+                        const active = b.dataset.gender === selectedGender;
+                        b.classList.toggle('btn-primary', active);
+                        b.classList.toggle('text-white', active);
+                        b.classList.toggle('btn-ghost', !active);
+                    });
+                    renderPercentiles(selectedGender);
+                } else {
+                    percToggle.innerHTML = '';
+                    percContainer.innerHTML = '<p class="text-gray-500 italic">No percentile data available.</p>';
+                }
+            } catch (err) {
+                percContainer.innerHTML = '<p class="text-red-500 italic">Error loading percentiles.</p>';
+            }
+        };
+
+        // Build year toggle: "All" + each individual year
+        if (percentileYears.length > 0) {
+            const chipBase = 'btn btn-sm border border-base-300 rounded-full px-4 py-1.5 text-sm transition-all shadow-none hover:shadow-none';
+            const yearOptions = ['All', ...percentileYears];
+            let activeYear = 'All';
+
+            yearOptions.forEach(yr => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = chipBase;
+                btn.textContent = yr;
+                btn.dataset.year = yr;
+                btn.addEventListener('click', () => {
+                    if (String(yr) === String(activeYear)) return;
+                    activeYear = yr;
+                    percYearToggle.querySelectorAll('button').forEach(b => {
+                        const active = String(b.dataset.year) === String(yr);
+                        b.classList.toggle('btn-primary', active);
+                        b.classList.toggle('text-white', active);
+                        b.classList.toggle('btn-ghost', !active);
+                    });
+                    loadPercentilesForYear(yr === 'All' ? 'all' : yr);
+                });
+                percYearToggle.appendChild(btn);
+            });
+
+            // Auto-select "All"
+            const firstBtn = percYearToggle.querySelector('button');
+            if (firstBtn) {
+                firstBtn.classList.add('btn-primary', 'text-white');
+                firstBtn.classList.remove('btn-ghost');
+            }
+        }
+
+        // Initial render with "All" data (already loaded from dashboard)
+        const percGenders = [...new Set(currentPercData.map(p => p.gender))].sort();
+        if (percGenders.length > 0) {
+            createGenderToggle(percToggle, percGenders, renderPercentiles);
+            renderPercentiles(percGenders[0]);
+        } else {
+            percContainer.innerHTML = '<p class="text-gray-500 italic">No percentile data available.</p>';
+        }
+
+        // ── Roster ──
+        const rosterToggle = document.getElementById('roster-gender-toggle');
+        const rosterContainer = document.getElementById('roster-container');
+        const rosterSearch = document.getElementById('roster-search');
+        const roster = data.roster || [];
+        const rosterGenders = [...new Set(roster.map(a => a.gender))].sort();
+
+        let currentRosterGender = rosterGenders[0] || null;
+
+        const renderRoster = (gender, searchFilter = '') => {
+            let filtered = roster.filter(a => a.gender === gender);
+            if (searchFilter) {
+                const q = searchFilter.toLowerCase();
+                filtered = filtered.filter(a => a.name.toLowerCase().includes(q));
+            }
+
+            if (filtered.length === 0) {
+                rosterContainer.innerHTML = '<p class="text-gray-500 italic">No athletes found.</p>';
+                return;
+            }
+
+            // Group by graduation year
+            const groups = {};
+            filtered.forEach(a => {
+                const yr = a.graduation_year || 'Unknown';
+                (groups[yr] = groups[yr] || []).push(a);
+            });
+
+            let html = '';
+            const sortedYears = Object.keys(groups).sort((a, b) => {
+                if (a === 'Unknown') return 1;
+                if (b === 'Unknown') return -1;
+                return Number(b) - Number(a);
+            });
+
+            sortedYears.forEach(yr => {
+                const label = yr === 'Unknown' ? 'Unknown Class' : `Class of ${yr}`;
+                html += `<h4 class="text-sm font-bold text-gray-600 uppercase tracking-wide mt-4 mb-2">${label} (${groups[yr].length})</h4>`;
+                html += '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">';
+                groups[yr].forEach(a => {
+                    html += `
+                        <a href="/athlete-dashboard/${a.athlete_id}"
+                           class="flex items-center gap-3 p-2 rounded-lg hover:bg-primary/5 transition-colors group">
+                            <div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                                ${esc(a.name.charAt(0))}
+                            </div>
+                            <span class="text-sm text-gray-800 group-hover:text-primary font-medium truncate">${esc(a.name)}</span>
+                        </a>`;
+                });
+                html += '</div>';
+            });
+
+            rosterContainer.innerHTML = html;
+        };
+
+        if (rosterGenders.length > 0) {
+            createGenderToggle(rosterToggle, rosterGenders, (g) => {
+                currentRosterGender = g;
+                renderRoster(g, rosterSearch?.value || '');
+            });
+            renderRoster(rosterGenders[0]);
+        } else {
+            rosterContainer.innerHTML = '<p class="text-gray-500 italic">No athletes found.</p>';
+        }
+
+        if (rosterSearch) {
+            rosterSearch.addEventListener('input', () => {
+                if (currentRosterGender) {
+                    renderRoster(currentRosterGender, rosterSearch.value.trim());
+                }
+            });
+        }
+
+    } catch (error) {
+        console.error('Error loading school data:', error);
+        loadingState.classList.add('hidden');
+        errorState.classList.remove('hidden');
+    }
+});
+</script>
+{% endblock %}
