@@ -2727,6 +2727,8 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
     If *year* is given, only results from that single season are
     considered (for both the school and statewide comparison).
     Otherwise all results since MIN_RECORDS_YEAR are used.
+    
+    OPTIMIZED: Pre-fetches all statewide bests in bulk queries instead of per-event.
     """
 
     year_filter = (Meet.year == year) if year else (Meet.year >= MIN_RECORDS_YEAR)
@@ -2812,64 +2814,97 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
                 "is_relay": True,
             }
 
-    # ── Merge individual + relay bests and compute percentiles ──
+    # ── Merge individual + relay bests ──
     all_bests = {}
     all_bests.update(indiv_best)
-    all_bests.update(relay_best)  # relay keys won't collide with indiv keys
+    all_bests.update(relay_best)
 
     if not all_bests:
         return []
 
+    # ── OPTIMIZATION: Pre-fetch ALL statewide individual bests in ONE query ──
+    indiv_events = [(e, g) for (e, g), info in all_bests.items() if not info["is_relay"]]
+    relay_events = [(e, g) for (e, g), info in all_bests.items() if info["is_relay"]]
+
+    # Structure: {(event, gender): [(athlete_id, best_mark), ...]}
+    statewide_indiv_bests = {}
+    statewide_relay_bests = {}
+
+    if indiv_events:
+        # Get all individual athlete bests grouped by event+gender in one query
+        all_indiv_rows = (
+            db.session.query(
+                AthleteResult.event,
+                Athlete.gender,
+                AthleteResult.athlete_id,
+                func.min(AthleteResult.result2).label("best_running"),
+                func.max(AthleteResult.result2).label("best_field"),
+                Event.event_type,
+            )
+            .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+            .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+            .join(Event, AthleteResult.event == Event.event)
+            .filter(
+                AthleteResult.result2.isnot(None),
+                year_filter,
+                Event.event_type != "Relay",
+            )
+            .group_by(AthleteResult.event, Athlete.gender, AthleteResult.athlete_id, Event.event_type)
+            .all()
+        )
+        
+        for row in all_indiv_rows:
+            key = (row.event, row.gender)
+            if key not in statewide_indiv_bests:
+                statewide_indiv_bests[key] = []
+            # Use min for running events, max for field events
+            best = row.best_running if _is_lower_better(row.event_type) else row.best_field
+            statewide_indiv_bests[key].append(best)
+
+    if relay_events:
+        # Get all relay school bests grouped by event+gender in one query
+        all_relay_rows = (
+            db.session.query(
+                RelayResult.event,
+                Meet.gender,
+                RelayResult.school_id,
+                func.min(RelayResult.result2).label("best"),
+            )
+            .join(Meet, RelayResult.meet_id == Meet.meet_id)
+            .filter(
+                RelayResult.result2.isnot(None),
+                year_filter,
+            )
+            .group_by(RelayResult.event, Meet.gender, RelayResult.school_id)
+            .all()
+        )
+        
+        for row in all_relay_rows:
+            key = (row.event, row.gender)
+            if key not in statewide_relay_bests:
+                statewide_relay_bests[key] = []
+            statewide_relay_bests[key].append(row.best)
+
+    # ── Calculate percentiles using pre-fetched data ──
     results = []
     for (event_name, gender), info in sorted(all_bests.items()):
         event_type = info["event_type"]
         lower_is_better = _is_lower_better(event_type)
-        agg = func.min if lower_is_better else func.max
         school_best_val = info["raw"]
 
-        # Choose comparison table based on relay or individual
         if info["is_relay"]:
-            statewide_bests = (
-                db.session.query(
-                    RelayResult.school_id,
-                    agg(RelayResult.result2).label("best"),
-                )
-                .join(Meet, RelayResult.meet_id == Meet.meet_id)
-                .filter(
-                    Meet.gender == gender,
-                    RelayResult.event == event_name,
-                    RelayResult.result2.isnot(None),
-                    year_filter,
-                )
-                .group_by(RelayResult.school_id)
-                .all()
-            )
+            all_marks = statewide_relay_bests.get((event_name, gender), [])
         else:
-            statewide_bests = (
-                db.session.query(
-                    AthleteResult.athlete_id,
-                    agg(AthleteResult.result2).label("best"),
-                )
-                .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
-                .join(Meet, AthleteResult.meet_id == Meet.meet_id)
-                .filter(
-                    Athlete.gender == gender,
-                    AthleteResult.event == event_name,
-                    AthleteResult.result2.isnot(None),
-                    year_filter,
-                )
-                .group_by(AthleteResult.athlete_id)
-                .all()
-            )
+            all_marks = statewide_indiv_bests.get((event_name, gender), [])
 
-        if not statewide_bests:
+        if not all_marks:
             continue
 
-        total = len(statewide_bests)
+        total = len(all_marks)
         if lower_is_better:
-            better_or_equal = sum(1 for row in statewide_bests if row.best <= school_best_val)
+            better_or_equal = sum(1 for m in all_marks if m <= school_best_val)
         else:
-            better_or_equal = sum(1 for row in statewide_bests if row.best >= school_best_val)
+            better_or_equal = sum(1 for m in all_marks if m >= school_best_val)
 
         percentile = round((1 - better_or_equal / total) * 100, 1)
 
