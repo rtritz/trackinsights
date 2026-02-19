@@ -1414,14 +1414,9 @@ def _compute_cohort_ranking(entries, target_key, lower_is_better, filter_fn=None
 
 
 def _summarize_leaderboard(entries, limit=10):
-    trimmed = entries[:limit]
-    target_entry = next((entry for entry in entries if entry.get("is_target")), None)
-    if target_entry and target_entry not in trimmed:
-        trimmed = trimmed + [target_entry]
-
     summary = []
     seen = set()
-    for entry in trimmed:
+    for entry in entries:
         key = (entry["athlete_id"], entry["meet_id"])
         if key in seen:
             continue
