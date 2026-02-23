@@ -1,0 +1,329 @@
+/* ============================================================
+   ONBOARDING / TUTORIAL OVERLAY SYSTEM
+   Spotlight + animated tooltip step-by-step tour
+   ============================================================ */
+
+/* ---- Overlay backdrop ---- */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  pointer-events: none;          /* let clicks pass through by default */
+  transition: opacity 320ms ease;
+  opacity: 0;
+}
+.onboarding-overlay.active {
+  opacity: 1;
+}
+
+/* The dark vignette with a spotlight cutout.
+   We use a huge box-shadow on a positioned element that
+   tracks the highlighted target via JS-set CSS custom props.  */
+.onboarding-spotlight {
+  position: fixed;
+  z-index: 10001;
+  border-radius: var(--spot-radius, 12px);
+  top:    var(--spot-y, 50%);
+  left:   var(--spot-x, 50%);
+  width:  var(--spot-w, 0px);
+  height: var(--spot-h, 0px);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  transition:
+    top 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    left 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 320ms ease;
+}
+
+/* A pulsing ring around the spotlight target */
+.onboarding-spotlight::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  animation: onboarding-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes onboarding-pulse {
+  0%, 100% { transform: scale(1);   opacity: 0.5; }
+  50%      { transform: scale(1.04); opacity: 1;   }
+}
+
+/* Clickable shield behind tooltip – blocks page interaction */
+.onboarding-shield {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  pointer-events: auto;
+  cursor: default;
+}
+
+/* ---- Tooltip ---- */
+.onboarding-tooltip {
+  position: fixed;
+  z-index: 10002;
+  width: min(92vw, 380px);
+  background: #ffffff;
+  border: 2px solid #8c0327;
+  border-radius: 1.25rem;
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(140, 3, 39, 0.08);
+  padding: 1.5rem 1.5rem 1.15rem;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(12px) scale(0.97);
+  transition:
+    opacity 300ms ease,
+    transform 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.onboarding-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Arrow / caret (CSS triangle via border trick) */
+.onboarding-tooltip__arrow {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border: 2px solid #8c0327;
+  transform: rotate(45deg);
+  z-index: -1;
+}
+/* arrow placement classes set by JS */
+.onboarding-tooltip__arrow--top    { top: -9px;    left: 50%; margin-left: -8px; border-bottom: none; border-right: none; }
+.onboarding-tooltip__arrow--bottom { bottom: -9px; left: 50%; margin-left: -8px; border-top: none; border-left: none; }
+.onboarding-tooltip__arrow--left   { left: -9px;   top: 50%;  margin-top: -8px;  border-right: none; border-bottom: none; }
+.onboarding-tooltip__arrow--right  { right: -9px;  top: 50%;  margin-top: -8px;  border-left: none; border-top: none; }
+
+/* ---- Content ---- */
+.onboarding-tooltip__step-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8c0327;
+  background: rgba(140, 3, 39, 0.08);
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  margin-bottom: 0.55rem;
+}
+
+.onboarding-tooltip__title {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-weight: 700;
+  font-style: italic;
+  font-size: 1.25rem;
+  color: #8c0327;
+  line-height: 1.25;
+  margin: 0 0 0.35rem;
+}
+
+.onboarding-tooltip__body {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #374151;
+  margin: 0 0 1rem;
+}
+
+/* ---- Progress bar ---- */
+.onboarding-progress {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 0.85rem;
+}
+.onboarding-progress__dot {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  transition: background 280ms ease;
+}
+.onboarding-progress__dot--active {
+  background: #8c0327;
+}
+.onboarding-progress__dot--done {
+  background: rgba(140, 3, 39, 0.35);
+}
+
+/* ---- Navigation buttons ---- */
+.onboarding-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.onboarding-nav__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  border: 2px solid #8c0327;
+  cursor: pointer;
+  transition: background 180ms ease, color 180ms ease, transform 120ms ease;
+  white-space: nowrap;
+}
+.onboarding-nav__btn:focus-visible {
+  outline: 2px solid #8c0327;
+  outline-offset: 2px;
+}
+.onboarding-nav__btn:active {
+  transform: scale(0.96);
+}
+
+/* Primary (Next / Done) */
+.onboarding-nav__btn--primary {
+  background: #8c0327;
+  color: #ffffff;
+  border-color: #8c0327;
+}
+.onboarding-nav__btn--primary:hover {
+  background: #6b0220;
+}
+
+/* Ghost (Back / Skip) */
+.onboarding-nav__btn--ghost {
+  background: transparent;
+  color: #8c0327;
+}
+.onboarding-nav__btn--ghost:hover {
+  background: rgba(140, 3, 39, 0.06);
+}
+
+/* Spacer pushes primary to right */
+.onboarding-nav__spacer {
+  flex: 1;
+}
+
+/* ---- Welcome card (centered, no spotlight) ---- */
+.onboarding-welcome {
+  position: fixed;
+  z-index: 10003;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+.onboarding-welcome__card {
+  width: min(92vw, 440px);
+  background: #ffffff;
+  border: 2px solid #8c0327;
+  border-radius: 1.5rem;
+  box-shadow: 0 32px 64px rgba(0, 0, 0, 0.28);
+  padding: 2rem 2rem 1.5rem;
+  text-align: center;
+  opacity: 0;
+  transform: scale(0.92) translateY(20px);
+  transition:
+    opacity 360ms ease,
+    transform 440ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.onboarding-welcome__card.visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+.onboarding-welcome__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 999px;
+  background: rgba(140, 3, 39, 0.08);
+  color: #8c0327;
+  margin-bottom: 0.75rem;
+}
+.onboarding-welcome__title {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-weight: 700;
+  font-style: italic;
+  font-size: 1.6rem;
+  color: #8c0327;
+  margin: 0 0 0.5rem;
+}
+.onboarding-welcome__body {
+  font-size: 0.95rem;
+  color: #4b5563;
+  line-height: 1.6;
+  margin: 0 0 1rem;
+  text-align: left;
+}
+.onboarding-welcome__actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ---- Info step progress bar ---- */
+.onboarding-info-progress {
+  width: 100%;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+.onboarding-info-progress__bar {
+  height: 100%;
+  background: #8c0327;
+  border-radius: 999px;
+  transition: width 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.onboarding-info-progress__label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(140, 3, 39, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.65rem;
+  text-align: center;
+}
+
+/* ---- Responsive adjustments ---- */
+@media (max-width: 640px) {
+  .onboarding-tooltip {
+    width: min(94vw, 340px);
+    padding: 1.15rem 1.15rem 1rem;
+  }
+  .onboarding-tooltip__title {
+    font-size: 1.1rem;
+  }
+  .onboarding-tooltip__body {
+    font-size: 0.85rem;
+  }
+  .onboarding-nav__btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+  }
+  .onboarding-welcome__card {
+    padding: 1.5rem 1.25rem 1.25rem;
+  }
+  .onboarding-welcome__title {
+    font-size: 1.35rem;
+  }
+}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-spotlight,
+  .onboarding-tooltip,
+  .onboarding-welcome__card {
+    transition-duration: 0ms !important;
+  }
+  .onboarding-spotlight::after {
+    animation: none;
+  }
+}
