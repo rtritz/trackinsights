@@ -207,6 +207,7 @@
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
         </span>
+        <span class="search-pill__label">Search</span>
         <div class="search-pill__content">
           <form id="navSearchForm" class="search-pill__form" role="search" onsubmit="return false;" novalidate>
             <label for="navSearchInput" class="sr-only">Search for your athlete's name and school</label>
@@ -360,6 +361,30 @@
       transform: translate(3px, 3px);
     }
 
+    .search-pill:not([data-open="true"]):not(.open):hover,
+    .search-pill:not([data-open="true"]):not(.open):focus-visible {
+      width: calc(var(--nav-pill-size) + 5.35rem);
+      justify-content: flex-start;
+      padding: 0 0.65rem 0 0.55rem;
+      box-shadow: 4px 4px 0 0 #111827;
+    }
+
+    .search-pill:not([data-open="true"]):not(.open):hover .search-pill__icon-bubble,
+    .search-pill:not([data-open="true"]):not(.open):focus-visible .search-pill__icon-bubble {
+      position: static;
+      transform: none;
+      width: 2.4rem;
+      height: 2.4rem;
+      margin-right: 0.55rem;
+    }
+
+    .search-pill:not([data-open="true"]):not(.open):hover .search-pill__label,
+    .search-pill:not([data-open="true"]):not(.open):focus-visible .search-pill__label {
+      opacity: 1;
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+
     .search-pill[data-open="true"],
     .search-pill.open {
       width: 80%;
@@ -485,6 +510,24 @@
       outline: none;
     }
 
+    .search-pill__label {
+      font-size: clamp(0.9rem, 1.2vw, 1.05rem);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      opacity: 0;
+      transform: translateX(-0.35rem);
+      transition: opacity 160ms ease;
+      pointer-events: none;
+      color: #ffffff;
+    }
+
+    .search-pill[data-open="true"] .search-pill__label,
+    .search-pill.open .search-pill__label {
+      display: none;
+    }
+
     .nav-pill {
       position: relative;
       display: flex;
@@ -579,6 +622,11 @@
       .search-pill[data-open="true"],
       .search-pill.open {
         width: min(92vw, 100%);
+      }
+
+      .search-pill:not([data-open="true"]):not(.open):hover,
+      .search-pill:not([data-open="true"]):not(.open):focus-visible {
+        width: calc(var(--nav-pill-size) + 4.6rem);
       }
 
       .nav-pill:hover,
