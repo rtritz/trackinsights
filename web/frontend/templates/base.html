@@ -170,7 +170,7 @@
     <div class="flex w-full items-center justify-center relative md:hidden min-w-0">
       <a href="{{ url_for('main.home') }}" class="font-impact italic text-primary text-3xl font-bold tracking-wide truncate">Track Insights</a>
       <div class="flex items-center gap-2 shrink-0 absolute right-0">
-        <a href="{{ url_for('main.search_page') }}" class="btn btn-circle btn-sm border-primary/50 text-primary bg-white/70 shadow-md"
+        <a href="{{ url_for('main.search_page') }}" class="btn btn-circle btn-sm border-2 border-gray-900 text-primary bg-white/90 mobile-nav-btn"
           aria-label="Go to search">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
             stroke-width="2">
@@ -179,7 +179,7 @@
           </svg>
         </a>
         <button type="button" id="mobile-nav-toggle"
-          class="btn btn-circle btn-primary btn-sm text-white border-none shadow-lg" aria-label="Open menu">
+          class="btn btn-circle btn-primary btn-sm text-white border-2 border-gray-900 mobile-nav-btn" aria-label="Open menu">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
             stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -285,21 +285,79 @@
       }
     }
 
+    .mobile-nav-btn {
+      box-shadow: 3px 3px 0 0 #111827;
+      transition: box-shadow 100ms ease, transform 100ms ease;
+    }
+
+    .mobile-nav-btn:active {
+      box-shadow: none !important;
+      transform: translate(3px, 3px);
+    }
+
+    .back-btn {
+      position: fixed;
+      top: 1.25rem;
+      left: 1rem;
+      z-index: 70;
+      height: 2rem;
+      width: 2rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 2px solid #111827;
+      background: #8c0327;
+      color: #ffffff;
+      box-shadow: 3px 3px 0 0 #111827;
+      cursor: pointer;
+      transition: box-shadow 100ms ease, transform 100ms ease, background 150ms ease;
+    }
+
+    .back-btn:hover {
+      background: #6b0220;
+    }
+
+    .back-btn:active {
+      box-shadow: none;
+      transform: translate(3px, 3px);
+    }
+
+    @media (min-width: 640px) {
+      .back-btn {
+        left: 1.25rem;
+      }
+    }
+
+    @media (min-width: 768px) {
+      .back-btn {
+        top: 1.75rem;
+        left: 2.5rem;
+        height: 2.5rem;
+        width: 2.5rem;
+      }
+    }
+
     .search-pill {
       position: relative;
       display: flex;
       align-items: center;
       background: #8c0327;
       color: #ffffff;
-      border: 2px solid #8c0327;
+      border: 2px solid #111827;
       border-radius: 999px;
       width: var(--nav-pill-size);
       height: var(--nav-pill-size);
       padding: 0;
-      box-shadow: 0 4px 12px rgba(17, 24, 39, 0.16);
+      box-shadow: 3px 3px 0 0 #111827;
       cursor: pointer;
       overflow: hidden;
-      transition: width 340ms cubic-bezier(0.22, 1, 0.36, 1), height 220ms ease, padding 220ms ease, box-shadow 240ms ease;
+      transition: width 340ms cubic-bezier(0.22, 1, 0.36, 1), height 220ms ease, padding 220ms ease, box-shadow 100ms ease, transform 100ms ease;
+    }
+
+    .search-pill:not([data-open="true"]):not(.open):active {
+      box-shadow: none;
+      transform: translate(3px, 3px);
     }
 
     .search-pill[data-open="true"],
@@ -307,9 +365,10 @@
       width: 80%;
       height: var(--nav-pill-size);
       padding: 0 0.55rem 0 0.7rem;
-      box-shadow: 0 20px 48px rgba(17, 24, 39, 0.24);
+      box-shadow: 4px 4px 0 0 #111827;
       cursor: text;
       background: #ffffff;
+      border-color: #111827;
       color: var(--primary-color);
     }
 
@@ -434,16 +493,16 @@
       width: var(--nav-pill-size);
       height: var(--nav-pill-size);
       border-radius: 999px;
-      border: 2px solid var(--primary-color);
+      border: 2px solid #111827;
       background: #ffffff;
       color: var(--primary-color);
       padding: 0;
       cursor: pointer;
       overflow: hidden;
-      box-shadow: 0 4px 12px rgba(17, 24, 39, 0.16);
+      box-shadow: 3px 3px 0 0 #111827;
       flex-shrink: 0;
       flex-grow: 0;
-      transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1), padding 200ms ease, box-shadow 220ms ease,  color 180ms ease;
+      transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1), padding 200ms ease, box-shadow 100ms ease, transform 100ms ease, color 180ms ease;
     }
 
     .nav-pill:hover,
@@ -452,8 +511,13 @@
       width: calc(var(--nav-pill-size) + 5.35rem);
       justify-content: flex-start;
       padding: 0 0.65rem 0 0.55rem;
-      box-shadow: 0 20px 48px rgba(17, 24, 39, 0.24), 0 0 0 3px rgba(140, 3, 39, 0.2);
+      box-shadow: 4px 4px 0 0 #111827;
       outline: none;
+    }
+
+    .nav-pill:active {
+      box-shadow: none;
+      transform: translate(3px, 3px);
     }
 
     .nav-pill__icon-bubble {
