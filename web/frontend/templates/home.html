@@ -1,5 +1,11 @@
 {% extends 'base.html' %}
 
+<style>
+  html {
+    scroll-behavior: smooth;
+  }
+</style>
+
 {% block content %}
 
 
@@ -174,7 +180,7 @@
 <div class="h-screen"></div>
 
 <!-- About Section -->
-<div class="relative z-10 bg-white pt-16 sm:pt-20 pb-24 sm:pb-32 px-2 sm:px-4">
+<div id="about" class="relative z-10 bg-white min-h-screen pt-28 sm:pt-32 pb-24 sm:pb-32 px-2 sm:px-4">
   <div class="max-w-6xl mx-auto space-y-8 sm:space-y-12">
     <div
       class="bg-gradient-to-br from-white via-primary/5 to-secondary/10 border border-primary/10 shadow-xl hover:shadow-2xl rounded-2xl sm:rounded-3xl p-6 sm:p-10">
