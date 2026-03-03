@@ -296,6 +296,10 @@
       configs.forEach((config, index) => {
         const rankingData = rankings[config.key];
         if (!rankingData && config.key !== 'overall') return;
+        // Omit grade-level rank card when no grade was specified
+        if (config.key === 'same_grade' && !gradeLevel) return;
+        // Omit enrollment rank card when no enrollment was specified
+        if (config.key === 'like_schools' && !enrollment) return;
         const card = document.createElement('div');
         card.className = 'card bg-white border border-base-200 shadow-sm overflow-hidden';
 
