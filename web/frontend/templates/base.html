@@ -207,6 +207,7 @@
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
         </span>
+        <span class="search-pill__label">Search</span>
         <div class="search-pill__content">
           <form id="navSearchForm" class="search-pill__form" role="search" onsubmit="return false;" novalidate>
             <label for="navSearchInput" class="sr-only">Search for your athlete's name and school</label>
@@ -232,7 +233,7 @@
         </span>
         <span class="nav-pill__label">Queries</span>
       </a>
-      <a href="{{ url_for('main.about') }}" id="about-toggle" aria-label="About" class="nav-pill pointer-events-auto">
+      <a href="{{ url_for('main.home') }}#about" id="about-toggle" aria-label="About" class="nav-pill pointer-events-auto">
         <span class="nav-pill__icon-bubble" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="nav-pill__icon" aria-hidden="true"
             focusable="false">
@@ -259,7 +260,7 @@
       <a href="{{ url_for('main.home') }}" class="mobile-menu-link uppercase">Home</a>
       <a href="{{ url_for('main.search_page') }}" class="mobile-menu-link uppercase">Search</a>
       <a href="{{ url_for('main.queries_page') }}" class="mobile-menu-link uppercase">Queries</a>
-      <a href="{{ url_for('main.about') }}" class="mobile-menu-link uppercase">About</a>
+      <a href="{{ url_for('main.home') }}#about" class="mobile-menu-link uppercase">About</a>
     </nav>
   </div>
   
@@ -358,6 +359,30 @@
     .search-pill:not([data-open="true"]):not(.open):active {
       box-shadow: none;
       transform: translate(3px, 3px);
+    }
+
+    .search-pill:not([data-open="true"]):not(.open):hover,
+    .search-pill:not([data-open="true"]):not(.open):focus-visible {
+      width: calc(var(--nav-pill-size) + 5.35rem);
+      justify-content: flex-start;
+      padding: 0 0.65rem 0 0.55rem;
+      box-shadow: 4px 4px 0 0 #111827;
+    }
+
+    .search-pill:not([data-open="true"]):not(.open):hover .search-pill__icon-bubble,
+    .search-pill:not([data-open="true"]):not(.open):focus-visible .search-pill__icon-bubble {
+      position: static;
+      transform: none;
+      width: 2.4rem;
+      height: 2.4rem;
+      margin-right: 0.55rem;
+    }
+
+    .search-pill:not([data-open="true"]):not(.open):hover .search-pill__label,
+    .search-pill:not([data-open="true"]):not(.open):focus-visible .search-pill__label {
+      opacity: 1;
+      transform: translateX(0);
+      pointer-events: auto;
     }
 
     .search-pill[data-open="true"],
@@ -485,6 +510,24 @@
       outline: none;
     }
 
+    .search-pill__label {
+      font-size: clamp(0.9rem, 1.2vw, 1.05rem);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      opacity: 0;
+      transform: translateX(-0.35rem);
+      transition: opacity 160ms ease;
+      pointer-events: none;
+      color: #ffffff;
+    }
+
+    .search-pill[data-open="true"] .search-pill__label,
+    .search-pill.open .search-pill__label {
+      display: none;
+    }
+
     .nav-pill {
       position: relative;
       display: flex;
@@ -579,6 +622,11 @@
       .search-pill[data-open="true"],
       .search-pill.open {
         width: min(92vw, 100%);
+      }
+
+      .search-pill:not([data-open="true"]):not(.open):hover,
+      .search-pill:not([data-open="true"]):not(.open):focus-visible {
+        width: calc(var(--nav-pill-size) + 4.6rem);
       }
 
       .nav-pill:hover,
@@ -738,6 +786,12 @@
       let resultsPanelTimeoutId = null;
 
       const isMobileViewport = () => window.matchMedia('(max-width: 767px)').matches;
+      const isHomePage = () => window.location.pathname === '{{ url_for('main.home') }}';
+      const scrollToAbout = () => {
+        const aboutSection = document.getElementById('about');
+        if (!aboutSection) return;
+        aboutSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
       const redirectToSearchPage = () => {
         window.location.href = "{{ url_for('main.search_page') }}";
       };
@@ -765,8 +819,31 @@
       }
 
       mobileMenuLinks.forEach(link => {
-        link.addEventListener('click', closeMobileMenu);
+        if (link.textContent.trim().toLowerCase() === 'about') {
+          link.addEventListener('click', function(e) {
+            e.preventDefault();
+            closeMobileMenu();
+            if (isHomePage()) {
+              scrollToAbout();
+            } else {
+              window.location.href = '{{ url_for('main.home') }}#about';
+            }
+          });
+        } else {
+          link.addEventListener('click', closeMobileMenu);
+        }
       });
+
+      if (aboutButton) {
+        aboutButton.addEventListener('click', function(e) {
+          e.preventDefault();
+          if (isHomePage()) {
+            scrollToAbout();
+          } else {
+            window.location.href = '{{ url_for('main.home') }}#about';
+          }
+        });
+      }
 
       const adjustResultsPanelBounds = () => {
         if (!resultsPanel || !searchPill || !aboutButton || !navbarEnd) return;
