@@ -223,7 +223,7 @@
           </button>
         </div>
       </div>
-      <a href="{{ url_for('main.queries_page') }}" id="queries-toggle" aria-label="Queries" class="nav-pill pointer-events-auto">
+      <a href="{{ url_for('main.insights_page') }}" id="queries-toggle" aria-label="Insights" class="nav-pill pointer-events-auto">
         <span class="nav-pill__icon-bubble" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" class="nav-pill__icon" fill="currentColor"
             aria-hidden="true" focusable="false">
@@ -231,7 +231,7 @@
               d="m665.216 768 110.848 192h-73.856L591.36 768H433.024L322.176 960H248.32l110.848-192H160a32 32 0 0 1-32-32V192H64a32 32 0 0 1 0-64h896a32 32 0 1 1 0 64h-64v544a32 32 0 0 1-32 32H665.216zM832 192H192v512h640V192zM352 448a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0v-64a32 32 0 0 1 32-32zm160-64a32 32 0 0 1 32 32v128a32 32 0 0 1-64 0V416a32 32 0 0 1 32-32zm160-64a32 32 0 0 1 32 32v192a32 32 0 1 1-64 0V352a32 32 0 0 1 32-32z" />
           </svg>
         </span>
-        <span class="nav-pill__label">Queries</span>
+        <span class="nav-pill__label">Insights</span>
       </a>
       <a href="{{ url_for('main.home') }}#about" id="about-toggle" aria-label="About" class="nav-pill pointer-events-auto">
         <span class="nav-pill__icon-bubble" aria-hidden="true">
@@ -259,7 +259,7 @@
     <nav class="flex flex-col items-center gap-6 text-2xl font-impact tracking-wider text-center">
       <a href="{{ url_for('main.home') }}" class="mobile-menu-link uppercase">Home</a>
       <a href="{{ url_for('main.search_page') }}" class="mobile-menu-link uppercase">Search</a>
-      <a href="{{ url_for('main.queries_page') }}" class="mobile-menu-link uppercase">Queries</a>
+      <a href="{{ url_for('main.insights_page') }}" class="mobile-menu-link uppercase">Insights</a>
       <a href="{{ url_for('main.home') }}#about" class="mobile-menu-link uppercase">About</a>
     </nav>
   </div>
@@ -551,7 +551,7 @@
     .nav-pill:hover,
     .nav-pill:focus-visible,
     .nav-pill.is-active {
-      width: calc(var(--nav-pill-size) + 5.35rem);
+      width: calc(var(--nav-pill-size) + 6.2rem);
       justify-content: flex-start;
       padding: 0 0.65rem 0 0.55rem;
       box-shadow: 4px 4px 0 0 #111827;
@@ -632,7 +632,7 @@
       .nav-pill:hover,
       .nav-pill:focus-visible,
       .nav-pill.is-active {
-        width: calc(var(--nav-pill-size) + 4.6rem);
+        width: calc(var(--nav-pill-size) + 5.4rem);
       }
     }
 

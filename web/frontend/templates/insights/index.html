@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="min-h-screen bg-white pt-20 sm:pt-24 pb-16 px-4">
+  <div class="relative max-w-4xl mx-auto">
+    <div
+      class="absolute inset-0 -z-10 mx-0 sm:mx-[-32px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none">
+    </div>
+    <div class="relative space-y-6">
+      <button onclick="history.back()" class="back-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+            clip-rule="evenodd" />
+        </svg>
+      </button>
+
+      <header class="text-center space-y-2">
+        <h1 class="font-impact italic text-4xl sm:text-5xl text-primary">
+          Insights
+        </h1>
+        <p class="text-base-content/70 max-w-2xl mx-auto text-sm sm:text-base">
+          Explore data-driven queries and reports for Indiana high school track and field.
+        </p>
+      </header>
+
+      <!-- Queries / Reports Toggle -->
+      <div class="flex items-center justify-center">
+        <div class="flex items-center gap-1">
+          <button type="button" id="toggle-queries"
+            class="relative px-4 py-1 text-lg font-semibold transition-colors duration-200 text-primary cursor-pointer">
+            Queries
+            <span id="underline-queries" class="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 bg-primary rounded-full transition-all duration-300 w-3/4"></span>
+          </button>
+          <span class="text-gray-300 text-lg font-light">/</span>
+          <button type="button" id="toggle-reports"
+            class="relative px-4 py-1 text-lg font-semibold transition-colors duration-200 text-gray-400 cursor-pointer">
+            Reports
+            <span id="underline-reports" class="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 bg-primary rounded-full transition-all duration-300 w-0"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Queries Section -->
+      <section id="queries-section">
+        <div class="grid gap-3 sm:grid-cols-2">
+          <a href="{{ url_for('main.percentiles_query_page') }}"
+            class="group flex items-center gap-4 bg-white border border-base-200 rounded-xl p-4 hover:border-primary hover:shadow-md transition-all">
+            <div
+              class="w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center text-lg font-bold shrink-0 shadow-sm">
+              %
+            </div>
+            <div class="min-w-0">
+              <h2 class="text-base font-semibold group-hover:text-primary transition-colors">Percentiles</h2>
+              <p class="text-xs text-base-content/60 leading-snug">Event percentiles by meet type, grade, and season.</p>
+            </div>
+          </a>
+
+          <a href="{{ url_for('main.sectional_trends_page') }}"
+            class="group flex items-center gap-4 bg-white border border-base-200 rounded-xl p-4 hover:border-primary hover:shadow-md transition-all">
+            <div
+              class="w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center shrink-0 shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+              </svg>
+            </div>
+            <div class="min-w-0">
+              <h2 class="text-base font-semibold group-hover:text-primary transition-colors">Sectional Event Trends</h2>
+              <p class="text-xs text-base-content/60 leading-snug">Event depth and qualification standards over time.</p>
+            </div>
+          </a>
+
+          <a href="{{ url_for('main.hypothetical_query_page') }}"
+            class="group flex items-center gap-4 bg-white border border-base-200 rounded-xl p-4 hover:border-primary hover:shadow-md transition-all">
+            <div
+              class="w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center shrink-0 shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <div class="min-w-0">
+              <h2 class="text-base font-semibold group-hover:text-primary transition-colors">Hypothetical Athlete</h2>
+              <p class="text-xs text-base-content/60 leading-snug">Enter a performance and see how it would rank.</p>
+            </div>
+          </a>
+
+          <div
+            class="flex items-center gap-4 bg-white/60 border border-dashed border-base-300 rounded-xl p-4">
+            <div
+              class="w-11 h-11 rounded-full bg-base-200 text-base-content/40 flex items-center justify-center shrink-0 text-lg">
+              +
+            </div>
+            <div class="min-w-0">
+              <h2 class="text-base font-semibold text-base-content/50">More Coming Soon</h2>
+              <p class="text-xs text-base-content/40 leading-snug">Additional query tools are in development.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Reports Section (hidden by default) -->
+      <section id="reports-section" class="hidden">
+        <div class="grid gap-3 sm:grid-cols-2">
+          <a href="{{ url_for('main.percentiles_report_page') }}"
+            class="group flex items-center gap-4 bg-white border border-base-200 rounded-xl p-4 hover:border-primary hover:shadow-md transition-all">
+            <div
+              class="w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center shrink-0 shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div class="min-w-0">
+              <h2 class="text-base font-semibold group-hover:text-primary transition-colors">Percentiles Summary</h2>
+              <p class="text-xs text-base-content/60 leading-snug">Overview of percentiles across all events, genders, and meet types.</p>
+            </div>
+          </a>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const queriesBtn = document.getElementById('toggle-queries');
+    const reportsBtn = document.getElementById('toggle-reports');
+    const underlineQueries = document.getElementById('underline-queries');
+    const underlineReports = document.getElementById('underline-reports');
+    const queriesSection = document.getElementById('queries-section');
+    const reportsSection = document.getElementById('reports-section');
+
+    const setTab = (tab) => {
+      if (tab === 'queries') {
+        queriesBtn.classList.add('text-primary');
+        queriesBtn.classList.remove('text-gray-400');
+        reportsBtn.classList.add('text-gray-400');
+        reportsBtn.classList.remove('text-primary');
+        underlineQueries.classList.remove('w-0');
+        underlineQueries.classList.add('w-3/4');
+        underlineReports.classList.remove('w-3/4');
+        underlineReports.classList.add('w-0');
+        queriesSection.classList.remove('hidden');
+        reportsSection.classList.add('hidden');
+      } else {
+        reportsBtn.classList.add('text-primary');
+        reportsBtn.classList.remove('text-gray-400');
+        queriesBtn.classList.add('text-gray-400');
+        queriesBtn.classList.remove('text-primary');
+        underlineReports.classList.remove('w-0');
+        underlineReports.classList.add('w-3/4');
+        underlineQueries.classList.remove('w-3/4');
+        underlineQueries.classList.add('w-0');
+        queriesSection.classList.add('hidden');
+        reportsSection.classList.remove('hidden');
+      }
+    };
+
+    queriesBtn.addEventListener('click', () => setTab('queries'));
+    reportsBtn.addEventListener('click', () => setTab('reports'));
+  });
+</script>
+{% endblock %}

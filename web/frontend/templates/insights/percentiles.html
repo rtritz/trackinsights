@@ -782,7 +782,7 @@
         return;
       }
 
-      const path = '/queries/percentiles';
+      const path = '/insights/percentiles';
       const url = `${window.location.origin}${path}?${query}`;
       const success = await copyTextToClipboard(url);
       copyQueryBtn.textContent = success ? 'Copied!' : 'Copy failed';

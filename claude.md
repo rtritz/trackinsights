@@ -31,7 +31,7 @@ trackinsights/
 │   │   │   ├── home.html         # Homepage
 │   │   │   ├── athlete-*.html    # Athlete-related pages
 │   │   │   ├── school-*.html     # School-related pages
-│   │   │   └── queries/          # Query tool pages
+│   │   │   └── insights/         # Insights pages (queries & reports)
 │   │   ├── static/
 │   │   │   ├── css/output.css    # Tailwind compiled CSS
 │   │   │   ├── js/main.js        # Client-side JavaScript
@@ -72,9 +72,9 @@ CONST.EVENT.ALL_BOYS_HURDLES = ["110 Hurdles", "300 Hurdles"]
 - `/athlete-dashboard/<int:athlete_id>` - Athlete dashboard
 - `/athlete-dashboard/<int:athlete_id>/result/<int:meet_id>/<path:event_name>` - Result detail
 - `/school-dashboard/<int:school_id>` - School dashboard
-- `/queries` - Queries index
-- `/queries/percentiles` - Percentiles query tool
-- `/queries/hypothetical` - Hypothetical result tool
+- `/insights` - Insights index (queries & reports)
+- `/insights/percentiles` - Percentiles query tool
+- `/insights/hypothetical` - Hypothetical result tool
 - `/about` - About page
 
 ### API Routes (return JSON, prefix: `/api`)
