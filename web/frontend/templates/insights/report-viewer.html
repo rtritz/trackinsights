@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="min-h-screen bg-white pt-20 sm:pt-24 pb-8 px-3 sm:px-6 flex flex-col">
+  <div class="relative max-w-6xl mx-auto w-full flex flex-col flex-1 min-h-0">
+    <div
+      class="absolute inset-0 -z-10 mx-0 sm:mx-[-32px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none">
+    </div>
+    <div class="relative flex flex-col flex-1 min-h-0 space-y-4">
+      <button onclick="history.back()" class="back-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+            clip-rule="evenodd" />
+        </svg>
+      </button>
+
+      <header class="text-center space-y-1">
+        <h1 class="font-impact italic text-3xl sm:text-4xl text-primary">{{ title }}</h1>
+        {% if description %}
+        <p class="text-base-content/70 text-sm sm:text-base max-w-2xl mx-auto">{{ description }}</p>
+        {% endif %}
+      </header>
+
+      <div class="flex items-center justify-end gap-2">
+        <a href="{{ pdf_url }}" download="{{ download_name or 'report.pdf' }}"
+          class="btn btn-sm btn-primary rounded-full gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Download PDF
+        </a>
+      </div>
+
+      <div class="flex-1 min-h-0 rounded-2xl border border-base-200 shadow-lg overflow-hidden bg-gray-100">
+        <iframe id="pdf-frame" src="{{ pdf_url }}" class="w-full h-full border-0" style="min-height: 70vh;"
+          title="{{ title }}">
+          <p class="p-8 text-center text-gray-600">
+            Your browser does not support embedded PDFs.
+            <a href="{{ pdf_url }}" class="text-primary underline">Download the PDF</a> instead.
+          </p>
+        </iframe>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

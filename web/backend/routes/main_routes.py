@@ -1,4 +1,4 @@
-from flask import render_template, request
+from flask import render_template, request, url_for
 from . import main_bp
 from ..queries import get_athletes
 
@@ -13,27 +13,38 @@ def search_page():
     return render_template('athlete-search.html')
 
 
-@main_bp.route('/queries')
-def queries_page():
-    return render_template('queries/index.html')
+@main_bp.route('/insights')
+def insights_page():
+    return render_template('insights/index.html')
 
 
-@main_bp.route('/queries/percentiles')
+@main_bp.route('/insights/reports/percentiles-summary')
+def percentiles_report_page():
+    return render_template(
+        'insights/report-viewer.html',
+        title='Percentiles Summary Report',
+        description='A comprehensive overview of track & field percentiles across all events, genders, and meet types.',
+        pdf_url=url_for('static', filename='percentiles_by10_readable.pdf'),
+        download_name='TrackInsights_Percentiles_Summary.pdf',
+    )
+
+
+@main_bp.route('/insights/percentiles')
 def percentiles_query_page():
-    return render_template('queries/percentiles.html')
+    return render_template('insights/percentiles.html')
 
 
-@main_bp.route('/queries/sectional-trends')
+@main_bp.route('/insights/sectional-trends')
 def sectional_trends_page():
-    return render_template('queries/sectional-trends.html')
+    return render_template('insights/sectional-trends.html')
 
 
-@main_bp.route('/queries/hypothetical')
+@main_bp.route('/insights/hypothetical')
 def hypothetical_query_page():
-    return render_template('queries/hypothetical.html')
+    return render_template('insights/hypothetical.html')
 
 
-@main_bp.route('/queries/hypothetical/result')
+@main_bp.route('/insights/hypothetical/result')
 def hypothetical_result_detail():
     event = request.args.get('event', '')
     time = request.args.get('time', '')
@@ -43,7 +54,7 @@ def hypothetical_result_detail():
     enrollment = request.args.get('enrollment', '')
     grade_level = request.args.get('grade_level', '')
     return render_template(
-        'queries/hypothetical-result-detail.html',
+        'insights/hypothetical-result-detail.html',
         event_name=event,
         time_input=time,
         gender=gender,
