@@ -1,14 +1,15 @@
 /* ============================================================
    ONBOARDING / TUTORIAL OVERLAY SYSTEM
-   Spotlight + animated tooltip step-by-step tour
+   Action-driven spotlight walkthrough with step dots,
+   driven-action hints, confetti celebration, and warm design.
    ============================================================ */
 
-/* ---- Overlay backdrop ---- */
+/* ── Overlay backdrop ── */
 .onboarding-overlay {
   position: fixed;
   inset: 0;
   z-index: 10000;
-  pointer-events: none;          /* let clicks pass through by default */
+  pointer-events: none;
   transition: opacity 320ms ease;
   opacity: 0;
 }
@@ -16,9 +17,7 @@
   opacity: 1;
 }
 
-/* The dark vignette with a spotlight cutout.
-   We use a huge box-shadow on a positioned element that
-   tracks the highlighted target via JS-set CSS custom props.  */
+/* ── Spotlight cutout ── */
 .onboarding-spotlight {
   position: fixed;
   z-index: 10001;
@@ -37,7 +36,7 @@
     border-radius 320ms ease;
 }
 
-/* A pulsing ring around the spotlight target */
+/* Pulsing ring */
 .onboarding-spotlight::after {
   content: '';
   position: absolute;
@@ -49,11 +48,11 @@
 }
 
 @keyframes onboarding-pulse {
-  0%, 100% { transform: scale(1);   opacity: 0.5; }
+  0%, 100% { transform: scale(1);    opacity: 0.5; }
   50%      { transform: scale(1.04); opacity: 1;   }
 }
 
-/* Clickable shield behind tooltip – blocks page interaction */
+/* ── Clickable shield (blocks page interaction) ── */
 .onboarding-shield {
   position: fixed;
   inset: 0;
@@ -62,7 +61,7 @@
   cursor: default;
 }
 
-/* ---- Tooltip ---- */
+/* ── Tooltip (spotlight steps) ── */
 .onboarding-tooltip {
   position: fixed;
   z-index: 10002;
@@ -86,7 +85,7 @@
   transform: translateY(0) scale(1);
 }
 
-/* Arrow / caret (CSS triangle via border trick) */
+/* ── Tooltip arrow ── */
 .onboarding-tooltip__arrow {
   position: absolute;
   width: 16px;
@@ -96,13 +95,12 @@
   transform: rotate(45deg);
   z-index: -1;
 }
-/* arrow placement classes set by JS */
 .onboarding-tooltip__arrow--top    { top: -9px;    left: 50%; margin-left: -8px; border-bottom: none; border-right: none; }
-.onboarding-tooltip__arrow--bottom { bottom: -9px; left: 50%; margin-left: -8px; border-top: none; border-left: none; }
-.onboarding-tooltip__arrow--left   { left: -9px;   top: 50%;  margin-top: -8px;  border-right: none; border-bottom: none; }
-.onboarding-tooltip__arrow--right  { right: -9px;  top: 50%;  margin-top: -8px;  border-left: none; border-top: none; }
+.onboarding-tooltip__arrow--bottom { bottom: -9px; left: 50%; margin-left: -8px; border-top: none;    border-left: none; }
+.onboarding-tooltip__arrow--left   { left: -9px;   top: 50%;  margin-top: -8px;  border-right: none;  border-bottom: none; }
+.onboarding-tooltip__arrow--right  { right: -9px;  top: 50%;  margin-top: -8px;  border-left: none;   border-top: none; }
 
-/* ---- Content ---- */
+/* ── Tooltip content ── */
 .onboarding-tooltip__step-badge {
   display: inline-block;
   font-size: 0.7rem;
@@ -130,30 +128,47 @@
   font-size: 0.92rem;
   line-height: 1.55;
   color: #374151;
-  margin: 0 0 1rem;
+  margin: 0 0 0.75rem;
 }
 
-/* ---- Progress bar ---- */
-.onboarding-progress {
+/* ── Driven-action hint ── */
+.onboarding-tooltip__driven-hint {
   display: flex;
-  gap: 5px;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #8c0327;
+  opacity: 0.7;
   margin-bottom: 0.85rem;
+  animation: onboarding-hint-pulse 2s ease-in-out infinite;
 }
-.onboarding-progress__dot {
-  flex: 1;
-  height: 4px;
-  border-radius: 999px;
-  background: #e5e7eb;
-  transition: background 280ms ease;
-}
-.onboarding-progress__dot--active {
-  background: #8c0327;
-}
-.onboarding-progress__dot--done {
-  background: rgba(140, 3, 39, 0.35);
+.onboarding-tooltip__driven-arrow {
+  display: inline-flex;
+  font-size: 1.1rem;
+  animation: onboarding-bounce-arrow 1.2s ease-in-out infinite;
 }
 
-/* ---- Navigation buttons ---- */
+@keyframes onboarding-hint-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+@keyframes onboarding-bounce-arrow {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+
+/* ── Driven-action click catcher ── */
+.onboarding-driven-catcher {
+  /* Transparent overlay positioned by JS */
+  background: transparent;
+  transition: background 160ms ease;
+}
+.onboarding-driven-catcher:hover {
+  background: rgba(140, 3, 39, 0.08);
+}
+
+/* ── Navigation buttons ── */
 .onboarding-nav {
   display: flex;
   align-items: center;
@@ -182,7 +197,6 @@
   transform: scale(0.96);
 }
 
-/* Primary (Next / Done) */
 .onboarding-nav__btn--primary {
   background: #8c0327;
   color: #ffffff;
@@ -192,7 +206,6 @@
   background: #6b0220;
 }
 
-/* Ghost (Back / Skip) */
 .onboarding-nav__btn--ghost {
   background: transparent;
   color: #8c0327;
@@ -201,12 +214,13 @@
   background: rgba(140, 3, 39, 0.06);
 }
 
-/* Spacer pushes primary to right */
 .onboarding-nav__spacer {
   flex: 1;
 }
 
-/* ---- Welcome card (centered, no spotlight) ---- */
+/* ═══════════════════════════════════════════════════
+   INFO CARD (centered, no spotlight)
+   ═══════════════════════════════════════════════════ */
 .onboarding-welcome {
   position: fixed;
   z-index: 10003;
@@ -216,14 +230,17 @@
   justify-content: center;
   pointer-events: auto;
 }
+
 .onboarding-welcome__card {
+  position: relative;
   width: min(92vw, 440px);
   background: #ffffff;
   border: 2px solid #8c0327;
   border-radius: 1.5rem;
   box-shadow: 0 32px 64px rgba(0, 0, 0, 0.28);
-  padding: 2rem 2rem 1.5rem;
+  padding: 2.25rem 2rem 1.5rem;
   text-align: center;
+  overflow: hidden;
   opacity: 0;
   transform: scale(0.92) translateY(20px);
   transition:
@@ -234,6 +251,19 @@
   opacity: 1;
   transform: scale(1) translateY(0);
 }
+
+/* Gradient accent strip at top of card */
+.onboarding-welcome__accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: linear-gradient(90deg, #8c0327, #f59e0b, #10b981, #3b82f6);
+  border-radius: 1.5rem 1.5rem 0 0;
+}
+
+/* Icon circle */
 .onboarding-welcome__icon {
   display: inline-flex;
   align-items: center;
@@ -245,6 +275,18 @@
   color: #8c0327;
   margin-bottom: 0.75rem;
 }
+.onboarding-welcome__icon--final {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  animation: onboarding-final-icon 600ms ease forwards;
+}
+
+@keyframes onboarding-final-icon {
+  0%   { transform: scale(0.5) rotate(-20deg); opacity: 0; }
+  60%  { transform: scale(1.15) rotate(5deg);  opacity: 1; }
+  100% { transform: scale(1) rotate(0deg);     opacity: 1; }
+}
+
 .onboarding-welcome__title {
   font-family: 'Oswald', 'Arial Narrow', sans-serif;
   font-weight: 700;
@@ -253,13 +295,47 @@
   color: #8c0327;
   margin: 0 0 0.5rem;
 }
+
 .onboarding-welcome__body {
   font-size: 0.95rem;
   color: #4b5563;
   line-height: 1.6;
-  margin: 0 0 1rem;
-  text-align: left;
+  margin: 0 0 0.85rem;
+  text-align: center;
 }
+
+/* ── Step dots ── */
+.onboarding-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 0.5rem;
+}
+.onboarding-dots__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  transition: background 280ms ease, transform 280ms ease;
+}
+.onboarding-dots__dot--active {
+  background: #8c0327;
+  transform: scale(1.35);
+}
+.onboarding-dots__dot--done {
+  background: rgba(140, 3, 39, 0.35);
+}
+
+/* Step counter text */
+.onboarding-welcome__counter {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(140, 3, 39, 0.45);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.85rem;
+}
+
 .onboarding-welcome__actions {
   display: flex;
   gap: 0.5rem;
@@ -267,32 +343,131 @@
   flex-wrap: wrap;
 }
 
-/* ---- Info step progress bar ---- */
-.onboarding-info-progress {
-  width: 100%;
-  height: 4px;
-  background: #e5e7eb;
-  border-radius: 999px;
-  margin-bottom: 0.5rem;
-  overflow: hidden;
+/* ── Final card special styling ── */
+.onboarding-welcome__card--final .onboarding-welcome__title {
+  color: #10b981;
 }
-.onboarding-info-progress__bar {
-  height: 100%;
-  background: #8c0327;
-  border-radius: 999px;
-  transition: width 400ms cubic-bezier(0.22, 1, 0.36, 1);
+.onboarding-welcome__card--final .onboarding-welcome__accent {
+  background: linear-gradient(90deg, #10b981, #3b82f6, #ec4899, #f59e0b);
 }
-.onboarding-info-progress__label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: rgba(140, 3, 39, 0.5);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 0.65rem;
-  text-align: center;
+.onboarding-welcome__card--final .onboarding-nav__btn--primary {
+  background: #10b981;
+  border-color: #10b981;
+}
+.onboarding-welcome__card--final .onboarding-nav__btn--primary:hover {
+  background: #059669;
+  border-color: #059669;
 }
 
-/* ---- Responsive adjustments ---- */
+/* ═══════════════════════════════════════════════════
+   CONFETTI ANIMATION
+   ═══════════════════════════════════════════════════ */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(55vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   TUTORIAL LIGHTBULB TRIGGER
+   ═══════════════════════════════════════════════════ */
+.tutorial-lightbulb {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 1.25rem;
+  z-index: 9999;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: #8c0327;
+  color: #ffffff;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 16px rgba(140, 3, 39, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 200ms ease, box-shadow 200ms ease, opacity 200ms ease;
+  opacity: 0.75;
+}
+.tutorial-lightbulb:hover {
+  transform: scale(1.12);
+  box-shadow: 0 6px 24px rgba(140, 3, 39, 0.45);
+  opacity: 1;
+}
+.tutorial-lightbulb:active {
+  transform: scale(0.95);
+}
+.tutorial-lightbulb:focus-visible {
+  outline: 2px solid #8c0327;
+  outline-offset: 3px;
+  opacity: 1;
+}
+
+/* ═══════════════════════════════════════════════════
+   CROSS-PAGE BANNER
+   ═══════════════════════════════════════════════════ */
+.onboarding-cross-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 9998;
+  pointer-events: auto;
+  transform: translateY(100%);
+  transition: transform 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.onboarding-cross-banner.visible {
+  transform: translateY(0);
+}
+.onboarding-cross-banner__inner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  background: #ffffff;
+  border-top: 3px solid #8c0327;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.12);
+  padding: 0.85rem 1.25rem;
+}
+.onboarding-cross-banner__text {
+  font-size: 0.92rem;
+  color: #374151;
+}
+.onboarding-cross-banner__text strong {
+  color: #8c0327;
+}
+.onboarding-cross-banner__btn {
+  text-decoration: none;
+  font-size: 0.82rem;
+  padding: 0.4rem 1rem;
+}
+.onboarding-cross-banner__close {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+  transition: color 160ms ease;
+}
+.onboarding-cross-banner__close:hover {
+  color: #374151;
+}
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════ */
 @media (max-width: 640px) {
   .onboarding-tooltip {
     width: min(94vw, 340px);
@@ -309,21 +484,36 @@
     font-size: 0.8rem;
   }
   .onboarding-welcome__card {
-    padding: 1.5rem 1.25rem 1.25rem;
+    padding: 2rem 1.25rem 1.25rem;
   }
   .onboarding-welcome__title {
     font-size: 1.35rem;
   }
+  .tutorial-lightbulb {
+    width: 2.5rem;
+    height: 2.5rem;
+    bottom: 1rem;
+    left: 1rem;
+  }
+  .tutorial-lightbulb svg {
+    width: 18px;
+    height: 18px;
+  }
 }
 
-/* ---- Reduced motion ---- */
+/* ═══════════════════════════════════════════════════
+   REDUCED MOTION
+   ═══════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
   .onboarding-spotlight,
   .onboarding-tooltip,
   .onboarding-welcome__card {
     transition-duration: 0ms !important;
   }
-  .onboarding-spotlight::after {
-    animation: none;
+  .onboarding-spotlight::after,
+  .onboarding-tooltip__driven-hint,
+  .onboarding-tooltip__driven-arrow,
+  .onboarding-welcome__icon--final {
+    animation: none !important;
   }
 }

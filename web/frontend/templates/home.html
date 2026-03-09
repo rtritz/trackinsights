@@ -98,12 +98,9 @@
       })();
     </script>
 
-  <div class="hero-title no-select" id="hero-tour-trigger" tabindex="0" role="button" aria-label="Start the Track Insights tutorial">
+  <div class="hero-title no-select">
       <span class="hero-title__text">
         Track Insights
-      </span>
-      <span class="hero-subtitle" id="hero-subtitle">
-        click to get started
       </span>
     </div>
 
@@ -145,28 +142,8 @@
       font-size: clamp(3.5rem, 8vw, 8rem);
       color: rgba(255, 255, 255, 0.92);
       text-align: center;
-      cursor: pointer;
       border-radius: clamp(1.5rem, 4vw, 3.5rem);
-      transition: transform 450ms cubic-bezier(0.19, 1, 0.22, 1),
-        letter-spacing 450ms cubic-bezier(0.19, 1, 0.22, 1),
-        color 300ms ease;
       isolation: isolate;
-    }
-
-    .hero-title::before {
-      content: '';
-      position: absolute;
-      inset: clamp(-2.5rem, -3vw, -1.5rem);
-      border-radius: inherit;
-      background: rgba(6, 6, 12, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(0px);
-      -webkit-backdrop-filter: blur(0px);
-      opacity: 0;
-      transform: scale(0.94);
-      transition: opacity 350ms ease, transform 450ms cubic-bezier(0.19, 1, 0.22, 1),
-        backdrop-filter 350ms ease, -webkit-backdrop-filter 350ms ease;
-      z-index: -1;
     }
 
     .hero-title__text {
@@ -174,32 +151,6 @@
       line-height: 0.85;
       text-shadow: 0 10px 22px rgba(0, 0, 0, 0.55);
       filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.45));
-      transition: filter 350ms ease, text-shadow 350ms ease;
-    }
-
-    /* ---- Tour trigger subtitle ---- */
-    .hero-subtitle {
-      display: block;
-      margin-top: clamp(0.6rem, 1.5vw, 1rem);
-      font-family: 'Oswald', 'Arial Narrow', sans-serif;
-      font-style: normal;
-      font-weight: 500;
-      font-size: clamp(0.9rem, 2vw, 1.35rem);
-      letter-spacing: clamp(0.15rem, 0.5vw, 0.4rem);
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.85);
-      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-      animation: subtitlePulse 2.5s ease-in-out infinite;
-      cursor: pointer;
-    }
-
-    @keyframes subtitlePulse {
-      0%, 100% { opacity: 0.7; transform: translateY(0); }
-      50%      { opacity: 1;   transform: translateY(-2px); }
-    }
-
-    .hero-subtitle--hidden {
-      display: none;
     }
 
     @media (max-width: 640px) {
@@ -208,158 +159,13 @@
       }
     }
 
-
-    .hero-title--static {
-      cursor: pointer;
-      transition: none;
-    }
-
-    .hero-title--static:hover,
-    .hero-title--static:focus-visible {
-      transform: none;
-      letter-spacing: clamp(0.2rem, 1.5vw, 0.8rem);
-      color: rgba(255, 255, 255, 0.92);
-    }
-
-    .hero-title--static::before {
-      opacity: 0;
-      transform: scale(1);
-      backdrop-filter: blur(0px);
-      -webkit-backdrop-filter: blur(0px);
-      transition: opacity 350ms ease, backdrop-filter 350ms ease, -webkit-backdrop-filter 350ms ease;
-    }
-
-    .hero-title--static:hover::before,
-    .hero-title--static:focus-visible::before {
-      opacity: 1;
-      transform: scale(1);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-    }
-
-    .hero-title:hover,
-    .hero-title:focus-visible {
-      transform: translateY(-6px) scale(1.02);
-      letter-spacing: clamp(0.35rem, 1.1vw, 1.5rem);
-      color: #fff9ec;
-    }
-    
-    .hero-title:hover::before,
-    .hero-title:focus-visible::before {
-      opacity: 1;
-      transform: scale(1.02);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-    }
-
-    .hero-title:hover .hero-title__text,
-    .hero-title:focus-visible .hero-title__text {
-      text-shadow: 0 14px 28px rgba(0, 0, 0, 0.65);
-      filter: drop-shadow(0 22px 38px rgba(0, 0, 0, 0.55));
-    }
-
-    @media (max-width: 900px) and (orientation: landscape) {
-      .hero-title {
-        cursor: pointer;
-      }
-
-    }
-
     @media (min-width: 1024px) {
       .hero-title__text {
         white-space: nowrap;
       }
-
-      .hero-title:hover,
-      .hero-title:focus-visible {
-        transform: translateY(-6px) scale(1.02);
-        letter-spacing: clamp(0.35rem, 1.1vw, 1.5rem);
-        color: #fff9ec;
-      }
-
-      .hero-title:hover::before,
-      .hero-title:focus-visible::before {
-        opacity: 1;
-        transform: scale(1.02);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-      }
-
-      .hero-title:hover .hero-title__text,
-      .hero-title:focus-visible .hero-title__text {
-        text-shadow: 0 14px 28px rgba(0, 0, 0, 0.65);
-        filter: drop-shadow(0 22px 38px rgba(0, 0, 0, 0.55));
-      }
-    }
-
-    /* Gentle bounce animation for "See More" text */
-    @keyframes fade-bounce {
-
-      0%,
-      100% {
-        transform: translateY(0px);
-      }
-
-      50% {
-        transform: translateY(-5px);
-      }
-    }
-
-    .animate-fade-bounce {
-      animation: fade-bounce 2s ease-in-out infinite;
     }
 
   </style>
-
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      const heroTitle = document.querySelector('.hero-title');
-
-      if (!heroTitle) {
-        return;
-      }
-
-      const landscapeQuery = window.matchMedia('(max-width: 900px) and (orientation: landscape)');
-      const mobileQuery = window.matchMedia('(max-width: 767px)');
-
-      const updateHeroInteractivity = () => {
-        const isLandscapeMobile = landscapeQuery.matches;
-        const isMobile = mobileQuery.matches;
-        const shouldDisable = isLandscapeMobile || isMobile;
-
-        if (shouldDisable) {
-          heroTitle.classList.add('hero-title--static');
-          // Keep tabindex for tour trigger accessibility
-          if (!heroTitle.hasAttribute('tabindex')) {
-            heroTitle.setAttribute('tabindex', '0');
-          }
-        } else {
-          heroTitle.classList.remove('hero-title--static');
-          if (!heroTitle.hasAttribute('tabindex')) {
-            heroTitle.setAttribute('tabindex', '0');
-          }
-        }
-
-      };
-
-      updateHeroInteractivity();
-
-      if (landscapeQuery.addEventListener) {
-        landscapeQuery.addEventListener('change', updateHeroInteractivity);
-      } else if (landscapeQuery.addListener) {
-        landscapeQuery.addListener(updateHeroInteractivity);
-      }
-
-      if (mobileQuery.addEventListener) {
-        mobileQuery.addEventListener('change', updateHeroInteractivity);
-      } else if (mobileQuery.addListener) {
-        mobileQuery.addListener(updateHeroInteractivity);
-      }
-
-      window.addEventListener('orientationchange', updateHeroInteractivity);
-      window.addEventListener('resize', updateHeroInteractivity);
-    });
-  </script>
 
 </div>
 </div>
