@@ -1,5 +1,9 @@
 {% extends 'base.html' %}
 
+{% block title %}{% if athlete_name %}{{ athlete_name }} - {% endif %}Athlete Dashboard - Track Insights{% endblock %}
+{% block meta_description %}{% if athlete_name %}View performance rankings, results, and sectional projections for {{ athlete_name }}{% if school_name %} of {{ school_name }}{% endif %}.{% else %}View Indiana high school track and field athlete performance data, rankings, and sectional projections.{% endif %}{% endblock %}
+{% block og_title %}{% if athlete_name %}{{ athlete_name }} - Athlete Dashboard{% else %}Athlete Dashboard{% endif %} - Track Insights{% endblock %}
+
 {% block content %}
 <!-- DaisyUI Top Navbar - consistent with home.html -->
 

@@ -1,5 +1,9 @@
 {% extends 'base.html' %}
 
+{% block title %}{% if school_name %}{{ school_name }} - {% endif %}School Dashboard - Track Insights{% endblock %}
+{% block meta_description %}{% if school_name %}Explore track and field data for {{ school_name }}{% if school_city %} in {{ school_city }}{% endif %} — athlete rosters, event results, and school comparisons.{% else %}View Indiana high school track and field school data, athlete rosters, and event results.{% endif %}{% endblock %}
+{% block og_title %}{% if school_name %}{{ school_name }} - School Dashboard{% else %}School Dashboard{% endif %} - Track Insights{% endblock %}
+
 {% block content %}
 <div class="min-h-screen bg-white pt-20 sm:pt-24 pb-24 sm:pb-32 px-2 sm:px-4">
 
