@@ -1,5 +1,9 @@
 {% extends 'base.html' %}
 
+{% block title %}{% if athlete_name %}{{ athlete_name }} - {% endif %}{{ event_name }} Result - Track Insights{% endblock %}
+{% block meta_description %}{% if athlete_name %}See how {{ athlete_name }}'s {{ event_name }} performance ranks across Indiana high school track and field sectionals.{% else %}Explore detailed result rankings and sectional projections for this {{ event_name }} performance.{% endif %}{% endblock %}
+{% block og_title %}{% if athlete_name %}{{ athlete_name }} - {% endif %}{{ event_name }} Result - Track Insights{% endblock %}
+
 {% block content %}
 <div class="min-h-screen bg-white pt-20 sm:pt-24 pb-24 sm:pb-32 px-2 sm:px-4">
   <div class="max-w-5xl mx-auto">

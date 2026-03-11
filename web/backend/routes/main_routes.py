@@ -1,6 +1,8 @@
-from flask import render_template, request, url_for
+from flask import render_template, request, url_for, Response
 from . import main_bp
 from ..queries import get_athletes
+from ..models import Athlete, School
+from sqlalchemy.orm import joinedload
 
 
 @main_bp.route('/')
@@ -67,28 +69,87 @@ def hypothetical_result_detail():
 
 @main_bp.route('/school-dashboard/<int:school_id>')
 def school_dashboard(school_id):
-    return render_template('school-dashboard.html', school_id=school_id)
+    school = School.query.get(school_id)
+    return render_template(
+        'school-dashboard.html',
+        school_id=school_id,
+        school_name=school.school_name if school else None,
+        school_city=school.city if school else None,
+    )
 
 
 @main_bp.route('/athlete-dashboard/<int:athlete_id>')
 def athlete_dashboard(athlete_id):
-    return render_template('athlete-dashboard.html', athlete_id=athlete_id)
+    athlete = Athlete.query.options(joinedload(Athlete.school)).get(athlete_id)
+    return render_template(
+        'athlete-dashboard.html',
+        athlete_id=athlete_id,
+        athlete_name=f"{athlete.first} {athlete.last}" if athlete else None,
+        school_name=athlete.school.school_name if athlete and athlete.school else None,
+    )
 
 
 @main_bp.route('/athlete-dashboard/<int:athlete_id>/result/<int:meet_id>/<path:event_name>')
 def athlete_result_detail(athlete_id, meet_id, event_name):
     result_type = request.args.get('result_type', 'Final')
+    athlete = Athlete.query.options(joinedload(Athlete.school)).get(athlete_id)
     return render_template(
         'athlete-result-detail.html',
         athlete_id=athlete_id,
         meet_id=meet_id,
         event_name=event_name,
         result_type=result_type,
+        athlete_name=f"{athlete.first} {athlete.last}" if athlete else None,
+        school_name=athlete.school.school_name if athlete and athlete.school else None,
     )
 
 
 @main_bp.route('/about')
 def about():
     return render_template('about.html')
+
+
+@main_bp.route('/robots.txt')
+def robots_txt():
+    lines = [
+        'User-agent: *',
+        'Allow: /',
+        '',
+        f'Sitemap: {url_for("main.sitemap_xml", _external=True)}',
+    ]
+    return Response('\n'.join(lines), mimetype='text/plain')
+
+
+@main_bp.route('/sitemap.xml')
+def sitemap_xml():
+    pages = [
+        url_for('main.home', _external=True),
+        url_for('main.search_page', _external=True),
+        url_for('main.insights_page', _external=True),
+        url_for('main.percentiles_query_page', _external=True),
+        url_for('main.sectional_trends_page', _external=True),
+        url_for('main.hypothetical_query_page', _external=True),
+        url_for('main.about', _external=True),
+    ]
+
+    athletes = Athlete.query.with_entities(Athlete.athlete_id).all()
+    for (aid,) in athletes:
+        pages.append(url_for('main.athlete_dashboard', athlete_id=aid, _external=True))
+
+    schools = School.query.with_entities(School.school_id).all()
+    for (sid,) in schools:
+        pages.append(url_for('main.school_dashboard', school_id=sid, _external=True))
+
+    xml_entries = []
+    for loc in pages:
+        xml_entries.append(f'  <url><loc>{loc}</loc></url>')
+
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + '\n'.join(xml_entries)
+        + '\n</urlset>'
+    )
+    return Response(xml, mimetype='application/xml')
 
 
