@@ -748,24 +748,43 @@
       const trackText = document.getElementById('track-text');
       const insightsText = document.getElementById('insights-text');
 
-      // Animate "Track" first
-      setTimeout(() => {
-        trackText.classList.add('float-in');
-      }, 250);
+      if (!overlay) {
+        return;
+      }
 
-      // Animate "Insights" after "Track"
-      setTimeout(() => {
-        insightsText.classList.add('float-in');
-      }, 500);
+      const removeOverlay = () => {
+        if (!overlay || !overlay.parentNode) {
+          return;
+        }
+        overlay.remove();
+      };
 
-      // Slide everything out to the right
-      setTimeout(() => {
-        overlay.classList.add('slide-out');
-        // Remove from DOM after animation completes
+      const fallbackTimer = setTimeout(removeOverlay, 2200);
+
+      const safeAnimate = (element, delay) => {
+        if (!element) {
+          return;
+        }
         setTimeout(() => {
-          overlay.remove();
-        }, 600);
-      }, 700);
+          element.classList.add('float-in');
+        }, delay);
+      };
+
+      try {
+        safeAnimate(trackText, 250);
+        safeAnimate(insightsText, 500);
+
+        setTimeout(() => {
+          overlay.classList.add('slide-out');
+          setTimeout(() => {
+            clearTimeout(fallbackTimer);
+            removeOverlay();
+          }, 600);
+        }, 700);
+      } catch (_error) {
+        clearTimeout(fallbackTimer);
+        removeOverlay();
+      }
     });
   </script>
 
@@ -1067,6 +1086,9 @@
       </a>
     </nav>
   </footer>
+
+  <div id="ti-footer-lightbulb-slot"
+    class="footer footer-horizontal fixed bottom-0 left-0 w-full justify-start bg-transparent pl-4 pb-4 pr-0 pt-0 overflow-visible pointer-events-none z-[84]"></div>
 
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
