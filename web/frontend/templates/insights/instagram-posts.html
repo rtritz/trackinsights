@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}Instagram Posts - Track Insights{% endblock %}
+{% block meta_description %}View Instagram posts from Track Insights directly in an embedded view.{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-white pt-20 sm:pt-24 pb-16 px-4">
+  <div class="relative max-w-4xl mx-auto">
+    <div
+      class="absolute inset-0 -z-10 mx-0 sm:mx-[-40px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none">
+    </div>
+    <div class="relative space-y-6">
+      <button onclick="history.back()" class="back-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+            clip-rule="evenodd" />
+        </svg>
+      </button>
+
+      <header class="text-center space-y-2">
+        <h1 class="font-impact italic text-4xl sm:text-5xl text-primary">
+          Instagram Posts
+        </h1>
+        <p class="text-base-content/70 max-w-2xl mx-auto text-sm sm:text-base">
+          Latest updates from @trackinsights
+        </p>
+      </header>
+
+      <div class="w-full">
+        <!-- Elfsight Instagram Feed Wrapper -->
+        <!-- Note: This uses a demo Elfsight widget. You can create your own free 3-column widget at elfsight.com -->
+        <div class="rounded-2xl overflow-hidden bg-transparent w-full">
+          <script src="https://static.elfsight.com/platform/platform.js" data-use-service-core defer></script>
+          <!-- The div below uses a default Elfsight app ID (which commonly shows Instagram posts in a masonry/grid style) 
+               Replace "e27a92fb-16ae-43fb-b0ee-91307b22a07c" with your own Widget ID if you sign up! -->
+          <div class="elfsight-app-e27a92fb-16ae-43fb-b0ee-91307b22a07c" data-elfsight-app-lazy></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

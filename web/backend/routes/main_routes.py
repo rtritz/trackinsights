@@ -46,6 +46,11 @@ def hypothetical_query_page():
     return render_template('insights/hypothetical.html')
 
 
+@main_bp.route('/insights/instagram-posts')
+def instagram_posts_page():
+    return render_template('insights/instagram-posts.html')
+
+
 @main_bp.route('/insights/hypothetical/result')
 def hypothetical_result_detail():
     event = request.args.get('event', '')
@@ -129,6 +134,7 @@ def sitemap_xml():
         url_for('main.percentiles_query_page', _external=True),
         url_for('main.sectional_trends_page', _external=True),
         url_for('main.hypothetical_query_page', _external=True),
+        url_for('main.instagram_posts_page', _external=True),
         url_for('main.about', _external=True),
     ]
 
