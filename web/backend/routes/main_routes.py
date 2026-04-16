@@ -31,6 +31,17 @@ def percentiles_report_page():
     )
 
 
+@main_bp.route('/insights/reports/top-returning-athletes')
+def top_returning_athletes_report_page():
+    return render_template(
+        'insights/report-viewer.html',
+        title='Top Returning Athletes Report',
+        description='A summary of the top returning Indiana high school track and field athletes.',
+        pdf_url=url_for('static', filename='top_returning_athletes.pdf'),
+        download_name='TrackInsights_Top_Returning_Athletes.pdf',
+    )
+
+
 @main_bp.route('/insights/percentiles')
 def percentiles_query_page():
     return render_template('insights/percentiles.html')
@@ -126,6 +137,8 @@ def sitemap_xml():
         url_for('main.home', _external=True),
         url_for('main.search_page', _external=True),
         url_for('main.insights_page', _external=True),
+        url_for('main.percentiles_report_page', _external=True),
+        url_for('main.top_returning_athletes_report_page', _external=True),
         url_for('main.percentiles_query_page', _external=True),
         url_for('main.sectional_trends_page', _external=True),
         url_for('main.hypothetical_query_page', _external=True),
