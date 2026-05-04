@@ -39,6 +39,7 @@ def top_returning_athletes_report_page():
         description='A summary of the top returning Indiana high school track and field athletes.',
         pdf_url=url_for('static', filename='top_returning_athletes.pdf'),
         download_name='TrackInsights_Top_Returning_Athletes.pdf',
+        show_credit_banner=True,
     )
 
 
