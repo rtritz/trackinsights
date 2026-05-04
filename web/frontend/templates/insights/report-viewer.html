@@ -36,6 +36,13 @@
         </a>
       </div>
 
+      {% if show_credit_banner %}
+      <div class="flex flex-wrap items-center justify-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-2 text-xs sm:text-sm text-primary">
+        <span class="font-semibold uppercase tracking-wide">Credit: Navraj</span>
+        <img src="{{ url_for('static', filename='images/navraj.png') }}" alt="Navraj" class="h-6 w-auto" />
+      </div>
+      {% endif %}
+
       <div class="rounded-2xl border border-base-200 shadow-lg overflow-hidden bg-gray-100"
         style="height: 76vh; min-height: 28rem; max-height: 90vh; resize: vertical; overflow: auto;">
         <iframe id="pdf-frame" src="{{ pdf_url }}" class="w-full h-full border-0" style="height: 100%; min-height: 100%;"
