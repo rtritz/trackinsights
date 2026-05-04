@@ -312,6 +312,15 @@ document.addEventListener('DOMContentLoaded', function () {
     activeHighlightTarget = null;
   };
 
+  const dismissTourForNavigation = () => {
+    if (localStorage.getItem(tourStorage.active) !== '1') {
+      return;
+    }
+    localStorage.removeItem(tourStorage.active);
+    localStorage.removeItem(tourStorage.step);
+    clearStepEmphasis();
+  };
+
   const applyStepEmphasis = (step) => {
     clearStepEmphasis();
 
@@ -348,6 +357,25 @@ document.addEventListener('DOMContentLoaded', function () {
     target.style.borderRadius = target.style.borderRadius || '9999px';
     activeHighlightTarget = target;
   };
+
+  const bindTourDismissOnNav = () => {
+    const insightsLink = document.getElementById('queries-toggle');
+    if (insightsLink) {
+      insightsLink.addEventListener('click', dismissTourForNavigation);
+    }
+
+    const mobileSearchLink = document.querySelector('a[aria-label="Go to search"]');
+    if (mobileSearchLink) {
+      mobileSearchLink.addEventListener('click', dismissTourForNavigation);
+    }
+
+    const navSearchPill = document.getElementById('nav-search-pill');
+    if (navSearchPill) {
+      navSearchPill.addEventListener('click', dismissTourForNavigation);
+    }
+  };
+
+  bindTourDismissOnNav();
 
   const lightbulbWidget = {
     wrap: null,
