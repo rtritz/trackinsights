@@ -3009,3 +3009,332 @@ def _compute_avg_places(school_id: int):
 
     return result
 
+
+# -----------------------------------------------------------------------------
+# Regional qualifier list (dynamic, current-year focused)
+# -----------------------------------------------------------------------------
+
+CURRENT_QUALIFIER_YEAR = 2026
+REGIONAL_SECTIONAL_GROUPS = {
+    1: (1, 2, 3, 4),
+    2: (5, 6, 7, 8),
+    3: (9, 10, 11, 12),
+    4: (13, 14, 15, 16),
+    5: (17, 18, 19, 20),
+    6: (21, 22, 23, 24),
+    7: (25, 26, 27, 28),
+    8: (29, 30, 31, 32),
+}
+REGIONAL_CALLBACK_COUNT = 4
+
+
+def _regional_events_for_gender(gender: str):
+    events = [
+        "100 Meters",
+        "200 Meters",
+        "400 Meters",
+        "800 Meters",
+        "1600 Meters",
+        "3200 Meters",
+        "300 Hurdles",
+        "High Jump",
+        "Long Jump",
+        "Shot Put",
+        "Discus",
+        "Pole Vault",
+        "4 x 100 Relay",
+        "4 x 400 Relay",
+        "4 x 800 Relay",
+    ]
+    events.insert(6, "110 Hurdles" if gender == "Boys" else "100 Hurdles")
+    return events
+
+
+def _regional_group_status(year: int, gender: str):
+    meet_nums = (
+        db.session.query(Meet.meet_num)
+        .filter(
+            Meet.meet_type == "Sectional",
+            Meet.year == year,
+            Meet.gender == gender,
+            Meet.meet_num.isnot(None),
+        )
+        .distinct()
+        .all()
+    )
+    loaded = {row[0] for row in meet_nums if row[0] is not None}
+
+    regional_host_rows = (
+        db.session.query(Meet.meet_num, Meet.host)
+        .filter(
+            Meet.meet_type == "Regional",
+            Meet.year == year,
+            Meet.gender == gender,
+            Meet.meet_num.isnot(None),
+        )
+        .all()
+    )
+    regional_hosts = {}
+    for meet_num, host in regional_host_rows:
+        if meet_num is None:
+            continue
+        if meet_num not in regional_hosts and host:
+            regional_hosts[meet_num] = host
+
+    regionals = []
+    for regional_num, feeders in REGIONAL_SECTIONAL_GROUPS.items():
+        feeder_set = set(feeders)
+        completed = sorted(feeder_set.intersection(loaded))
+        missing = sorted(feeder_set.difference(loaded))
+        if len(completed) == len(feeders):
+            status = "ready"
+        elif completed:
+            status = "not_ready"
+        else:
+            status = "not_ready"
+
+        regionals.append(
+            {
+                "regional_num": regional_num,
+                "status": status,
+                "completed_sectionals": len(completed),
+                "total_sectionals": len(feeders),
+                "missing_sectionals": missing,
+                "loaded_sectionals": completed,
+                "regional_host": regional_hosts.get(regional_num),
+            }
+        )
+
+    total_completed = sum(item["completed_sectionals"] for item in regionals)
+    ready_count = sum(1 for item in regionals if item["status"] == "ready")
+
+    return {
+        "year": year,
+        "gender": gender,
+        "ready_regionals": ready_count,
+        "total_regionals": len(REGIONAL_SECTIONAL_GROUPS),
+        "completed_sectionals": total_completed,
+        "total_sectionals": 32,
+        "generated_at": func.now(),
+        "regionals": regionals,
+    }
+
+
+def get_regional_qualifiers_status(gender: str, year: int = CURRENT_QUALIFIER_YEAR):
+    clean_gender = (gender or "").strip().title()
+    if clean_gender not in ("Boys", "Girls"):
+        raise ValueError("gender must be Boys or Girls")
+
+    payload = _regional_group_status(year, clean_gender)
+    payload["generated_at"] = str(db.session.query(func.datetime("now")).scalar())
+    payload["disclaimer"] = "Unofficial until IHSAA confirmation."
+    return payload
+
+
+def _extend_callbacks_for_ties(rows, callback_count):
+    def _result_value(item):
+        if isinstance(item, dict):
+            return item.get("result2")
+        return getattr(item, "result2", None)
+
+    if callback_count <= 0 or len(rows) <= callback_count:
+        return rows[:callback_count]
+
+    selected = list(rows[:callback_count])
+    last_value = _result_value(selected[-1])
+    idx = callback_count
+    while idx < len(rows) and _result_value(rows[idx]) == last_value:
+        selected.append(rows[idx])
+        idx += 1
+    return selected
+
+
+def _compute_event_qualifiers(event_name: str, gender: str, year: int, feeder_meet_nums: tuple):
+    event_type = _get_event_types_map().get(event_name, "Track")
+    lower_is_better = event_type != "Field"
+
+    if "Relay" in event_name:
+        rows = (
+            db.session.query(
+                RelayResult.school_id.label("school_id"),
+                School.school_name.label("school_name"),
+                RelayResult.event.label("event"),
+                RelayResult.result.label("result"),
+                RelayResult.result2.label("result2"),
+                RelayResult.place.label("place"),
+                Meet.host.label("host"),
+                Meet.meet_num.label("meet_num"),
+            )
+            .join(Meet, RelayResult.meet_id == Meet.meet_id)
+            .join(School, RelayResult.school_id == School.school_id)
+            .filter(
+                Meet.meet_type == "Sectional",
+                Meet.year == year,
+                Meet.gender == gender,
+                Meet.meet_num.in_(feeder_meet_nums),
+                RelayResult.event == event_name,
+                RelayResult.result2.isnot(None),
+                RelayResult.place.isnot(None),
+            )
+            .all()
+        )
+
+        top3 = [row for row in rows if row.place is not None and row.place <= 3]
+        others = [row for row in rows if row.place is not None and row.place > 3]
+        others_sorted = sorted(others, key=lambda row: row.result2, reverse=not lower_is_better)
+        callbacks = _extend_callbacks_for_ties(others_sorted, REGIONAL_CALLBACK_COUNT)
+
+        formatted = []
+        for row in top3:
+            formatted.append(
+                {
+                    "event": row.event,
+                    "event_type": event_type,
+                    "name": None,
+                    "grade": None,
+                    "school": row.school_name,
+                    "result": row.result,
+                    "result2": row.result2,
+                    "place": row.place,
+                    "sectional_host": row.host,
+                    "sectional_num": row.meet_num,
+                    "is_callback": False,
+                }
+            )
+
+        for row in callbacks:
+            formatted.append(
+                {
+                    "event": row.event,
+                    "event_type": event_type,
+                    "name": None,
+                    "grade": None,
+                    "school": row.school_name,
+                    "result": row.result,
+                    "result2": row.result2,
+                    "place": row.place,
+                    "sectional_host": row.host,
+                    "sectional_num": row.meet_num,
+                    "is_callback": True,
+                }
+            )
+
+        return sorted(formatted, key=lambda row: row["result2"], reverse=not lower_is_better)
+
+    rows = (
+        db.session.query(
+            AthleteResult.athlete_id.label("athlete_id"),
+            Athlete.first.label("first"),
+            Athlete.last.label("last"),
+            AthleteResult.grade.label("grade"),
+            School.school_name.label("school_name"),
+            AthleteResult.event.label("event"),
+            AthleteResult.result.label("result"),
+            AthleteResult.result2.label("result2"),
+            AthleteResult.place.label("place"),
+            Meet.host.label("host"),
+            Meet.meet_num.label("meet_num"),
+        )
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .join(School, Athlete.school_id == School.school_id)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .filter(
+            Meet.meet_type == "Sectional",
+            Meet.year == year,
+            Meet.gender == gender,
+            Meet.meet_num.in_(feeder_meet_nums),
+            AthleteResult.event == event_name,
+            AthleteResult.result_type == "Final",
+            AthleteResult.result2.isnot(None),
+            AthleteResult.place.isnot(None),
+        )
+        .all()
+    )
+
+    top3 = [row for row in rows if row.place is not None and row.place <= 3]
+    others = [row for row in rows if row.place is not None and row.place > 3]
+    others_sorted = sorted(others, key=lambda row: row.result2, reverse=not lower_is_better)
+    callbacks = _extend_callbacks_for_ties(others_sorted, REGIONAL_CALLBACK_COUNT)
+
+    formatted = []
+    for row in top3:
+        formatted.append(
+            {
+                "event": row.event,
+                "event_type": event_type,
+                "name": f"{(row.last or '').strip()}, {(row.first or '').strip()}".strip(", "),
+                "grade": row.grade,
+                "school": row.school_name,
+                "result": row.result,
+                "result2": row.result2,
+                "place": row.place,
+                "sectional_host": row.host,
+                "sectional_num": row.meet_num,
+                "is_callback": False,
+            }
+        )
+
+    for row in callbacks:
+        formatted.append(
+            {
+                "event": row.event,
+                "event_type": event_type,
+                "name": f"{(row.last or '').strip()}, {(row.first or '').strip()}".strip(", "),
+                "grade": row.grade,
+                "school": row.school_name,
+                "result": row.result,
+                "result2": row.result2,
+                "place": row.place,
+                "sectional_host": row.host,
+                "sectional_num": row.meet_num,
+                "is_callback": True,
+            }
+        )
+
+    return sorted(formatted, key=lambda row: row["result2"], reverse=not lower_is_better)
+
+
+def get_regional_qualifiers(gender: str, regional_num: int, year: int = CURRENT_QUALIFIER_YEAR):
+    clean_gender = (gender or "").strip().title()
+    if clean_gender not in ("Boys", "Girls"):
+        raise ValueError("gender must be Boys or Girls")
+
+    if regional_num not in REGIONAL_SECTIONAL_GROUPS:
+        raise ValueError("regional_num must be an integer between 1 and 8")
+
+    status_payload = _regional_group_status(year, clean_gender)
+    status_map = {row["regional_num"]: row for row in status_payload["regionals"]}
+    regional_status = status_map[regional_num]
+
+    response = {
+        "context": {
+            "year": year,
+            "gender": clean_gender,
+            "regional_num": regional_num,
+            "status": regional_status["status"],
+            "completed_sectionals": regional_status["completed_sectionals"],
+            "total_sectionals": regional_status["total_sectionals"],
+            "missing_sectionals": regional_status["missing_sectionals"],
+            "generated_at": str(db.session.query(func.datetime("now")).scalar()),
+            "disclaimer": "Unofficial until IHSAA confirmation.",
+        },
+        "events": [],
+    }
+
+    if regional_status["status"] != "ready":
+        return response
+
+    feeder_meet_nums = REGIONAL_SECTIONAL_GROUPS[regional_num]
+    events = _regional_events_for_gender(clean_gender)
+    for event_name in events:
+        qualifiers = _compute_event_qualifiers(event_name, clean_gender, year, feeder_meet_nums)
+        response["events"].append(
+            {
+                "event": event_name,
+                "event_type": _get_event_types_map().get(event_name, "Track"),
+                "qualifiers": qualifiers,
+            }
+        )
+
+    return response
+

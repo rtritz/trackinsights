@@ -300,68 +300,68 @@ class Database:
 
 		if gender == "Boys":
 			if event == "4 x 800 Relay":
-			    sum = sum + c.time_to_seconds("7:55.19")
+			    sum = sum + c.time_to_seconds("7:55.14")
 			elif event == "110 Hurdles":
-			    sum = sum + c.time_to_seconds("14.85")
+			    sum = sum + c.time_to_seconds("14.62")
 			elif event == "100 Meters":
-			    sum = sum + c.time_to_seconds("10.82")
+			    sum = sum + c.time_to_seconds("10.97")
 			elif event == "1600 Meters":
-			    sum = sum + c.time_to_seconds("4:15.87")
+			    sum = sum + c.time_to_seconds("4:15.49")
 			elif event == "4 x 100 Relay":
-			    sum = sum + c.time_to_seconds("42.45")
+			    sum = sum + c.time_to_seconds("42.36")
 			elif event == "400 Meters":
-			    sum = sum + c.time_to_seconds("49.19")
+			    sum = sum + c.time_to_seconds("48.87")
 			elif event == "300 Hurdles":
-			    sum = sum + c.time_to_seconds("39.47")
+			    sum = sum + c.time_to_seconds("39.10")
 			elif event == "800 Meters":
-			    sum = sum + c.time_to_seconds("1:54.84")
+			    sum = sum + c.time_to_seconds("1:55.30")
 			elif event == "200 Meters":
-			    sum = sum + c.time_to_seconds("21.98")
+			    sum = sum + c.time_to_seconds("22.15")
 			elif event == "3200 Meters":
-			    sum = sum + c.time_to_seconds("9:11.71")
+			    sum = sum + c.time_to_seconds("9:09.20")
 			elif event == "4 x 400 Relay":
-			    sum = sum + c.time_to_seconds("3:21.56")
+			    sum = sum + c.time_to_seconds("3:21.72")
 			elif event == "Discus":
-			    sum = sum + c.distance_to_inches("158' 9\"")
+			    sum = sum + c.distance_to_inches("165' 8\"")
 			elif event == "Shot Put":
-			    sum = sum + c.distance_to_inches("57' 4.5\"")
+			    sum = sum + c.distance_to_inches("56' 3.25\"")
 			elif event == "Long Jump":
-			    sum = sum + c.distance_to_inches("22' 2\"")
+			    sum = sum + c.distance_to_inches("22' 3\"")
 			elif event == "High Jump":
-			    sum = sum + c.distance_to_inches("6' 4\"")
+			    sum = sum + c.distance_to_inches("6' 6\"")
 			elif event == "Pole Vault":
-			    sum = sum + c.distance_to_inches("14' 0\"")
+			    sum = sum + c.distance_to_inches("14' 9\"")
 		else:
 			if event == "4 x 800 Relay":
-				sum = sum + c.time_to_seconds("9:25.87")
+				sum = sum + c.time_to_seconds("9:20.44")
 			elif event == "100 Hurdles":
-				sum = sum + c.time_to_seconds("14.54")
+				sum = sum + c.time_to_seconds("14.87")
 			elif event == "100 Meters":
-				sum = sum + c.time_to_seconds("12.17")
+				sum = sum + c.time_to_seconds("12.23")
 			elif event == "1600 Meters":
-				sum = sum + c.time_to_seconds("5:01.10")
+				sum = sum + c.time_to_seconds("4:57.56")
 			elif event == "4 x 100 Relay":
-				sum = sum + c.time_to_seconds("48.52")
+				sum = sum + c.time_to_seconds("48.05")
 			elif event == "400 Meters":
-				sum = sum + c.time_to_seconds("57.79")
+				sum = sum + c.time_to_seconds("57.39")
 			elif event == "300 Hurdles":
-				sum = sum + c.time_to_seconds("45.43")
+				sum = sum + c.time_to_seconds("45.07")
 			elif event == "800 Meters":
-				sum = sum + c.time_to_seconds("2:16.09")
+				sum = sum + c.time_to_seconds("2:13.68")
 			elif event == "200 Meters":
-				sum = sum + c.time_to_seconds("25.37")
+				sum = sum + c.time_to_seconds("25.20")
 			elif event == "3200 Meters":
-				sum = sum + c.time_to_seconds("10:47.35")
+				sum = sum + c.time_to_seconds("10:45.74")
 			elif event == "4 x 400 Relay":
-				sum = sum + c.time_to_seconds("3:59.08")
+				sum = sum + c.time_to_seconds("3:57.56")
 			elif event == "Discus":
-				sum = sum + c.distance_to_inches("125' 7\"")
+				sum = sum + c.distance_to_inches("130' 6\"")
 			elif event == "Shot Put":
-				sum = sum + c.distance_to_inches("41' 2.5\"")
+				sum = sum + c.distance_to_inches("41' 6.75\"")
 			elif event == "Long Jump":
-				sum = sum + c.distance_to_inches("18' 2.25\"")
+				sum = sum + c.distance_to_inches("18' 0\"")
 			elif event == "High Jump":
-				sum = sum + c.distance_to_inches("5' 4\"")
+				sum = sum + c.distance_to_inches("5' 5\"")
 			elif event == "Pole Vault":
 				sum = sum + c.distance_to_inches("11' 3\"")
 		
