@@ -15,27 +15,32 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <meta property="og:title" content="Track Insights - An Indiana Track and Field Data Analysis Project" />
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://trackinsights.com/" />
-  <meta property="og:image" content="https://trackinsights.example.com/static/images/og-image.jpg" />
+  <title>{% block title %}Track Insights - Indiana High School Track & Field Data{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Explore Indiana high school track and field data — athlete dashboards, school comparisons, percentile rankings, and sectional projections.{% endblock %}">
+  <link rel="canonical" href="{% block canonical %}{{ request.url }}{% endblock %}">
 
-  <title>Track Insights</title>
+  <meta property="og:title" content="{% block og_title %}Track Insights - Indiana High School Track & Field Data{% endblock %}" />
+  <meta property="og:description" content="{% block og_description %}Explore Indiana high school track and field data — athlete dashboards, school comparisons, percentile rankings, and sectional projections.{% endblock %}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="{{ request.url }}" />
+  <meta property="og:image" content="{{ url_for('static', filename='images/favicon-ti.webp', _external=True) }}" />
+
   <link rel="icon" type="image/webp" href="{{ url_for('static', filename='images/favicon-ti.webp') }}" />
-  <!-- <link href="../static/css/output.css" rel="stylesheet"> -->
-   <link rel="icon" href="{{ url_for('static', filename='images/favicon-ti.webp') }}">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
   <link href="{{ url_for('static', filename='css/output.css') }}" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
   <link href="https://cdn.jsdelivr.net/combine/npm/daisyui@5/theme/autumn.css" rel="stylesheet" type="text/css" />
 
-  <!-- Oswald font via Google Fonts -->
+  <!-- Google Fonts (non-blocking) -->
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Racing+Sans+One&family=Contrail+One&family=Staatliches&display=swap" rel="stylesheet">
+
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Oswald:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Racing+Sans+One&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Contrail+One&family=Racing+Sans+One&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Contrail+One&family=Racing+Sans+One&family=Staatliches&display=swap');
 
     .font-impact {
       font-family: 'Oswald', 'Arial Narrow', 'Segoe UI', 'Arial', sans-serif;
@@ -170,7 +175,7 @@
     <div class="flex w-full items-center justify-center relative md:hidden min-w-0">
       <a href="{{ url_for('main.home') }}" class="font-impact italic text-primary text-3xl font-bold tracking-wide truncate">Track Insights</a>
       <div class="flex items-center gap-2 shrink-0 absolute right-0">
-        <a href="{{ url_for('main.search_page') }}" class="btn btn-circle btn-sm border-primary/50 text-primary bg-white/70 shadow-md"
+        <a href="{{ url_for('main.search_page') }}" class="btn btn-circle btn-sm border-2 border-gray-900 text-primary bg-white/90 mobile-nav-btn"
           aria-label="Go to search">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
             stroke-width="2">
@@ -179,7 +184,7 @@
           </svg>
         </a>
         <button type="button" id="mobile-nav-toggle"
-          class="btn btn-circle btn-primary btn-sm text-white border-none shadow-lg" aria-label="Open menu">
+          class="btn btn-circle btn-primary btn-sm text-white border-2 border-gray-900 mobile-nav-btn" aria-label="Open menu">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
             stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -207,6 +212,7 @@
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
         </span>
+        <span class="search-pill__label">Search</span>
         <div class="search-pill__content">
           <form id="navSearchForm" class="search-pill__form" role="search" onsubmit="return false;" novalidate>
             <label for="navSearchInput" class="sr-only">Search for your athlete's name and school</label>
@@ -222,7 +228,7 @@
           </button>
         </div>
       </div>
-      <a href="{{ url_for('main.queries_page') }}" id="queries-toggle" aria-label="Queries" class="nav-pill pointer-events-auto">
+      <a href="{{ url_for('main.insights_page') }}" id="queries-toggle" aria-label="Insights" class="nav-pill pointer-events-auto">
         <span class="nav-pill__icon-bubble" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" class="nav-pill__icon" fill="currentColor"
             aria-hidden="true" focusable="false">
@@ -230,9 +236,9 @@
               d="m665.216 768 110.848 192h-73.856L591.36 768H433.024L322.176 960H248.32l110.848-192H160a32 32 0 0 1-32-32V192H64a32 32 0 0 1 0-64h896a32 32 0 1 1 0 64h-64v544a32 32 0 0 1-32 32H665.216zM832 192H192v512h640V192zM352 448a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0v-64a32 32 0 0 1 32-32zm160-64a32 32 0 0 1 32 32v128a32 32 0 0 1-64 0V416a32 32 0 0 1 32-32zm160-64a32 32 0 0 1 32 32v192a32 32 0 1 1-64 0V352a32 32 0 0 1 32-32z" />
           </svg>
         </span>
-        <span class="nav-pill__label">Queries</span>
+        <span class="nav-pill__label">Insights</span>
       </a>
-      <a href="{{ url_for('main.about') }}" id="about-toggle" aria-label="About" class="nav-pill pointer-events-auto">
+      <a href="{{ url_for('main.home') }}#about" id="about-toggle" aria-label="About" class="nav-pill pointer-events-auto">
         <span class="nav-pill__icon-bubble" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="nav-pill__icon" aria-hidden="true"
             focusable="false">
@@ -258,8 +264,8 @@
     <nav class="flex flex-col items-center gap-6 text-2xl font-impact tracking-wider text-center">
       <a href="{{ url_for('main.home') }}" class="mobile-menu-link uppercase">Home</a>
       <a href="{{ url_for('main.search_page') }}" class="mobile-menu-link uppercase">Search</a>
-      <a href="{{ url_for('main.queries_page') }}" class="mobile-menu-link uppercase">Queries</a>
-      <a href="{{ url_for('main.about') }}" class="mobile-menu-link uppercase">About</a>
+      <a href="{{ url_for('main.insights_page') }}" class="mobile-menu-link uppercase">Insights</a>
+      <a href="{{ url_for('main.home') }}#about" class="mobile-menu-link uppercase">About</a>
     </nav>
   </div>
   
@@ -285,21 +291,116 @@
       }
     }
 
+    .mobile-nav-btn {
+      box-shadow: 3px 3px 0 0 #111827;
+      transition: box-shadow 100ms ease, transform 100ms ease;
+    }
+
+    .mobile-nav-btn:active {
+      box-shadow: none !important;
+      transform: translate(3px, 3px);
+    }
+
+    .back-btn {
+      position: fixed;
+      top: 1.25rem;
+      left: 1rem;
+      z-index: 70;
+      height: 2rem;
+      width: 2rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 2px solid #111827;
+      background: #8c0327;
+      color: #ffffff;
+      box-shadow: 3px 3px 0 0 #111827;
+      appearance: none;
+      -webkit-appearance: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      cursor: pointer;
+      transition: box-shadow 100ms ease, transform 100ms ease, background 180ms ease, color 180ms ease;
+    }
+
+    .back-btn:hover {
+      background: #6b0220;
+      box-shadow: 4px 4px 0 0 #111827;
+      outline: none;
+    }
+
+    .back-btn:focus-visible {
+      background: #6b0220;
+      box-shadow: 4px 4px 0 0 #111827;
+      outline: none;
+    }
+
+    .back-btn:active {
+      box-shadow: none;
+      transform: translate(3px, 3px);
+      background: #6b0220;
+    }
+
+    @media (min-width: 640px) {
+      .back-btn {
+        left: 1.25rem;
+      }
+    }
+
+    @media (min-width: 768px) {
+      .back-btn {
+        top: 1.75rem;
+        left: 2.5rem;
+        height: 2.5rem;
+        width: 2.5rem;
+      }
+    }
+
     .search-pill {
       position: relative;
       display: flex;
       align-items: center;
       background: #8c0327;
       color: #ffffff;
-      border: 2px solid #8c0327;
+      border: 2px solid #111827;
       border-radius: 999px;
       width: var(--nav-pill-size);
       height: var(--nav-pill-size);
       padding: 0;
-      box-shadow: 0 4px 12px rgba(17, 24, 39, 0.16);
+      box-shadow: 3px 3px 0 0 #111827;
       cursor: pointer;
       overflow: hidden;
-      transition: width 340ms cubic-bezier(0.22, 1, 0.36, 1), height 220ms ease, padding 220ms ease, box-shadow 240ms ease;
+      transition: width 340ms cubic-bezier(0.22, 1, 0.36, 1), height 220ms ease, padding 220ms ease, box-shadow 100ms ease, transform 100ms ease;
+    }
+
+    .search-pill:not([data-open="true"]):not(.open):hover,
+    .search-pill:not([data-open="true"]):not(.open):focus-visible {
+      width: calc(var(--nav-pill-size) + 5.35rem);
+      justify-content: flex-start;
+      padding: 0 0.65rem 0 0.55rem;
+      box-shadow: 4px 4px 0 0 #111827;
+    }
+
+    .search-pill:not([data-open="true"]):not(.open):hover .search-pill__icon-bubble,
+    .search-pill:not([data-open="true"]):not(.open):focus-visible .search-pill__icon-bubble {
+      position: static;
+      transform: none;
+      width: 2.4rem;
+      height: 2.4rem;
+      margin-right: 0.55rem;
+    }
+
+    .search-pill:not([data-open="true"]):not(.open):hover .search-pill__label,
+    .search-pill:not([data-open="true"]):not(.open):focus-visible .search-pill__label {
+      opacity: 1;
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+
+    .search-pill:not([data-open="true"]):not(.open):active {
+      box-shadow: none;
+      transform: translate(3px, 3px);
     }
 
     .search-pill[data-open="true"],
@@ -307,9 +408,10 @@
       width: 80%;
       height: var(--nav-pill-size);
       padding: 0 0.55rem 0 0.7rem;
-      box-shadow: 0 20px 48px rgba(17, 24, 39, 0.24);
+      box-shadow: 4px 4px 0 0 #111827;
       cursor: text;
       background: #ffffff;
+      border-color: #111827;
       color: var(--primary-color);
     }
 
@@ -426,6 +528,24 @@
       outline: none;
     }
 
+    .search-pill__label {
+      font-size: clamp(0.9rem, 1.2vw, 1.05rem);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      opacity: 0;
+      transform: translateX(-0.35rem);
+      transition: opacity 160ms ease;
+      pointer-events: none;
+      color: #ffffff;
+    }
+
+    .search-pill[data-open="true"] .search-pill__label,
+    .search-pill.open .search-pill__label {
+      display: none;
+    }
+
     .nav-pill {
       position: relative;
       display: flex;
@@ -434,26 +554,31 @@
       width: var(--nav-pill-size);
       height: var(--nav-pill-size);
       border-radius: 999px;
-      border: 2px solid var(--primary-color);
+      border: 2px solid #111827;
       background: #ffffff;
       color: var(--primary-color);
       padding: 0;
       cursor: pointer;
       overflow: hidden;
-      box-shadow: 0 4px 12px rgba(17, 24, 39, 0.16);
+      box-shadow: 3px 3px 0 0 #111827;
       flex-shrink: 0;
       flex-grow: 0;
-      transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1), padding 200ms ease, box-shadow 220ms ease,  color 180ms ease;
+      transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1), padding 200ms ease, box-shadow 100ms ease, transform 100ms ease, color 180ms ease;
     }
 
     .nav-pill:hover,
     .nav-pill:focus-visible,
     .nav-pill.is-active {
-      width: calc(var(--nav-pill-size) + 5.35rem);
+      width: calc(var(--nav-pill-size) + 6.2rem);
       justify-content: flex-start;
       padding: 0 0.65rem 0 0.55rem;
-      box-shadow: 0 20px 48px rgba(17, 24, 39, 0.24), 0 0 0 3px rgba(140, 3, 39, 0.2);
+      box-shadow: 4px 4px 0 0 #111827;
       outline: none;
+    }
+
+    .nav-pill:active {
+      box-shadow: none;
+      transform: translate(3px, 3px);
     }
 
     .nav-pill__icon-bubble {
@@ -517,10 +642,15 @@
         width: min(92vw, 100%);
       }
 
+      .search-pill:not([data-open="true"]):not(.open):hover,
+      .search-pill:not([data-open="true"]):not(.open):focus-visible {
+        width: calc(var(--nav-pill-size) + 4.6rem);
+      }
+
       .nav-pill:hover,
       .nav-pill:focus-visible,
       .nav-pill.is-active {
-        width: calc(var(--nav-pill-size) + 4.6rem);
+        width: calc(var(--nav-pill-size) + 5.4rem);
       }
     }
 
@@ -614,7 +744,7 @@
 
     @media (max-width: 767px) and (orientation: portrait) {
       .navbar-mobile-pad {
-        padding-top: 1.25rem; /* Tailwind pt-5 */
+        padding-top: 0.5rem; /* Reduced for better vertical centering */
       }
     }
 
@@ -631,24 +761,43 @@
       const trackText = document.getElementById('track-text');
       const insightsText = document.getElementById('insights-text');
 
-      // Animate "Track" first
-      setTimeout(() => {
-        trackText.classList.add('float-in');
-      }, 250);
+      if (!overlay) {
+        return;
+      }
 
-      // Animate "Insights" after "Track"
-      setTimeout(() => {
-        insightsText.classList.add('float-in');
-      }, 500);
+      const removeOverlay = () => {
+        if (!overlay || !overlay.parentNode) {
+          return;
+        }
+        overlay.remove();
+      };
 
-      // Slide everything out to the right
-      setTimeout(() => {
-        overlay.classList.add('slide-out');
-        // Remove from DOM after animation completes
+      const fallbackTimer = setTimeout(removeOverlay, 2200);
+
+      const safeAnimate = (element, delay) => {
+        if (!element) {
+          return;
+        }
         setTimeout(() => {
-          overlay.remove();
-        }, 600);
-      }, 700);
+          element.classList.add('float-in');
+        }, delay);
+      };
+
+      try {
+        safeAnimate(trackText, 250);
+        safeAnimate(insightsText, 500);
+
+        setTimeout(() => {
+          overlay.classList.add('slide-out');
+          setTimeout(() => {
+            clearTimeout(fallbackTimer);
+            removeOverlay();
+          }, 600);
+        }, 700);
+      } catch (_error) {
+        clearTimeout(fallbackTimer);
+        removeOverlay();
+      }
     });
   </script>
 
@@ -674,6 +823,12 @@
       let resultsPanelTimeoutId = null;
 
       const isMobileViewport = () => window.matchMedia('(max-width: 767px)').matches;
+      const isHomePage = () => window.location.pathname === '{{ url_for('main.home') }}';
+      const scrollToAbout = () => {
+        const aboutSection = document.getElementById('about');
+        if (!aboutSection) return;
+        aboutSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
       const redirectToSearchPage = () => {
         window.location.href = "{{ url_for('main.search_page') }}";
       };
@@ -701,8 +856,31 @@
       }
 
       mobileMenuLinks.forEach(link => {
-        link.addEventListener('click', closeMobileMenu);
+        if (link.textContent.trim().toLowerCase() === 'about') {
+          link.addEventListener('click', function(e) {
+            e.preventDefault();
+            closeMobileMenu();
+            if (isHomePage()) {
+              scrollToAbout();
+            } else {
+              window.location.href = '{{ url_for('main.home') }}#about';
+            }
+          });
+        } else {
+          link.addEventListener('click', closeMobileMenu);
+        }
       });
+
+      if (aboutButton) {
+        aboutButton.addEventListener('click', function(e) {
+          e.preventDefault();
+          if (isHomePage()) {
+            scrollToAbout();
+          } else {
+            window.location.href = '{{ url_for('main.home') }}#about';
+          }
+        });
+      }
 
       const adjustResultsPanelBounds = () => {
         if (!resultsPanel || !searchPill || !aboutButton || !navbarEnd) return;
@@ -897,7 +1075,9 @@
     });
   </script>
 
+  <main>
   {% block content %}{% endblock %}
+  </main>
 
   <footer class="hidden footer sm:footer-horizontal bg-base-200 text-black items-center p-4 relative">
     <aside class="hidden grid-flow-col items-center">
@@ -919,6 +1099,9 @@
       </a>
     </nav>
   </footer>
+
+  <div id="ti-footer-lightbulb-slot"
+    class="footer footer-horizontal fixed bottom-0 left-0 w-full justify-start bg-transparent pl-4 pb-4 pr-0 pt-0 overflow-visible pointer-events-none z-[84]"></div>
 
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
