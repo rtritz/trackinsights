@@ -15,6 +15,8 @@ from ..queries import (
     get_hypothetical_result_rankings,
     get_school_dashboard_data,
     _compute_school_percentiles,
+    get_regional_qualifiers_status,
+    get_regional_qualifiers,
 )
 
 
@@ -228,4 +230,42 @@ def api_get_school_percentiles(school_id):
     year = request.args.get('year', type=int)
     results = _compute_school_percentiles(school_id, year=year)
     return jsonify(results)
+
+
+@api_bp.route('/regional-qualifiers/status')
+def api_regional_qualifiers_status():
+    """Return regional readiness status for a gender and year."""
+    gender = request.args.get('gender', 'Boys').strip()
+    year = request.args.get('year', default=2026, type=int)
+    if year is None or year < 2000:
+        return jsonify({'error': 'year must be a valid season year'}), 400
+
+    try:
+        payload = get_regional_qualifiers_status(gender=gender, year=year)
+        return jsonify(payload)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
+
+
+@api_bp.route('/regional-qualifiers')
+def api_regional_qualifiers():
+    """Return regional qualifier list for a specific gender, year, and regional."""
+    gender = request.args.get('gender', 'Boys').strip()
+    regional_num = request.args.get('regional_num', type=int)
+    year = request.args.get('year', default=2026, type=int)
+
+    if regional_num is None:
+        return jsonify({'error': 'regional_num is required'}), 400
+    if year is None or year < 2000:
+        return jsonify({'error': 'year must be a valid season year'}), 400
+
+    try:
+        payload = get_regional_qualifiers(gender=gender, regional_num=regional_num, year=year)
+        return jsonify(payload)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
 
