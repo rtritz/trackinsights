@@ -456,3 +456,46 @@ class Database:
 
 	def do_commit(self):
 		self.conn.commit()
+
+	def get_athlete_id_by_name_school(self, first: str, last: str, school_id: int) -> int | None:
+	    """
+	    Look up an athlete by name and school only, ignoring grad year.
+	    Returns athlete_id or None if not found.
+	    """
+	    query = """
+	        SELECT athlete_id
+	        FROM athlete
+	        WHERE UPPER(first) = UPPER(?)
+	          AND UPPER(last)  = UPPER(?)
+	          AND school_id    = ?
+	        LIMIT 1
+	    """
+	    row = self.cursor.execute(query, (first, last, school_id)).fetchone()
+	    return row[0] if row else None
+	
+	
+	def get_athlete_grad_year(self, athlete_id: int) -> int | None:
+	    """
+	    Return the grad_year for a given athlete_id, or None if not found.
+	    """
+	    query = """
+	        SELECT grad_year
+	        FROM athlete
+	        WHERE athlete_id = ?
+	    """
+	    row = self.cursor.execute(query, (athlete_id,)).fetchone()
+	    return row[0] if row else None
+	
+	
+	def update_athlete_grad_year(self, athlete_id: int, grad_year: int, commit: bool = True) -> None:
+	    """
+	    Update the grad_year for a given athlete_id.
+	    """
+	    query = """
+	        UPDATE athlete
+	        SET grad_year = ?
+	        WHERE athlete_id = ?
+	    """
+	    self.cursor.execute(query, (grad_year, athlete_id))
+	    if commit:
+	        self.connection.commit()

@@ -19,19 +19,20 @@ class Conversion:
 		return round(min * 60 + sec, 2)
 	
 	def distance_to_inches(self, distance):
-		if distance.isalpha():
-			return 0
+	    if distance.isalpha():
+	        return 0
 	
-		distance = distance.replace("\"", "")
-		index = distance.find("'")
-		
-		if index == -1:
-			return float(distance)
-			
-		feet = int(distance[0:index])
-		inches = float(distance[index+1:])
-		
-		return feet * 12 + inches
+	    distance = distance.replace('"', '').replace("'", '-').strip()
+	
+	    index = distance.find('-')
+	
+	    if index == -1:
+	        return float(distance)
+	
+	    feet   = int(distance[0:index])
+	    inches = float(distance[index+1:]) if distance[index+1:] else 0.0
+	
+	    return feet * 12 + inches
 	
 	def inches_to_distance(self, total_inches):
 		feet = total_inches // 12
