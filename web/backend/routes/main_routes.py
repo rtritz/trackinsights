@@ -60,7 +60,41 @@ def hypothetical_query_page():
 
 @main_bp.route('/insights/regional-qualifiers')
 def regional_qualifiers_page():
-    return render_template('insights/regional-qualifiers.html')
+    return render_template(
+        'insights/regional-qualifiers.html',
+        page_heading='Unofficial Regional Qualifiers',
+        page_title='Unofficial Regional Qualifiers - Track Insights',
+        page_description='Unofficial regional qualifier lists.',
+        page_subtitle='These lists are unofficial and do not reflect any scratches that may have been made at the sectional level.',
+        coverage_unit='sectionals',
+        completed_field='completed_sectionals',
+        total_field='total_sectionals',
+        missing_field='missing_sectionals',
+        load_error='Unable to load regional qualifiers.',
+        detail_unavailable_text='That regional is awaiting meet result data.',
+        api_status_url='/api/regional-qualifiers/status',
+        api_detail_url='/api/regional-qualifiers',
+    )
+
+
+@main_bp.route('/insights/state-qualifiers')
+def state_qualifiers_page():
+    return render_template(
+        'insights/state-qualifiers.html',
+        page_heading='Unofficial State Qualifiers',
+        page_title='Unofficial State Qualifiers - Track Insights',
+        page_description='Unofficial state qualifier lists.',
+        page_subtitle='These lists are unofficial and do not reflect any scratches that may have been made at the regional level.',
+        coverage_unit='regional meet results',
+        completed_field='completed_regionals',
+        total_field='total_regionals',
+        missing_field='missing_regionals',
+        load_error='Unable to load state qualifiers.',
+        status_error='Unable to load state status.',
+        pending_text='State qualifiers are pending.',
+        api_status_url='/api/state-qualifiers/status',
+        api_detail_url='/api/state-qualifiers',
+    )
 
 
 @main_bp.route('/insights/hypothetical/result')
@@ -149,6 +183,7 @@ def sitemap_xml():
         url_for('main.sectional_trends_page', _external=True),
         url_for('main.hypothetical_query_page', _external=True),
         url_for('main.regional_qualifiers_page', _external=True),
+        url_for('main.state_qualifiers_page', _external=True),
         url_for('main.about', _external=True),
     ]
 
