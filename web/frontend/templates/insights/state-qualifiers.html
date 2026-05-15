@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title|default('Unofficial State Qualifiers - Track Insights') }}{% endblock %}
+{% block meta_description %}{{ page_description|default('Unofficial state qualifier lists.') }}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-white pt-20 sm:pt-24 pb-10 px-3 sm:px-6">
+  <div class="relative max-w-6xl mx-auto">
+    <div class="absolute inset-0 -z-10 mx-0 sm:mx-[-40px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none"></div>
+
+    <div class="relative space-y-6">
+      <button onclick="history.back()" class="back-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+        </svg>
+      </button>
+
+      <header class="text-center space-y-2">
+        <h1 class="font-impact italic text-4xl sm:text-5xl text-primary">{{ page_heading|default('Unofficial State Qualifiers') }}</h1>
+        <p class="text-sm sm:text-base text-base-content/70 max-w-2xl mx-auto">{{ page_subtitle|default('These lists are unofficial and do not reflect any scratches that may have been made at the regional level.') }}</p>
+      </header>
+
+      <div class="rounded-[24px] bg-white border border-base-200 p-4 sm:p-6 shadow-lg">
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-2" id="gender-group"></div>
+          <label for="year-select" class="text-xs sm:text-sm text-base-content/70">Year</label>
+          <select id="year-select" class="select select-sm select-bordered w-24">
+            <option value="2026">2026</option>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
+            <option value="2023">2023</option>
+          </select>
+        </div>
+      </div>
+
+      <section class="rounded-[24px] bg-white border border-base-200 p-4 sm:p-6 shadow-lg space-y-4">
+        <div id="status-line" class="text-sm text-base-content/60 px-1 hidden"></div>
+        <div id="status-loading" class="hidden text-sm text-base-content/50 px-1">
+          Loading state qualifiers...
+        </div>
+
+        <div id="detail-loading" class="hidden py-8 text-center">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+        </div>
+
+        <div id="detail-content" class="hidden space-y-6"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const apiStatusUrl = {{ api_status_url|default('/api/state-qualifiers/status')|tojson }};
+  const apiDetailUrl = {{ api_detail_url|default('/api/state-qualifiers')|tojson }};
+  const loadErrorMessage = {{ load_error|default('Unable to load state qualifiers.')|tojson }};
+  const statusErrorMessage = {{ status_error|default('Unable to load state status.')|tojson }};
+  const pendingText = {{ pending_text|default('State qualifiers are pending.')|tojson }};
+  const params = new URLSearchParams(window.location.search);
+  const parsedYear = Number.parseInt(params.get('year') || '2026', 10);
+  const selectedYear = Number.isInteger(parsedYear) && parsedYear >= 2000 ? parsedYear : 2026;
+
+  const state = {
+    year: selectedYear,
+    gender: 'Boys',
+    statusPayload: null,
+  };
+
+  const yearSelect = document.getElementById('year-select');
+  const genderGroup = document.getElementById('gender-group');
+  const statusLine = document.getElementById('status-line');
+  const statusLoading = document.getElementById('status-loading');
+  const detailLoading = document.getElementById('detail-loading');
+  const detailContent = document.getElementById('detail-content');
+  const genders = ['Boys', 'Girls'];
+
+  yearSelect.value = String(state.year);
+
+  yearSelect.addEventListener('change', () => {
+    const nextYear = Number.parseInt(yearSelect.value, 10);
+    if (!Number.isInteger(nextYear) || nextYear < 2000) {
+      yearSelect.value = String(state.year);
+      return;
+    }
+
+    state.year = nextYear;
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('year', String(state.year));
+    window.history.replaceState({}, '', nextUrl.toString());
+    fetchStatus();
+  });
+
+  function setBanner(text, tone = 'info') {
+    statusLoading.classList.add('hidden');
+    if (!text) {
+      statusLine.classList.add('hidden');
+      statusLine.textContent = '';
+      return;
+    }
+
+    statusLine.classList.remove('hidden');
+    if (tone === 'warning') {
+      statusLine.className = 'text-sm text-base-content/50 px-1';
+    } else if (tone === 'error') {
+      statusLine.className = 'text-sm text-red-700 bg-red-50 border border-red-200 rounded-full px-3 py-1 inline-flex items-center';
+    } else {
+      statusLine.className = 'text-sm text-base-content/60 px-1';
+    }
+    statusLine.textContent = text;
+  }
+
+  function setLoading(isLoading) {
+    detailLoading.classList.toggle('hidden', !isLoading);
+  }
+
+  function renderGenderButtons() {
+    genderGroup.innerHTML = '';
+    genders.forEach((gender) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `btn btn-sm rounded-full ${gender === state.gender ? 'btn-primary' : 'btn-outline'}`;
+      btn.textContent = gender;
+      btn.addEventListener('click', () => {
+        if (state.gender === gender) return;
+        state.gender = gender;
+        renderGenderButtons();
+        fetchStatus();
+      });
+      genderGroup.appendChild(btn);
+    });
+  }
+
+  function clearResults() {
+    detailContent.classList.add('hidden');
+    detailContent.innerHTML = '';
+  }
+
+  function renderPending() {
+    clearResults();
+    setBanner('Pending', 'warning');
+  }
+
+  function renderDetail(payload) {
+    const context = payload.context || {};
+    const events = Array.isArray(payload.events) ? payload.events : [];
+
+    if (context.status !== 'ready') {
+      renderPending();
+      return;
+    }
+
+    if (!events.length) {
+      clearResults();
+      setBanner('No qualifier data found for this state meet.', 'warning');
+      return;
+    }
+
+    setBanner('', 'info');
+    detailContent.classList.remove('hidden');
+    detailContent.innerHTML = '';
+
+    events.forEach((eventBlock) => {
+      const section = document.createElement('section');
+      section.className = 'space-y-2';
+
+      const headerWrap = document.createElement('div');
+      headerWrap.className = 'flex flex-wrap items-center gap-2';
+
+      const header = document.createElement('h3');
+      header.className = 'text-base font-semibold text-base-content';
+      header.textContent = eventBlock.event;
+      headerWrap.appendChild(header);
+
+      if (eventBlock.standard_mark) {
+        const standard = document.createElement('span');
+        standard.className = 'badge badge-sm text-xs font-semibold border-emerald-600/40 bg-emerald-50 text-emerald-700';
+        standard.textContent = `Standard: ${eventBlock.standard_mark}`;
+        headerWrap.appendChild(standard);
+      }
+
+      section.appendChild(headerWrap);
+
+      const qualifiers = Array.isArray(eventBlock.qualifiers) ? eventBlock.qualifiers : [];
+      if (!qualifiers.length) {
+        const empty = document.createElement('p');
+        empty.className = 'text-sm text-base-content/60';
+        empty.textContent = 'No qualifiers available.';
+        section.appendChild(empty);
+        detailContent.appendChild(section);
+        return;
+      }
+
+      const wrap = document.createElement('div');
+      wrap.className = 'overflow-x-auto border border-base-200 rounded-lg';
+      const nameHeader = String(eventBlock.event || '').startsWith('4 x ') ? 'School' : 'Name';
+      wrap.innerHTML = `
+        <table class="table table-xs sm:table-sm w-full bg-white">
+          <thead>
+            <tr>
+              <th>${nameHeader}</th>
+              <th>Grade</th>
+              <th>School</th>
+              <th>Result</th>
+              <th>Place</th>
+              <th>Regional Host</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      `;
+
+      const tbody = wrap.querySelector('tbody');
+      qualifiers.forEach((row) => {
+        const tr = document.createElement('tr');
+        const displayName = row.name || row.school || '-';
+        const metStandard = Boolean(row.met_standard) || row.qualifier_type === 'standard';
+        let nameText = displayName;
+        if (row.qualifier_type === 'fill' || row.is_callback) {
+          nameText = `${displayName} <span class="text-blue-600 font-semibold">(callback)</span>`;
+        }
+        const resultText = metStandard
+          ? `${row.result || ''} <span class="text-emerald-700 font-bold ml-1">STAN</span>`
+          : `${row.result || ''}`;
+        tr.innerHTML = `
+          <td>${nameText}</td>
+          <td>${row.grade || ''}</td>
+          <td>${row.school || ''}</td>
+          <td>${resultText}</td>
+          <td>${row.place || ''}</td>
+          <td>${row.sectional_host || ''}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      section.appendChild(wrap);
+      detailContent.appendChild(section);
+    });
+  }
+
+  async function fetchStatus() {
+    setLoading(true);
+    clearResults();
+    statusLine.classList.add('hidden');
+    statusLine.textContent = '';
+    statusLoading.classList.remove('hidden');
+
+    try {
+      const response = await fetch(`${apiStatusUrl}?gender=${encodeURIComponent(state.gender)}&year=${state.year}`);
+      if (!response.ok) {
+        throw new Error(statusErrorMessage);
+      }
+      const payload = await response.json();
+      state.statusPayload = payload;
+
+      if (payload.status !== 'ready') {
+        renderPending(payload);
+        return;
+      }
+
+      statusLoading.classList.add('hidden');
+
+      const detailResponse = await fetch(`${apiDetailUrl}?gender=${encodeURIComponent(state.gender)}&year=${state.year}`);
+      if (!detailResponse.ok) {
+        throw new Error(loadErrorMessage);
+      }
+      const detailPayload = await detailResponse.json();
+      renderDetail(detailPayload);
+    } catch (error) {
+      clearResults();
+      setBanner(error.message || loadErrorMessage, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  renderGenderButtons();
+  fetchStatus();
+});
+</script>
+{% endblock %}

@@ -17,6 +17,8 @@ from ..queries import (
     _compute_school_percentiles,
     get_regional_qualifiers_status,
     get_regional_qualifiers,
+    get_state_qualifiers_status,
+    get_state_qualifiers,
 )
 
 
@@ -263,6 +265,40 @@ def api_regional_qualifiers():
 
     try:
         payload = get_regional_qualifiers(gender=gender, regional_num=regional_num, year=year)
+        return jsonify(payload)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
+
+
+@api_bp.route('/state-qualifiers/status')
+def api_state_qualifiers_status():
+    """Return state readiness status for a gender and year."""
+    gender = request.args.get('gender', 'Boys').strip()
+    year = request.args.get('year', default=2026, type=int)
+    if year is None or year < 2000:
+        return jsonify({'error': 'year must be a valid season year'}), 400
+
+    try:
+        payload = get_state_qualifiers_status(gender=gender, year=year)
+        return jsonify(payload)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
+
+
+@api_bp.route('/state-qualifiers')
+def api_state_qualifiers():
+    """Return state qualifier list for a specific gender and year."""
+    gender = request.args.get('gender', 'Boys').strip()
+    year = request.args.get('year', default=2026, type=int)
+    if year is None or year < 2000:
+        return jsonify({'error': 'year must be a valid season year'}), 400
+
+    try:
+        payload = get_state_qualifiers(gender=gender, year=year)
         return jsonify(payload)
     except ValueError as exc:
         return jsonify({'error': str(exc)}), 400

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
-{% block title %}Unofficial Regional Qualifiers - Track Insights{% endblock %}
-{% block meta_description %}Unofficial regional qualifier lists by year, gender, and regional for Indiana high school track and field.{% endblock %}
+{% block title %}{{ page_title|default('Unofficial Regional Qualifiers - Track Insights') }}{% endblock %}
+{% block meta_description %}{{ page_description|default('Unofficial regional qualifier lists by year, gender, and regional for Indiana high school track and field.') }}{% endblock %}
 
 {% block content %}
 <div class="min-h-screen bg-white pt-20 sm:pt-24 pb-10 px-3 sm:px-6">
@@ -16,8 +16,8 @@
       </button>
 
       <header class="text-center space-y-2">
-        <h1 class="font-impact italic text-4xl sm:text-5xl text-primary">Unofficial Regional Qualifiers</h1>
-        <p class="text-sm sm:text-base text-base-content/70 max-w-2xl mx-auto">These lists are unofficial and do not reflect any scratches that may have been made at the sectional level.</p>
+        <h1 class="font-impact italic text-4xl sm:text-5xl text-primary">{{ page_heading|default('Unofficial Regional Qualifiers') }}</h1>
+        <p class="text-sm sm:text-base text-base-content/70 max-w-2xl mx-auto">{{ page_subtitle|default('These lists are unofficial and do not reflect any scratches that may have been made at the sectional level.') }}</p>
       </header>
 
       <div class="rounded-[24px] bg-white border border-base-200 p-4 sm:p-6 shadow-lg">
@@ -58,6 +58,16 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+  const apiStatusUrl = {{ api_status_url|default('/api/regional-qualifiers/status')|tojson }};
+  const apiDetailUrl = {{ api_detail_url|default('/api/regional-qualifiers')|tojson }};
+  const completedField = {{ completed_field|default('completed_sectionals')|tojson }};
+  const totalField = {{ total_field|default('total_sectionals')|tojson }};
+  const missingField = {{ missing_field|default('missing_sectionals')|tojson }};
+  const coverageUnit = {{ coverage_unit|default('sectionals')|tojson }};
+  const loadErrorMessage = {{ load_error|default('Unable to load regional qualifiers.')|tojson }};
+  const statusErrorMessage = {{ status_error|default('Unable to load regional status.')|tojson }};
+  const detailUnavailableText = {{ detail_unavailable_text|default('That regional is awaiting meet result data.')|tojson }};
+  const groupLabel = {{ group_label|default('Regional')|tojson }};
   const params = new URLSearchParams(window.location.search);
   const parsedYear = Number.parseInt(params.get('year') || '2026', 10);
   const selectedYear = Number.isInteger(parsedYear) && parsedYear >= 2000 ? parsedYear : 2026;
@@ -153,16 +163,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchStatus() {
     try {
-      const response = await fetch(`/api/regional-qualifiers/status?gender=${encodeURIComponent(state.gender)}&year=${state.year}`);
+      const response = await fetch(`${apiStatusUrl}?gender=${encodeURIComponent(state.gender)}&year=${state.year}`);
       if (!response.ok) {
-        throw new Error('Unable to load regional status.');
+        throw new Error(statusErrorMessage);
       }
       const payload = await response.json();
       state.statusPayload = payload;
       renderRegionalCards();
     } catch (error) {
       statusGrid.innerHTML = '';
-      setMessage(error.message || 'Failed to load regional status.', 'error');
+      setMessage(error.message || statusErrorMessage, 'error');
     }
   }
 
@@ -181,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       card.innerHTML = `
-        <h3 class="font-semibold text-sm">Regional #${regional.regional_num}</h3>
+        <h3 class="font-semibold text-sm">${groupLabel} #${regional.regional_num}</h3>
         <p class="text-xs text-base-content/60 mt-1">${regional.regional_host || 'Pending'}</p>
       `;
 
@@ -190,10 +200,10 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         card.addEventListener('click', () => {
           detailSection.classList.remove('hidden');
-          detailTitle.textContent = `${state.year} ${state.gender} Regional #${regional.regional_num} - ${getRegionalHost(regional.regional_num)}`;
+          detailTitle.textContent = `${state.year} ${state.gender} ${groupLabel} #${regional.regional_num} - ${getRegionalHost(regional.regional_num)}`;
           detailContent.classList.add('hidden');
           detailContent.innerHTML = '';
-          setMessage('That regional is awaiting meet result data.', 'warning');
+          setMessage(detailUnavailableText, 'warning');
         });
       }
 
@@ -208,14 +218,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const safeRegionalNum = Number.isFinite(regionalNum) ? regionalNum : context.regional_num;
     const regionalHost = Number.isFinite(regionalNum) ? getRegionalHost(regionalNum) : 'Pending';
     detailSection.classList.remove('hidden');
-    detailTitle.textContent = `${state.year} ${context.gender} Regional #${safeRegionalNum} - ${regionalHost}`;
+    detailTitle.textContent = `${state.year} ${context.gender} ${groupLabel} #${safeRegionalNum} - ${regionalHost}`;
 
     if (context.status !== 'ready') {
       clearDetailTable();
-      const missing = (context.missing_sectionals || []).join(', ');
-      const missingText = missing ? ` Missing sectionals: ${missing}.` : '';
+      const missing = (context[missingField] || []).join(', ');
+      const missingText = missing ? ` Missing ${coverageUnit}: ${missing}.` : '';
       detailSection.classList.remove('hidden');
-      setMessage(`This regional is not ready yet. Coverage is ${context.completed_sectionals}/${context.total_sectionals}.${missingText}`, 'warning');
+      setMessage(`This ${groupLabel.toLowerCase()} is not ready yet. Coverage is ${context[completedField]}/${context[totalField]} ${coverageUnit} loaded.${missingText}`, 'warning');
       return;
     }
 
@@ -234,10 +244,22 @@ document.addEventListener('DOMContentLoaded', () => {
       const section = document.createElement('section');
       section.className = 'space-y-2';
 
+      const headerWrap = document.createElement('div');
+      headerWrap.className = 'flex flex-wrap items-center gap-2';
+
       const header = document.createElement('h3');
       header.className = 'text-base font-semibold text-base-content';
       header.textContent = eventBlock.event;
-      section.appendChild(header);
+      headerWrap.appendChild(header);
+
+      if (eventBlock.standard_mark) {
+        const standard = document.createElement('span');
+        standard.className = 'badge badge-sm text-xs font-semibold border-emerald-600/40 bg-emerald-50 text-emerald-700';
+        standard.textContent = `Standard: ${eventBlock.standard_mark}`;
+        headerWrap.appendChild(standard);
+      }
+
+      section.appendChild(headerWrap);
 
       const qualifiers = Array.isArray(eventBlock.qualifiers) ? eventBlock.qualifiers : [];
       if (!qualifiers.length) {
@@ -251,11 +273,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const wrap = document.createElement('div');
       wrap.className = 'overflow-x-auto border border-base-200 rounded-lg';
+      const nameHeader = String(eventBlock.event || '').startsWith('4 x ') ? 'School' : 'Name';
       wrap.innerHTML = `
         <table class="table table-xs sm:table-sm w-full bg-white">
           <thead>
             <tr>
-              <th>Name / School</th>
+              <th>${nameHeader}</th>
               <th>Grade</th>
               <th>School</th>
               <th>Result</th>
@@ -271,14 +294,19 @@ document.addEventListener('DOMContentLoaded', () => {
       qualifiers.forEach((row) => {
         const tr = document.createElement('tr');
         const displayName = row.name || row.school || '-';
-        const nameText = row.is_callback
-          ? `${displayName} <span class="text-blue-600 font-semibold">(callback)</span>`
-          : displayName;
+        const metStandard = Boolean(row.met_standard) || row.qualifier_type === 'standard';
+        let nameText = displayName;
+        if (row.qualifier_type === 'fill' || row.is_callback) {
+          nameText = `${displayName} <span class="text-blue-600 font-semibold">(callback)</span>`;
+        }
+        const resultText = metStandard
+          ? `${row.result || ''} <span class="text-emerald-700 font-bold ml-1">STAN</span>`
+          : `${row.result || ''}`;
         tr.innerHTML = `
           <td>${nameText}</td>
           <td>${row.grade || ''}</td>
           <td>${row.school || ''}</td>
-          <td>${row.result || ''}</td>
+          <td>${resultText}</td>
           <td>${row.place || ''}</td>
           <td>${row.sectional_host || ''}</td>
         `;
@@ -299,15 +327,15 @@ document.addEventListener('DOMContentLoaded', () => {
     detailMessage.classList.add('hidden');
 
     try {
-      const response = await fetch(`/api/regional-qualifiers?gender=${encodeURIComponent(state.gender)}&regional_num=${regionalNum}&year=${state.year}`);
+      const response = await fetch(`${apiDetailUrl}?gender=${encodeURIComponent(state.gender)}&regional_num=${regionalNum}&year=${state.year}`);
       if (!response.ok) {
-        throw new Error('Unable to load regional qualifiers.');
+        throw new Error(loadErrorMessage);
       }
       const payload = await response.json();
       renderDetail(payload);
     } catch (error) {
       clearDetailTable();
-      setMessage(error.message || 'Failed to load qualifier list.', 'error');
+      setMessage(error.message || loadErrorMessage, 'error');
     } finally {
       setLoading(false);
     }
