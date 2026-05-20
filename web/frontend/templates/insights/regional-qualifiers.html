@@ -77,6 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
     gender: 'Boys',
     statusPayload: null,
     selectedRegional: null,
+    detailRequestId: 0,
   };
 
   const yearSelect = document.getElementById('year-select');
@@ -328,7 +329,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchRegionalDetail(regionalNum) {
     state.selectedRegional = regionalNum;
+    state.detailRequestId += 1;
+    const requestId = state.detailRequestId;
     detailSection.classList.remove('hidden');
+    const regionalHost = getRegionalHost(regionalNum);
+    detailTitle.textContent = `${state.year} ${state.gender} ${groupLabel} #${regionalNum} - ${regionalHost}`;
     setLoading(true);
     detailContent.classList.add('hidden');
     detailContent.innerHTML = '';
@@ -336,16 +341,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       const response = await fetch(`${apiDetailUrl}?gender=${encodeURIComponent(state.gender)}&regional_num=${regionalNum}&year=${state.year}`);
+      if (requestId !== state.detailRequestId) {
+        return;
+      }
       if (!response.ok) {
         throw new Error(loadErrorMessage);
       }
       const payload = await response.json();
+      if (requestId !== state.detailRequestId) {
+        return;
+      }
       renderDetail(payload);
     } catch (error) {
+      if (requestId !== state.detailRequestId) {
+        return;
+      }
       clearDetailTable();
       setMessage(error.message || loadErrorMessage, 'error');
     } finally {
-      setLoading(false);
+      if (requestId === state.detailRequestId) {
+        setLoading(false);
+      }
     }
   }
 
