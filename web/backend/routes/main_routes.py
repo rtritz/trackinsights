@@ -2,6 +2,7 @@ from flask import render_template, request, url_for, Response
 from . import main_bp
 from ..queries import get_athletes
 from ..models import Athlete, School
+from ..videos import INTERVIEW_VIDEOS
 from sqlalchemy.orm import joinedload
 
 
@@ -129,14 +130,26 @@ def school_dashboard(school_id):
     )
 
 
+@main_bp.route('/interviews')
+def interviews_page():
+    return render_template('interviews.html', videos=INTERVIEW_VIDEOS)
+
+
 @main_bp.route('/athlete-dashboard/<int:athlete_id>')
 def athlete_dashboard(athlete_id):
     athlete = Athlete.query.options(joinedload(Athlete.school)).get(athlete_id)
+    athlete_id_key = str(athlete_id)
+    athlete_videos = [
+        video for video in INTERVIEW_VIDEOS
+        if video.get('athlete_id') is not None and str(video.get('athlete_id')).strip() == athlete_id_key
+    ]
+
     return render_template(
         'athlete-dashboard.html',
         athlete_id=athlete_id,
         athlete_name=f"{athlete.first} {athlete.last}" if athlete else None,
         school_name=athlete.school.school_name if athlete and athlete.school else None,
+        athlete_videos=athlete_videos,
     )
 
 

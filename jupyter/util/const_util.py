@@ -61,5 +61,5 @@ class CONST:
 		ALL_BOYS_EVENTS = [ALL_TRACK, ALL_FIELD, ALL_RELAY, ALL_BOYS_HURDLES]
 		
 	# File paths
-	DB_PATH = "./db/Track.db"
+	DB_PATH = "../web/data/Track.db"
 	OUTPUT_PATH = "./output"

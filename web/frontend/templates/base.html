@@ -238,6 +238,14 @@
         </span>
         <span class="nav-pill__label">Insights</span>
       </a>
+      <a href="{{ url_for('main.interviews_page') }}" aria-label="Interviews" class="nav-pill nav-pill--wide pointer-events-auto">
+        <span class="nav-pill__icon-bubble" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="nav-pill__icon" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M15 10l4.553-2.277A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+          </svg>
+        </span>
+        <span class="nav-pill__label">Interviews</span>
+      </a>
       <a href="{{ url_for('main.home') }}#about" id="about-toggle" aria-label="About" class="nav-pill pointer-events-auto">
         <span class="nav-pill__icon-bubble" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="nav-pill__icon" aria-hidden="true"
@@ -265,6 +273,7 @@
       <a href="{{ url_for('main.home') }}" class="mobile-menu-link uppercase">Home</a>
       <a href="{{ url_for('main.search_page') }}" class="mobile-menu-link uppercase">Search</a>
       <a href="{{ url_for('main.insights_page') }}" class="mobile-menu-link uppercase">Insights</a>
+      <a href="{{ url_for('main.interviews_page') }}" class="mobile-menu-link uppercase">Interviews</a>
       <a href="{{ url_for('main.home') }}#about" class="mobile-menu-link uppercase">About</a>
     </nav>
   </div>
@@ -574,6 +583,12 @@
       padding: 0 0.65rem 0 0.55rem;
       box-shadow: 4px 4px 0 0 #111827;
       outline: none;
+    }
+
+    .nav-pill--wide:hover,
+    .nav-pill--wide:focus-visible,
+    .nav-pill--wide.is-active {
+      width: calc(var(--nav-pill-size) + 8rem);
     }
 
     .nav-pill:active {
