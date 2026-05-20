@@ -3348,6 +3348,49 @@ def _extend_to_cutoff_with_ties(rows, target_count):
     return selected
 
 
+def _missing_top3_places_by_meet(rows):
+    meet_places = {}
+    meet_hosts = {}
+
+    for row in rows:
+        meet_num_raw = getattr(row, "meet_num", None)
+        if meet_num_raw is None:
+            continue
+
+        try:
+            meet_num = int(meet_num_raw)
+        except (TypeError, ValueError):
+            continue
+
+        meet_places.setdefault(meet_num, set())
+        if meet_num not in meet_hosts:
+            meet_hosts[meet_num] = getattr(row, "host", None)
+
+        place_raw = getattr(row, "place", None)
+        try:
+            place = int(place_raw)
+        except (TypeError, ValueError):
+            continue
+
+        if 1 <= place <= 3:
+            meet_places[meet_num].add(place)
+
+    missing = []
+    for meet_num in sorted(meet_places.keys()):
+        for place in (1, 2, 3):
+            if place not in meet_places[meet_num]:
+                missing.append((meet_num, place, meet_hosts.get(meet_num)))
+
+    return missing
+
+
+def _qualifier_sort_key(row, lower_is_better: bool):
+    value = row.get("result2")
+    if value is None:
+        return float("inf") if lower_is_better else float("-inf")
+    return value
+
+
 def _compute_event_qualifiers(
     event_name: str,
     gender: str,
@@ -3385,7 +3428,17 @@ def _compute_event_qualifiers(
             .all()
         )
 
+        # Detect which sectionals are missing the event entirely
+        present_meet_nums = {row.meet_num for row in rows}
+        missing_event_meet_nums = set(feeder_meet_nums) - present_meet_nums
+        print(f"[DEBUG] Event: {event_name}, Present sectionals: {sorted(present_meet_nums)}, Missing sectionals: {sorted(missing_event_meet_nums)}", file=sys.stderr)
+        # Get host info for missing sectionals
+        host_map = {row.meet_num: row.host for row in rows}
+        for meet_num in missing_event_meet_nums:
+            host_map.setdefault(meet_num, None)
+
         top3 = [row for row in rows if row.place is not None and row.place <= 3]
+        missing_top3 = _missing_top3_places_by_meet(rows)
         others = [row for row in rows if row.place is not None and row.place > 3]
         others_sorted = sorted(others, key=lambda row: row.result2, reverse=not lower_is_better)
 
@@ -3397,7 +3450,8 @@ def _compute_event_qualifiers(
         selected_school_ids.update(row.school_id for row in standard_qualifiers)
 
         remaining = [row for row in others_sorted if row.school_id not in selected_school_ids]
-        needed_for_field_size = max(0, target_field_size - (len(top3) + len(standard_qualifiers)))
+        auto_slots = len(top3) + len(missing_top3) + 3 * len(missing_event_meet_nums)
+        needed_for_field_size = max(0, target_field_size - (auto_slots + len(standard_qualifiers)))
         fill_qualifiers = _extend_to_cutoff_with_ties(remaining, needed_for_field_size)
 
         formatted = []
@@ -3420,6 +3474,48 @@ def _compute_event_qualifiers(
                     "is_callback": False,
                 }
             )
+
+        for meet_num, place, host in missing_top3:
+            formatted.append(
+                {
+                    "event": event_name,
+                    "event_type": event_type,
+                    "name": None,
+                    "grade": None,
+                    "school": "Missing on MileSplit",
+                    "result": "Missing on MileSplit",
+                    "result2": None,
+                    "place": place,
+                    "sectional_host": _display_sectional_host(host, meet_num, year, gender),
+                    "sectional_num": meet_num,
+                    "met_standard": False,
+                    "qualifier_type": "auto-missing",
+                    "is_callback": False,
+                    "is_placeholder": True,
+                }
+            )
+
+        # Add placeholders for sectionals missing the event entirely
+        for meet_num in missing_event_meet_nums:
+            for place in (1, 2, 3):
+                formatted.append(
+                    {
+                        "event": event_name,
+                        "event_type": event_type,
+                        "name": None,
+                        "grade": None,
+                        "school": "Missing on MileSplit",
+                        "result": "Missing on MileSplit",
+                        "result2": None,
+                        "place": place,
+                        "sectional_host": _display_sectional_host(host_map.get(meet_num), meet_num, year, gender),
+                        "sectional_num": meet_num,
+                        "met_standard": False,
+                        "qualifier_type": "auto-missing",
+                        "is_callback": False,
+                        "is_placeholder": True,
+                    }
+                )
 
         for row in standard_qualifiers:
             formatted.append(
@@ -3459,7 +3555,7 @@ def _compute_event_qualifiers(
                 }
             )
 
-        return sorted(formatted, key=lambda row: row["result2"], reverse=not lower_is_better)
+        return sorted(formatted, key=lambda row: _qualifier_sort_key(row, lower_is_better), reverse=not lower_is_better)
 
     rows = (
         db.session.query(
@@ -3491,7 +3587,22 @@ def _compute_event_qualifiers(
         .all()
     )
 
+    # Detect which sectionals are missing the event entirely (individual events)
+    present_meet_nums = {row.meet_num for row in rows}
+    missing_event_meet_nums = set(feeder_meet_nums) - present_meet_nums
+    print(f"[DEBUG] Event: {event_name}, Present sectionals: {sorted(present_meet_nums)}, Missing sectionals: {sorted(missing_event_meet_nums)}", file=sys.stderr)
+    # Get host info for missing sectionals
+    host_map = {row.meet_num: row.host for row in rows}
+    for meet_num in missing_event_meet_nums:
+        host_map.setdefault(meet_num, None)
+
+    # DEBUG: Print which sectionals are missing the event entirely
+    present_meet_nums = {row.meet_num for row in rows}
+    missing_event_meet_nums = set(feeder_meet_nums) - present_meet_nums
+    print(f"[DEBUG] Event: {event_name}, Present sectionals: {sorted(present_meet_nums)}, Missing sectionals: {sorted(missing_event_meet_nums)}", file=sys.stderr)
+
     top3 = [row for row in rows if row.place is not None and row.place <= 3]
+    missing_top3 = _missing_top3_places_by_meet(rows)
     others = [row for row in rows if row.place is not None and row.place > 3]
     others_sorted = sorted(others, key=lambda row: row.result2, reverse=not lower_is_better)
 
@@ -3503,7 +3614,10 @@ def _compute_event_qualifiers(
     selected_athlete_ids.update(row.athlete_id for row in standard_qualifiers)
 
     remaining = [row for row in others_sorted if row.athlete_id not in selected_athlete_ids]
-    needed_for_field_size = max(0, target_field_size - (len(top3) + len(standard_qualifiers)))
+    # Count placeholders as auto-qualifiers for callback math
+    num_missing_event_placeholders = 3 * len(missing_event_meet_nums)
+    auto_slots = len(top3) + len(missing_top3) + num_missing_event_placeholders
+    needed_for_field_size = max(0, target_field_size - (auto_slots + len(standard_qualifiers)))
     fill_qualifiers = _extend_to_cutoff_with_ties(remaining, needed_for_field_size)
 
     formatted = []
@@ -3526,6 +3640,48 @@ def _compute_event_qualifiers(
                 "is_callback": False,
             }
         )
+
+    for meet_num, place, host in missing_top3:
+        formatted.append(
+            {
+                "event": event_name,
+                "event_type": event_type,
+                "name": "Missing on MileSplit",
+                "grade": "-",
+                "school": "-",
+                "result": "-",
+                "result2": None,
+                "place": place,
+                "sectional_host": _display_sectional_host(host, meet_num, year, gender),
+                "sectional_num": meet_num,
+                "met_standard": False,
+                "qualifier_type": "auto-missing",
+                "is_callback": False,
+                "is_placeholder": True,
+            }
+        )
+
+    # Add placeholders for sectionals missing the event entirely (individual events)
+    for meet_num in missing_event_meet_nums:
+        for place in (1, 2, 3):
+            formatted.append(
+                {
+                    "event": event_name,
+                    "event_type": event_type,
+                    "name": "Missing on MileSplit",
+                    "grade": "-",
+                    "school": "-",
+                    "result": "-",
+                    "result2": None,
+                    "place": place,
+                    "sectional_host": _display_sectional_host(host_map.get(meet_num), meet_num, year, gender),
+                    "sectional_num": meet_num,
+                    "met_standard": False,
+                    "qualifier_type": "auto-missing",
+                    "is_callback": False,
+                    "is_placeholder": True,
+                }
+            )
 
     for row in standard_qualifiers:
         formatted.append(
@@ -3565,7 +3721,7 @@ def _compute_event_qualifiers(
             }
         )
 
-    return sorted(formatted, key=lambda row: row["result2"], reverse=not lower_is_better)
+    return sorted(formatted, key=lambda row: _qualifier_sort_key(row, lower_is_better), reverse=not lower_is_better)
 
 
 def get_regional_qualifiers(gender: str, regional_num: int, year: int = CURRENT_QUALIFIER_YEAR):

@@ -1,13 +1,25 @@
 import sqlite3
 import pandas as pd
+import time
 from util.conversion_util import Conversion
 from decimal import Decimal, ROUND_HALF_UP, ROUND_DOWN
 	
 class Database:
 	def __init__(self, db_path):
 		self.db_path = db_path
-		self.conn = sqlite3.connect(db_path)
+		self.conn = sqlite3.connect(db_path, timeout=30.0)
 		self.cursor = self.conn.cursor()
+		self.conn.execute("PRAGMA busy_timeout = 30000")
+
+	def _execute_write(self, query, parameters=(), retries=5, delay=0.4):
+		for attempt in range(retries + 1):
+			try:
+				self.cursor.execute(query, parameters)
+				return
+			except sqlite3.OperationalError as e:
+				if "database is locked" not in str(e).lower() or attempt == retries:
+					raise
+				time.sleep(delay * (attempt + 1))
 	
 	def get_all_schools(self, year=2024):       
 		query = "SELECT school.school_id, school_name, team_name, school_type, nickname, address, city, zip, \
@@ -146,21 +158,21 @@ class Database:
 	def merge_athlete(self, good_id, bad_id):
 		query = "update athlete_result set athlete_id = ? where athlete_id = ?"
 		parameters = (good_id, bad_id)
-		self.cursor.execute(query, parameters)
+		self._execute_write(query, parameters)
 
 		query = "update relay_athlete set athlete_id = ? where athlete_id = ?"
-		self.cursor.execute(query, parameters)
+		self._execute_write(query, parameters)
 
 		parameters = (bad_id, )
 		query = "delete from athlete where athlete_id = ?"
-		self.cursor.execute(query, parameters)
+		self._execute_write(query, parameters)
 		
 		self.conn.commit()
 			
 	def insert_meet(self, host, type, num, year, gender, commit=True):
 		query = "INSERT INTO meet (host, meet_type, meet_num, year, gender) VALUES (?, ?, ?, ?, ?)"
 		parameters = (host, type, num, year, gender)
-		self.cursor.execute(query, parameters)
+		self._execute_write(query, parameters)
 
 		if commit:
 			self.conn.commit()
@@ -168,7 +180,7 @@ class Database:
 	def insert_school(self, name, team_name, type, nickname, address, city, zip, commit=True):
 		query = "INSERT INTO school (school_name, team_name, school_type, nickname, address, city, zip) VALUES (?, ?, ?, ?, ?, ?, ?)"
 		parameters = (name, team_name, type, nickname, address, city, zip)
-		self.cursor.execute(query, parameters)
+		self._execute_write(query, parameters)
 
 		if commit:
 			self.conn.commit()
@@ -176,7 +188,7 @@ class Database:
 	def insert_school_enrollment(self, school_id, year, enrollment, commit=True):
 		query = "INSERT OR IGNORE INTO school_enrollment (school_id, year, enrollment) VALUES (?, ?, ?)"
 		parameters = (school_id, year, enrollment)
-		self.cursor.execute(query, parameters)
+		self._execute_write(query, parameters)
 
 		if commit:
 			self.conn.commit()
@@ -184,7 +196,7 @@ class Database:
 	def insert_athlete(self, school_id, first, last, gender, grad_year, commit=True):
 		query = "INSERT INTO athlete (school_id, first, last, gender, grad_year) VALUES (?, ?, ?, ?, ?)"
 		parameters = (school_id, first, last, gender, grad_year)
-		self.cursor.execute(query, parameters)
+		self._execute_write(query, parameters)
 
 		if commit:
 			self.conn.commit()
@@ -196,7 +208,7 @@ class Database:
 		query = "INSERT INTO athlete_result (athlete_id, meet_id, event, result_type, grade, result, result2, place) \
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
 		parameters = (athlete_id, meet_id, event, type, grade, result, result2, place)
-		self.cursor.execute(query, parameters)
+		self._execute_write(query, parameters)
 
 		if commit:
 			self.conn.commit()
@@ -205,7 +217,7 @@ class Database:
 		query = "INSERT INTO relay_result (school_id, meet_id, event, result, result2, place, athlete_names) \
 		VALUES (?, ?, ?, ?, ?, ?, ?)"
 		parameters = (school_id, meet_id, event, result, result2, place, athlete_names)
-		self.cursor.execute(query, parameters)
+		self._execute_write(query, parameters)
 
 		if commit:
 			self.conn.commit()
@@ -218,7 +230,7 @@ class Database:
 		query = "INSERT INTO relay_athlete (relay_id, athlete_id) \
 		VALUES (?, ?)"
 		parameters = (relay_id, athlete_id)
-		self.cursor.execute(query, parameters)
+		self._execute_write(query, parameters)
 
 		if commit:
 			self.conn.commit()
@@ -228,7 +240,7 @@ class Database:
 		VALUES (?, ?, ?, ?, ?)"
 		parameters = (year, gender, meet_type, link_id, increment)
 		
-		self.cursor.execute(query, parameters)
+		self._execute_write(query, parameters)
 
 		if commit:
 			self.conn.commit()
@@ -506,6 +518,6 @@ class Database:
 	        SET grad_year = ?
 	        WHERE athlete_id = ?
 	    """
-	    self.cursor.execute(query, (grad_year, athlete_id))
+	    self._execute_write(query, (grad_year, athlete_id))
 	    if commit:
-	        self.connection.commit()
+	        self.conn.commit()

@@ -184,11 +184,11 @@ document.addEventListener('DOMContentLoaded', () => {
     regionals.forEach((regional) => {
       const ready = regional.status === 'ready';
       const card = document.createElement('article');
-      card.className = 'rounded-lg border p-3 text-center shadow-sm';
+      card.className = 'rounded-lg border p-3 text-center transition-all';
       if (ready) {
-        card.classList.add('border-primary/40', 'bg-white', 'cursor-pointer', 'hover:border-primary', 'hover:shadow-md', 'transition-all');
+        card.classList.add('border-2', 'border-primary', 'bg-white', 'cursor-pointer', 'shadow-md', 'hover:border-primary', 'hover:shadow-lg');
       } else {
-        card.classList.add('border-warning/40', 'bg-warning/5', 'cursor-pointer', 'hover:border-warning', 'hover:shadow-md', 'transition-all', 'opacity-80');
+        card.classList.add('border-warning/40', 'bg-warning/5', 'cursor-pointer', 'hover:border-warning', 'hover:shadow-md', 'opacity-80');
       }
 
       if (ready) {
@@ -305,8 +305,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const displayName = row.name || row.school || '-';
         const metStandard = Boolean(row.met_standard) || row.qualifier_type === 'standard';
         let nameText = displayName;
+        // Add callback badge if needed
         if (row.qualifier_type === 'fill' || row.is_callback) {
           nameText = `${displayName} <span class="text-blue-600 font-semibold">(callback)</span>`;
+        }
+        // Style entire row for placeholder
+        if (row.is_placeholder) {
+          tr.classList.add('text-orange-600', 'bg-orange-50');
         }
         const resultText = metStandard
           ? `${row.result || ''} <span class="text-emerald-700 font-bold ml-1">STAN</span>`
