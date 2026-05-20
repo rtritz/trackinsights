@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function getRegionalHost(regionalNum) {
     const regionals = state.statusPayload?.regionals || [];
     const match = regionals.find((regional) => regional.regional_num === regionalNum);
-    return match?.regional_host || 'Pending';
+    return match?.regional_host || 'Host TBD';
   }
 
   function renderGenderButtons() {
@@ -187,23 +187,31 @@ document.addEventListener('DOMContentLoaded', () => {
       if (ready) {
         card.classList.add('border-primary/40', 'bg-white', 'cursor-pointer', 'hover:border-primary', 'hover:shadow-md', 'transition-all');
       } else {
-        card.classList.add('border-base-200', 'bg-base-100/60', 'cursor-not-allowed', 'opacity-70');
+        card.classList.add('border-warning/40', 'bg-warning/5', 'cursor-pointer', 'hover:border-warning', 'hover:shadow-md', 'transition-all', 'opacity-80');
       }
 
-      card.innerHTML = `
-        <h3 class="font-semibold text-sm">${groupLabel} #${regional.regional_num}</h3>
-        <p class="text-xs text-base-content/60 mt-1">${regional.regional_host || 'Pending'}</p>
-      `;
-
       if (ready) {
+        card.innerHTML = `
+          <h3 class="font-semibold text-sm">${groupLabel} #${regional.regional_num}</h3>
+          <p class="text-xs text-base-content/60 mt-1">${regional.regional_host || 'Host TBD'}</p>
+        `;
         card.addEventListener('click', () => fetchRegionalDetail(regional.regional_num));
       } else {
+        const missing = (regional.missing_sectionals || []);
+        const missingText = missing.length
+          ? `Awaiting Sectional${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}`
+          : 'Awaiting sectional data';
+        card.innerHTML = `
+          <h3 class="font-semibold text-sm">${groupLabel} #${regional.regional_num}</h3>
+          <p class="text-xs font-semibold text-warning mt-1">Pending</p>
+          <p class="text-xs text-base-content/50 mt-0.5">${missingText}</p>
+        `;
         card.addEventListener('click', () => {
           detailSection.classList.remove('hidden');
-          detailTitle.textContent = `${state.year} ${state.gender} ${groupLabel} #${regional.regional_num} - ${getRegionalHost(regional.regional_num)}`;
+          detailTitle.textContent = `${state.year} ${state.gender} ${groupLabel} #${regional.regional_num}`;
           detailContent.classList.add('hidden');
           detailContent.innerHTML = '';
-          setMessage(detailUnavailableText, 'warning');
+          setMessage(`Pending — ${missingText}.`, 'warning');
         });
       }
 
@@ -216,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const events = payload.events || [];
     const regionalNum = Number(context.regional_num);
     const safeRegionalNum = Number.isFinite(regionalNum) ? regionalNum : context.regional_num;
-    const regionalHost = Number.isFinite(regionalNum) ? getRegionalHost(regionalNum) : 'Pending';
+    const regionalHost = Number.isFinite(regionalNum) ? getRegionalHost(regionalNum) : 'Host TBD';
     detailSection.classList.remove('hidden');
     detailTitle.textContent = `${state.year} ${context.gender} ${groupLabel} #${safeRegionalNum} - ${regionalHost}`;
 

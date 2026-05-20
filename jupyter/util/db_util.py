@@ -23,13 +23,23 @@ class Database:
 		
 	def get_school_id(self, school_name):
 		query = "SELECT school_id from school where school_name = ? or team_name = ?"
-		parameters = (school_name, school_name)
-		df = pd.read_sql_query(query, self.conn, params=parameters)
-	
-		if df.size == 0:
-			return None
-		else:
-			return int(df.iloc[0,0])
+		candidate_names = [school_name]
+		clean_name = str(school_name).strip()
+		if clean_name.upper().endswith(" HS"):
+			candidate_names.append(clean_name[:-3].strip())
+		candidate_names.append(clean_name.replace(" High School", "").strip())
+
+		seen = set()
+		for candidate in candidate_names:
+			if not candidate or candidate in seen:
+				continue
+			seen.add(candidate)
+			parameters = (candidate, candidate)
+			df = pd.read_sql_query(query, self.conn, params=parameters)
+			if df.size != 0:
+				return int(df.iloc[0, 0])
+
+		return None
 	
 	def get_all_house_values(self, year):
 		query = "SELECT * from house_values where year = ?"

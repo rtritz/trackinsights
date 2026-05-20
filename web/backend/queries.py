@@ -1,8 +1,11 @@
 import re
 import sys
+import html as html_lib
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional
+from urllib.parse import urljoin
+from urllib.request import Request, urlopen
 
 from sqlalchemy import or_, func, and_
 from sqlalchemy.orm import joinedload
@@ -18,6 +21,7 @@ from .models import (
 )
 from . import db
 from .util.conversion_util import Conversion
+from .util.regional_hosts import get_configured_regional_hosts
 from .util.standards_util import meets_state_standard, get_state_standard_display
 
 
@@ -3068,6 +3072,150 @@ def _regional_events_for_gender(gender: str):
     return events
 
 
+@lru_cache(maxsize=32)
+def _ihsaa_regional_hosts(year: int, gender: str):
+    gender_slug = "boys" if str(gender).strip().lower() == "boys" else "girls"
+    parsed_year = int(year)
+    season_slug = f"{parsed_year - 1}-{parsed_year % 100:02d}"
+    url = f"https://www.ihsaa.org/sports/{gender_slug}/track-field/{season_slug}-tournament?round=regionals"
+
+    try:
+        request = Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+        )
+        with urlopen(request, timeout=20) as response:
+            html = response.read().decode("utf-8", errors="ignore")
+    except Exception:
+        return {}
+
+    hosts = {}
+
+    # The tournament page includes sectional and regional rows together.
+    # Regional rows include "Sectional Host:" in their text.
+    paragraphs = re.findall(r"<p[^>]*>.*?</p>", html, flags=re.IGNORECASE | re.DOTALL)
+    for block in paragraphs:
+        lower_block = block.lower()
+        if "in.milesplit.com" not in lower_block or "/results" not in lower_block:
+            continue
+        if "sectional host:" not in lower_block:
+            continue
+
+        text = re.sub(r"<[^>]+>", " ", block)
+        text = html_lib.unescape(re.sub(r"\s+", " ", text)).strip()
+
+        before_tickets = text.split("Tickets", 1)[0].strip()
+        match = re.match(r"^(\d{1,2})\.\s*(.+)$", before_tickets)
+        if not match:
+            continue
+
+        regional_num = int(match.group(1))
+        host = re.sub(
+            r"\s+\d{1,2}(?::\d{2})?\s*[ap]m(?:\s*[A-Z]{2})?$",
+            "",
+            match.group(2).strip(),
+            flags=re.IGNORECASE,
+        ).strip(" -")
+        host = re.sub(r"\s*\(\d+\)\s*$", "", host).strip()
+        if host and regional_num not in hosts:
+            hosts[regional_num] = host
+
+    return hosts
+
+
+@lru_cache(maxsize=32)
+def _ihsaa_sectional_hosts(year: int, gender: str):
+    gender_slug = "boys" if str(gender).strip().lower() == "boys" else "girls"
+    parsed_year = int(year)
+    season_slug = f"{parsed_year - 1}-{parsed_year % 100:02d}"
+    url = f"https://www.ihsaa.org/sports/{gender_slug}/track-field/{season_slug}-tournament?round=sectionals"
+
+    try:
+        request = Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+        )
+        with urlopen(request, timeout=20) as response:
+            html = response.read().decode("utf-8", errors="ignore")
+    except Exception:
+        return {}
+
+    hosts = {}
+    paragraphs = re.findall(r"<p[^>]*>.*?</p>", html, flags=re.IGNORECASE | re.DOTALL)
+    for block in paragraphs:
+        lower_block = block.lower()
+        if "in.milesplit.com" not in lower_block or "/results" not in lower_block:
+            continue
+        if "schools:" not in lower_block:
+            continue
+
+        text = re.sub(r"<[^>]+>", " ", block)
+        text = html_lib.unescape(re.sub(r"\s+", " ", text)).strip()
+
+        before_tickets = text.split("Tickets", 1)[0].strip()
+        match = re.match(r"^(\d{1,2})\.\s*(.+)$", before_tickets)
+        if not match:
+            continue
+
+        sectional_num = int(match.group(1))
+        host = re.sub(
+            r"\s+\d{1,2}(?::\d{2})?\s*[ap]m(?:\s*[A-Z]{2})?$",
+            "",
+            match.group(2).strip(),
+            flags=re.IGNORECASE,
+        ).strip(" -")
+        host = re.sub(r"\s*\(\d+\)\s*$", "", host).strip()
+
+        if 1 <= sectional_num <= 32 and host and sectional_num not in hosts:
+            hosts[sectional_num] = host
+
+    return hosts
+
+
+def _display_sectional_host(host: Optional[str], meet_num: Optional[int], year: int, gender: str) -> str:
+    raw_host = (host or "").strip()
+    if raw_host and not re.match(r"^IHSAA\s+Sectional\s+\d+", raw_host, flags=re.IGNORECASE):
+        return re.sub(r"\s*\(\d+\)\s*$", "", raw_host).strip()
+
+    if meet_num is not None:
+        fallback_host = _ihsaa_sectional_hosts(year, gender).get(int(meet_num))
+        if fallback_host:
+            return fallback_host
+
+    if raw_host:
+        return raw_host
+    if meet_num is not None:
+        return f"Sectional {meet_num}"
+    return ""
+
+
+def _regional_hosts_for_year(year: int, gender: str):
+    regional_hosts = get_configured_regional_hosts(year, gender)
+
+    regional_host_rows = (
+        db.session.query(Meet.meet_num, Meet.host)
+        .filter(
+            Meet.meet_type == "Regional",
+            Meet.year == year,
+            Meet.gender == gender,
+            Meet.meet_num.isnot(None),
+        )
+        .all()
+    )
+
+    for meet_num, host in regional_host_rows:
+        if meet_num is None:
+            continue
+        if host:
+            regional_hosts.setdefault(meet_num, host)
+
+    # Fill any remaining gaps from IHSAA tournament hosts.
+    for meet_num, host in _ihsaa_regional_hosts(year, gender).items():
+        regional_hosts.setdefault(meet_num, host)
+
+    return regional_hosts
+
+
 def _regional_group_status(year: int, gender: str):
     meet_nums = (
         db.session.query(Meet.meet_num)
@@ -3082,22 +3230,7 @@ def _regional_group_status(year: int, gender: str):
     )
     loaded = {row[0] for row in meet_nums if row[0] is not None}
 
-    regional_host_rows = (
-        db.session.query(Meet.meet_num, Meet.host)
-        .filter(
-            Meet.meet_type == "Regional",
-            Meet.year == year,
-            Meet.gender == gender,
-            Meet.meet_num.isnot(None),
-        )
-        .all()
-    )
-    regional_hosts = {}
-    for meet_num, host in regional_host_rows:
-        if meet_num is None:
-            continue
-        if meet_num not in regional_hosts and host:
-            regional_hosts[meet_num] = host
+    regional_hosts = _regional_hosts_for_year(year, gender)
 
     regionals = []
     for regional_num, feeders in REGIONAL_SECTIONAL_GROUPS.items():
@@ -3163,22 +3296,7 @@ def _state_group_status(year: int, gender: str):
     )
     loaded = {row[0] for row in meet_nums if row[0] is not None}
 
-    regional_host_rows = (
-        db.session.query(Meet.meet_num, Meet.host)
-        .filter(
-            Meet.meet_type == "Regional",
-            Meet.year == year,
-            Meet.gender == gender,
-            Meet.meet_num.isnot(None),
-        )
-        .all()
-    )
-    regional_hosts = {}
-    for meet_num, host in regional_host_rows:
-        if meet_num is None:
-            continue
-        if meet_num not in regional_hosts and host:
-            regional_hosts[meet_num] = host
+    regional_hosts = _regional_hosts_for_year(year, gender)
 
     all_regionals = sorted(REGIONAL_SECTIONAL_GROUPS.keys())
     loaded_regionals = [regional_num for regional_num in all_regionals if regional_num in loaded]
@@ -3295,7 +3413,7 @@ def _compute_event_qualifiers(
                     "result": row.result,
                     "result2": row.result2,
                     "place": row.place,
-                    "sectional_host": row.host,
+                    "sectional_host": _display_sectional_host(row.host, row.meet_num, year, gender),
                     "sectional_num": row.meet_num,
                     "met_standard": met_standard,
                     "qualifier_type": "auto",
@@ -3314,7 +3432,7 @@ def _compute_event_qualifiers(
                     "result": row.result,
                     "result2": row.result2,
                     "place": row.place,
-                    "sectional_host": row.host,
+                    "sectional_host": _display_sectional_host(row.host, row.meet_num, year, gender),
                     "sectional_num": row.meet_num,
                     "met_standard": True,
                     "qualifier_type": "standard",
@@ -3333,7 +3451,7 @@ def _compute_event_qualifiers(
                     "result": row.result,
                     "result2": row.result2,
                     "place": row.place,
-                    "sectional_host": row.host,
+                    "sectional_host": _display_sectional_host(row.host, row.meet_num, year, gender),
                     "sectional_num": row.meet_num,
                     "met_standard": False,
                     "qualifier_type": "fill",
@@ -3401,7 +3519,7 @@ def _compute_event_qualifiers(
                 "result": row.result,
                 "result2": row.result2,
                 "place": row.place,
-                "sectional_host": row.host,
+                "sectional_host": _display_sectional_host(row.host, row.meet_num, year, gender),
                 "sectional_num": row.meet_num,
                 "met_standard": met_standard,
                 "qualifier_type": "auto",
@@ -3420,7 +3538,7 @@ def _compute_event_qualifiers(
                 "result": row.result,
                 "result2": row.result2,
                 "place": row.place,
-                "sectional_host": row.host,
+                "sectional_host": _display_sectional_host(row.host, row.meet_num, year, gender),
                 "sectional_num": row.meet_num,
                 "met_standard": True,
                 "qualifier_type": "standard",
@@ -3439,7 +3557,7 @@ def _compute_event_qualifiers(
                 "result": row.result,
                 "result2": row.result2,
                 "place": row.place,
-                "sectional_host": row.host,
+                "sectional_host": _display_sectional_host(row.host, row.meet_num, year, gender),
                 "sectional_num": row.meet_num,
                 "met_standard": False,
                 "qualifier_type": "fill",

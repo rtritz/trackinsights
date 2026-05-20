@@ -75,6 +75,37 @@
             </div>
         </div>
 
+        {% if athlete_videos %}
+        <!-- Interview Videos Section -->
+        <div class="mb-6 sm:mb-8">
+            <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
+                Interview{% if athlete_videos|length > 1 %}s{% endif %}
+            </h2>
+            <div class="grid grid-cols-1 {% if athlete_videos|length > 1 %}md:grid-cols-2{% endif %} gap-6">
+                {% for video in athlete_videos %}
+                <div class="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
+                    <div class="relative w-full" style="padding-bottom: 56.25%;">
+                        <iframe
+                            class="absolute inset-0 w-full h-full"
+                            src="https://www.youtube-nocookie.com/embed/{{ video.youtube_id }}"
+                            title="{{ video.title | e }}"
+                            frameborder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowfullscreen
+                            loading="lazy">
+                        </iframe>
+                    </div>
+                    {% if video.description %}
+                    <div class="p-3 sm:p-4">
+                        <p class="text-sm text-gray-600">{{ video.description }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Badges Section -->
         <div class="mb-6 sm:mb-8">
             <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
