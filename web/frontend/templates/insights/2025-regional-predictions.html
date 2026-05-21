@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+
+{% block title %}2025 Regional Predictions (Accuracy Check) - Track Insights{% endblock %}
+{% block meta_description %}Projected 2025 Indiana regional team scores (Boys and Girls) generated from sectional finals — used to validate the projection model against actual 2025 regional results.{% endblock %}
+
+{% block content %}
+<style>
+  .rp25-h1 {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-style: italic;
+    line-height: 1;
+  }
+  .rp25-h2 {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-style: italic;
+  }
+  .rp25-kicker {
+    font-family: 'Staatliches', sans-serif;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #8c0327;
+  }
+  .rp25-card {
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 12px;
+    box-shadow: 0 10px 20px -18px rgba(0,0,0,0.18);
+  }
+  .rp25-card header {
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .rp25-table { width: 100%; border-collapse: collapse; }
+  .rp25-table th {
+    font-family: 'Staatliches', sans-serif;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    text-align: left;
+    color: rgba(0,0,0,0.55);
+    padding: 0.45rem 0.6rem;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+  }
+  .rp25-table td {
+    font-family: 'Georgia', serif;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px dotted rgba(0,0,0,0.08);
+    font-size: 0.92rem;
+  }
+  .rp25-table tr:last-child td { border-bottom: none; }
+  .rp25-place {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-style: italic;
+    color: #8c0327;
+    width: 2.2rem;
+  }
+  .rp25-score {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    text-align: right;
+    width: 4rem;
+  }
+  .rp25-leader td { background: rgba(140,3,39,0.04); }
+  .rp25-gender-tag {
+    font-family: 'Staatliches', sans-serif;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+  }
+  .rp25-boys { color: #2563eb; }
+  .rp25-girls { color: #db2777; }
+</style>
+
+<div class="min-h-screen bg-white pt-16 sm:pt-20 pb-16 px-4 sm:px-6">
+  <div class="max-w-6xl mx-auto">
+
+    <button onclick="history.back()" class="back-btn" aria-label="Go back">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd"
+          d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+          clip-rule="evenodd" />
+      </svg>
+    </button>
+
+    <header class="text-center mb-2">
+      <p class="rp25-kicker text-xs sm:text-sm">Accuracy Check · Internal Test Page</p>
+      <h1 class="rp25-h1 text-4xl sm:text-5xl mt-2 text-base-content">2025 Regional Predictions</h1>
+      <p class="font-serif text-base-content/70 text-sm sm:text-base mt-3 max-w-2xl mx-auto">
+        Projected team scores for the 2025 Indiana regionals, computed from that year's
+        sectional finals using the same model as the 2026 report. Compare these to the
+        actual 2025 regional results to gauge how well the projection matches reality.
+      </p>
+    </header>
+
+    {% for section in sections %}
+
+    {#  ============================================================
+        EDITOR'S NOTES — one box per gender. Edit the prose inside
+        the matching gender branch below.
+        ============================================================ #}
+    {% if section.gender == 'Boys' %}
+    <aside class="mt-6 mb-2 mx-auto max-w-3xl border-l-4 border-primary/60 bg-primary/5 rounded-r-lg px-5 py-4 font-serif text-base-content/80 text-[0.95rem] leading-relaxed">
+      <p class="rp25-kicker text-[0.65rem] mb-2">Editor's Notes — Boys</p>
+      <p>
+        For the boys:
+        The projected team scores perfectly predicted Regional 1 top 5 teams.
+        For Regional 2, the function only predicted the winner (Warsaw Community), but accurately predicted which teams would be in the top 5
+        For Regional 3, the function correctly predicted that the team scores would be very close across the top 5, and which teams would be in the top 5, but did not predict a signle correct placement within the top 5.
+        For Regional 4, the function did not predict the winner, but got 4 of the top 5 teams right.
+        For Regional 5, the function perfectly predicted the top 5 in exact order.
+        For Regional 6, the function did not predict the winner, but got 4 of the top 5 teams right.
+        For Regional 7, the function perfectly predicted the top 5 in exact order.
+        For Regional 8, the function predicted the winner and got the top 3 in order, but missed one team in the bottom of the top 5.
+      </p>
+    </aside>
+    {% elif section.gender == 'Girls' %}
+    <aside class="mt-10 mb-2 mx-auto max-w-3xl border-l-4 border-primary/60 bg-primary/5 rounded-r-lg px-5 py-4 font-serif text-base-content/80 text-[0.95rem] leading-relaxed">
+      <p class="rp25-kicker text-[0.65rem] mb-2">Editor's Notes — Girls</p>
+      <p>
+        For the girls:
+        The function predicted all 8 regional winners correctly.
+        For Regional 1, the function predicted the winner and got the top 3 in exact order, with 4 of the top 5 teams right.
+        For Regional 2, the function predicted the winner and got the top 3 in exact order, with 4 of the top 5 teams right.
+        For Regional 3, the function predicted the winner and correctly identified all 5 top teams, but only positions 1 and 4 landed in the right order.
+        For Regional 4, the function predicted the winner and correctly identified all 5 top teams, with positions 1, 2, and 5 in exact order — only 3rd and 4th swapped.
+        For Regional 5, the function predicted the winner and correctly identified all 5 top teams, with 1st and 5th in exact order — the middle three shuffled.
+        For Regional 6, the function predicted the winner and got 4 of the top 5 teams right.
+        For Regional 7, the function got the top 4 in exact order, with 4 of the top 5 teams right.
+        For Regional 8, the function predicted the winner and got the top 3 in exact order with all 5 top teams right — only 4th and 5th swapped.
+      </p>
+    </aside>
+    {% endif %}
+
+    <section class="mt-6">
+      <div class="flex items-baseline gap-3 mb-4">
+        <span class="rp25-gender-tag {% if section.gender == 'Boys' %}rp25-boys{% else %}rp25-girls{% endif %}">{{ section.gender }}</span>
+        <h2 class="rp25-h2 text-2xl sm:text-3xl">2025 {{ section.gender }} — Projected</h2>
+      </div>
+
+      {% if section.predictions %}
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
+        {% for regional in section.predictions %}
+        <div class="rp25-card overflow-hidden">
+          <header class="px-4 py-2.5 flex items-baseline justify-between">
+            <div>
+              <p class="rp25-kicker text-[0.6rem]">Regional {{ regional.regional_num }}</p>
+              <p class="rp25-h2 text-lg mt-0.5">
+                {% if regional.host %}{{ regional.host }}{% else %}Regional {{ regional.regional_num }}{% endif %}
+              </p>
+            </div>
+            <p class="text-[0.6rem] text-base-content/40 font-mono hidden sm:block">
+              Sect. {{ (regional.regional_num - 1) * 4 + 1 }}–{{ regional.regional_num * 4 }}
+            </p>
+          </header>
+          {% if regional.rows %}
+          <table class="rp25-table">
+            <thead>
+              <tr>
+                <th>Pl.</th>
+                <th>Team</th>
+                <th class="text-right">Pts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in regional.rows %}
+              <tr class="{% if loop.first %}rp25-leader{% endif %}">
+                <td class="rp25-place">{{ row.place }}</td>
+                <td>{{ row.team }}</td>
+                <td class="rp25-score">{{ '%g' % row.score }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="px-4 py-5 text-xs text-base-content/50 italic font-serif">No data.</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="font-serif text-base-content/60 italic">No 2025 {{ section.gender }} sectional data found.</p>
+      {% endif %}
+    </section>
+    {% endfor %}
+
+    <p class="text-center mt-12">
+      <a href="{{ url_for('main.insights_page') }}"
+        class="btn btn-sm btn-outline btn-primary rounded-full">
+        ← Back to Insights
+      </a>
+    </p>
+
+  </div>
+</div>
+{% endblock %}
