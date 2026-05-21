@@ -1,9 +1,21 @@
+from datetime import datetime
+
 from flask import render_template, request, url_for, Response
 from . import main_bp
 from ..queries import get_athletes
 from ..models import Athlete, School
 from ..videos import INTERVIEW_VIDEOS
+from ..util.regional_hosts import get_configured_regional_hosts
 from sqlalchemy.orm import joinedload
+
+# regional_predictions lives under backend/scripts; queries.py already adds
+# that directory to sys.path, so this import resolves at app boot.
+from regional_predictions import get_regional_predictions  # type: ignore  # noqa: E402
+
+# Master switch for the 2025 accuracy-check report. When False, the card on the
+# /insights page is hidden and the URL returns a 404. Flip to False before
+# pushing public; flip to True locally to spot-check the model.
+SHOW_2025_REGIONAL_PREDICTIONS = True
 
 
 @main_bp.route('/')
@@ -18,7 +30,10 @@ def search_page():
 
 @main_bp.route('/insights')
 def insights_page():
-    return render_template('insights/index.html')
+    return render_template(
+        'insights/index.html',
+        show_2025_regional_predictions=SHOW_2025_REGIONAL_PREDICTIONS,
+    )
 
 
 @main_bp.route('/insights/reports/percentiles-summary')
@@ -57,6 +72,46 @@ def sectional_trends_page():
 @main_bp.route('/insights/hypothetical')
 def hypothetical_query_page():
     return render_template('insights/hypothetical.html')
+
+
+@main_bp.route('/insights/reports/2026-regional-predictions')
+def regional_predictions_2026_report_page():
+    year = 2026
+    gender = 'Girls'
+    top_n = 10
+    hosts = get_configured_regional_hosts(year, gender)
+    predictions = get_regional_predictions(year, gender, top_n=top_n, hosts=hosts)
+    now = datetime.now()
+    updated_label = f"{now.strftime('%B')} {now.day}, {now.year}"
+    return render_template(
+        'insights/2026-regional-predictions.html',
+        year=year,
+        gender=gender,
+        top_n=top_n,
+        predictions=predictions,
+        boys_unavailable=True,
+        updated_label=updated_label,
+    )
+
+
+@main_bp.route('/insights/reports/2025-regional-predictions')
+def regional_predictions_2025_report_page():
+    if not SHOW_2025_REGIONAL_PREDICTIONS:
+        from flask import abort
+        abort(404)
+    year = 2025
+    top_n = 10
+    sections = []
+    for gender in ('Boys', 'Girls'):
+        hosts = get_configured_regional_hosts(year, gender)
+        predictions = get_regional_predictions(year, gender, top_n=top_n, hosts=hosts)
+        sections.append({'gender': gender, 'predictions': predictions})
+    return render_template(
+        'insights/2025-regional-predictions.html',
+        year=year,
+        top_n=top_n,
+        sections=sections,
+    )
 
 
 @main_bp.route('/insights/regional-qualifiers')
@@ -192,6 +247,7 @@ def sitemap_xml():
         url_for('main.insights_page', _external=True),
         url_for('main.percentiles_report_page', _external=True),
         url_for('main.top_returning_athletes_report_page', _external=True),
+        url_for('main.regional_predictions_2026_report_page', _external=True),
         url_for('main.percentiles_query_page', _external=True),
         url_for('main.sectional_trends_page', _external=True),
         url_for('main.hypothetical_query_page', _external=True),
