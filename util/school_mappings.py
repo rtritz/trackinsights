@@ -12,6 +12,9 @@ SCHOOL_MAPPINGS = {
     # Formatted API full names → DB school_name
     "Cardinal Ritter High School": "Indianapolis Cardinal Ritter",
     "Crispus Attucks Medical Magnet High School": "Indianapolis Crispus Attucks",
+    "Crispus Attucks Medical Magnet": "Indianapolis Crispus Attucks",
+    "Southwestern High School (Shel": "Southwestern (Shelbyville)",
+    "Southwestern High School (Shelbyville)": "Southwestern (Shelbyville)",
     "Covenant Christian High School (Indianapolis)": "Covenant Christian (Indpls)",
     "George Washington High School": "Indianapolis George Washington Community",
     # Sectional 21 API names (Girls 2025)

@@ -3348,9 +3348,14 @@ def _extend_to_cutoff_with_ties(rows, target_count):
     return selected
 
 
-def _missing_top3_places_by_meet(rows):
-    meet_places = {}
-    meet_hosts = {}
+def _missing_auto_slots_by_meet(rows, cutoff_place: int = 3):
+    """Return placeholder slots needed per meet, handling ties correctly.
+
+    MileSplit place labels can skip a place when there is a tie (for example,
+    1st, 2nd, 2nd, no 3rd). In that case, there are already three automatic
+    qualifiers represented, so no placeholder should be added.
+    """
+    meet_data = {}
 
     for row in rows:
         meet_num_raw = getattr(row, "meet_num", None)
@@ -3362,9 +3367,12 @@ def _missing_top3_places_by_meet(rows):
         except (TypeError, ValueError):
             continue
 
-        meet_places.setdefault(meet_num, set())
-        if meet_num not in meet_hosts:
-            meet_hosts[meet_num] = getattr(row, "host", None)
+        if meet_num not in meet_data:
+            meet_data[meet_num] = {
+                "top_count": 0,
+                "places": set(),
+                "host": getattr(row, "host", None),
+            }
 
         place_raw = getattr(row, "place", None)
         try:
@@ -3372,14 +3380,26 @@ def _missing_top3_places_by_meet(rows):
         except (TypeError, ValueError):
             continue
 
-        if 1 <= place <= 3:
-            meet_places[meet_num].add(place)
+        if 1 <= place <= cutoff_place:
+            meet_data[meet_num]["top_count"] += 1
+            meet_data[meet_num]["places"].add(place)
 
     missing = []
-    for meet_num in sorted(meet_places.keys()):
-        for place in (1, 2, 3):
-            if place not in meet_places[meet_num]:
-                missing.append((meet_num, place, meet_hosts.get(meet_num)))
+    for meet_num in sorted(meet_data.keys()):
+        top_count = meet_data[meet_num]["top_count"]
+        missing_slots = max(0, cutoff_place - top_count)
+        if missing_slots == 0:
+            continue
+
+        missing_places = [
+            place for place in range(1, cutoff_place + 1)
+            if place not in meet_data[meet_num]["places"]
+        ]
+        while len(missing_places) < missing_slots:
+            missing_places.append(cutoff_place)
+
+        for place in missing_places[:missing_slots]:
+            missing.append((meet_num, place, meet_data[meet_num]["host"]))
 
     return missing
 
@@ -3431,14 +3451,13 @@ def _compute_event_qualifiers(
         # Detect which sectionals are missing the event entirely
         present_meet_nums = {row.meet_num for row in rows}
         missing_event_meet_nums = set(feeder_meet_nums) - present_meet_nums
-        print(f"[DEBUG] Event: {event_name}, Present sectionals: {sorted(present_meet_nums)}, Missing sectionals: {sorted(missing_event_meet_nums)}", file=sys.stderr)
         # Get host info for missing sectionals
         host_map = {row.meet_num: row.host for row in rows}
         for meet_num in missing_event_meet_nums:
             host_map.setdefault(meet_num, None)
 
         top3 = [row for row in rows if row.place is not None and row.place <= 3]
-        missing_top3 = _missing_top3_places_by_meet(rows)
+        missing_top3 = _missing_auto_slots_by_meet(rows)
         others = [row for row in rows if row.place is not None and row.place > 3]
         others_sorted = sorted(others, key=lambda row: row.result2, reverse=not lower_is_better)
 
@@ -3482,8 +3501,8 @@ def _compute_event_qualifiers(
                     "event_type": event_type,
                     "name": None,
                     "grade": None,
-                    "school": "Missing on MileSplit",
-                    "result": "Missing on MileSplit",
+                    "school": "-",
+                    "result": "-",
                     "result2": None,
                     "place": place,
                     "sectional_host": _display_sectional_host(host, meet_num, year, gender),
@@ -3504,8 +3523,8 @@ def _compute_event_qualifiers(
                         "event_type": event_type,
                         "name": None,
                         "grade": None,
-                        "school": "Missing on MileSplit",
-                        "result": "Missing on MileSplit",
+                        "school": "-",
+                        "result": "-",
                         "result2": None,
                         "place": place,
                         "sectional_host": _display_sectional_host(host_map.get(meet_num), meet_num, year, gender),
@@ -3590,19 +3609,13 @@ def _compute_event_qualifiers(
     # Detect which sectionals are missing the event entirely (individual events)
     present_meet_nums = {row.meet_num for row in rows}
     missing_event_meet_nums = set(feeder_meet_nums) - present_meet_nums
-    print(f"[DEBUG] Event: {event_name}, Present sectionals: {sorted(present_meet_nums)}, Missing sectionals: {sorted(missing_event_meet_nums)}", file=sys.stderr)
     # Get host info for missing sectionals
     host_map = {row.meet_num: row.host for row in rows}
     for meet_num in missing_event_meet_nums:
         host_map.setdefault(meet_num, None)
 
-    # DEBUG: Print which sectionals are missing the event entirely
-    present_meet_nums = {row.meet_num for row in rows}
-    missing_event_meet_nums = set(feeder_meet_nums) - present_meet_nums
-    print(f"[DEBUG] Event: {event_name}, Present sectionals: {sorted(present_meet_nums)}, Missing sectionals: {sorted(missing_event_meet_nums)}", file=sys.stderr)
-
     top3 = [row for row in rows if row.place is not None and row.place <= 3]
-    missing_top3 = _missing_top3_places_by_meet(rows)
+    missing_top3 = _missing_auto_slots_by_meet(rows)
     others = [row for row in rows if row.place is not None and row.place > 3]
     others_sorted = sorted(others, key=lambda row: row.result2, reverse=not lower_is_better)
 
