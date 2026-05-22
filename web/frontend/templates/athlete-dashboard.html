@@ -74,8 +74,8 @@
             </h2>
             <div class="grid grid-cols-1 {% if athlete_videos|length > 1 %}md:grid-cols-2{% endif %} gap-6">
                 {% for video in athlete_videos %}
-                <div class="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
-                    <div class="relative w-full" style="padding-bottom: 56.25%;">
+                <div class="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white max-w-md">
+                    <div class="relative w-full" style="padding-bottom: 40%;">
                         <iframe
                             class="absolute inset-0 w-full h-full"
                             src="https://www.youtube-nocookie.com/embed/{{ video.youtube_id }}"
