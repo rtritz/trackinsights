@@ -28,14 +28,6 @@
 
     <!-- Dashboard Content -->
     <div id="dashboard-content" class="hidden max-w-6xl mx-auto" data-school-id="{{ school_id }}">
-        <button onclick="history.back()" class="back-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd"
-                    d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
-                    clip-rule="evenodd" />
-            </svg>
-        </button>
-
         <!-- Header Section -->
         <div class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 mb-6 sm:mb-8 shadow-lg">
             <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
@@ -88,8 +80,40 @@
 
             <!-- Year Toggle -->
             <div id="percentiles-year-toggle" class="flex flex-wrap gap-2 mb-4"></div>
+            <p class="text-xs text-base-content/60">Tip: click a year to focus it. Ctrl/Cmd+click adds or removes comparison years.</p>
+            <p id="percentiles-compare-status" class="text-xs text-amber-700 mt-1 mb-3"></p>
 
             <div id="school-percentiles-container" class="overflow-x-auto">
+            </div>
+        </div>
+
+        <!-- Relay Results Section -->
+        <div class="mb-6 sm:mb-8">
+            <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
+                Relay Results
+            </h2>
+
+            <div class="space-y-4">
+                <div class="rounded-2xl border border-base-200 bg-base-100 p-3 sm:p-4">
+                    <div class="space-y-3">
+                        <div>
+                            <p class="text-xs uppercase tracking-wide text-base-content/60 mb-2">Year</p>
+                            <div id="relay-year-toggle" class="flex flex-wrap gap-2"></div>
+                        </div>
+                        <div>
+                            <p class="text-xs uppercase tracking-wide text-base-content/60 mb-2">Meet Type</p>
+                            <div id="relay-meet-toggle" class="flex flex-wrap gap-2"></div>
+                        </div>
+                        <div>
+                            <p class="text-xs uppercase tracking-wide text-base-content/60 mb-2">Event</p>
+                            <div id="relay-event-toggle" class="flex flex-wrap gap-2"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="relay-summary-cards" class="grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
+
+                <div id="relay-results-container" class="overflow-x-auto"></div>
             </div>
         </div>
 
@@ -228,9 +252,17 @@ document.addEventListener('DOMContentLoaded', async function () {
         'High Jump', 'Long Jump', 'Pole Vault', 'Shot Put', 'Discus',
     ];
     const eventRank = (e) => { const i = EVENT_ORDER.indexOf(e); return i >= 0 ? i : 999; };
+    const RELAY_EVENTS = ['4 x 100 Relay', '4 x 400 Relay', '4 x 800 Relay'];
+    const RELAY_MEET_TYPES = ['Sectional', 'Regional', 'State'];
+    const relayMeetRank = (meetType) => ({ State: 3, Regional: 2, Sectional: 1 }[meetType] || 0);
 
     // ── Global gender state ──
     let currentGlobalGender = null;
+    const relayFilterState = {
+        year: 'all',
+        meetType: 'all',
+        event: 'all',
+    };
 
     try {
         const resp = await fetch(`/api/schools/${schoolId}/dashboard`);
@@ -271,20 +303,31 @@ document.addEventListener('DOMContentLoaded', async function () {
         // ── Collect all genders from the data ──
         const cumulativePoints = data.cumulative_points || {};
         const roster = data.roster || [];
-        let currentPercData = (data.school_percentiles || []).slice().sort((a, b) => eventRank(a.event) - eventRank(b.event));
+        const basePercentileData = (data.school_percentiles || []).slice().sort((a, b) => eventRank(a.event) - eventRank(b.event));
+        const percentileDataByYear = { all: basePercentileData };
+        let selectedPercentileYears = ['all'];
         const percentileYears = data.percentile_years || [];
+        const relayResults = data.relay_results || [];
+        const relayYears = data.relay_years || [];
 
         const allGenders = new Set([
             ...Object.keys(cumulativePoints),
             ...roster.map(a => a.gender),
-            ...currentPercData.map(p => p.gender)
+            ...basePercentileData.map(p => p.gender),
+            ...relayResults.map(r => r.gender),
         ]);
         const genderOptions = [...allGenders].sort();
 
         // ── Containers ──
         const teamStatsContainer = document.getElementById('team-stats-container');
         const percYearToggle = document.getElementById('percentiles-year-toggle');
+        const percCompareStatus = document.getElementById('percentiles-compare-status');
         const percContainer = document.getElementById('school-percentiles-container');
+        const relayYearToggle = document.getElementById('relay-year-toggle');
+        const relayMeetToggle = document.getElementById('relay-meet-toggle');
+        const relayEventToggle = document.getElementById('relay-event-toggle');
+        const relaySummaryCards = document.getElementById('relay-summary-cards');
+        const relayResultsContainer = document.getElementById('relay-results-container');
         const rosterContainer = document.getElementById('roster-container');
         const rosterSearch = document.getElementById('roster-search');
 
@@ -330,7 +373,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 const fmtTeamPlace = (data) => {
                     if (!data || data.team_rank === null || data.team_rank === undefined) return '–';
                     const avgPlaceStr = data.avg_place !== null ? ` <span class="text-[10px] text-gray-400">(avg ${data.avg_place})</span>` : '';
-                    return `${ordinal(data.team_rank)}/${data.total_teams}${avgPlaceStr}`;
+                    return `${ordinal(data.team_rank)} / ${data.total_teams}${avgPlaceStr}`;
                 };
                 const fmtPts = (data) => (data && data.points) ? data.points : '–';
 
@@ -351,11 +394,357 @@ document.addEventListener('DOMContentLoaded', async function () {
             teamStatsContainer.appendChild(card);
         };
 
+        // ── Shared percentile bar renderer ──
+        const renderPercentileBar = (percentile, rank, total) => {
+            const value = Number(percentile || 0);
+            const safeWidth = Math.max(0, Math.min(100, value));
+            const labelPos = Math.max(6, Math.min(94, safeWidth));
+            const tooltipText = (rank !== undefined && rank !== null && total)
+                ? `${value}% · ${rank} / ${total}`
+                : `${value}%`;
+            return `
+                <div class="relative group min-w-[8rem] cursor-pointer">
+                    <div class="h-3 bg-base-200 rounded-md overflow-hidden border border-base-300/60">
+                        <div class="h-full rounded-md transition-all" style="width: ${safeWidth}%; background: linear-gradient(to right, #8c0327, #b0042f);"></div>
+                    </div>
+                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                        ${tooltipText}
+                    </div>
+                    <div class="relative h-4 mt-0.5">
+                        <span class="absolute text-[10px] sm:text-xs font-semibold tabular-nums text-base-content/80 whitespace-nowrap" style="left: ${labelPos}%; transform: translateX(-50%);">
+                            ${value}%
+                        </span>
+                    </div>
+                </div>
+            `;
+        };
+
         // ── Render Percentiles ──
+        const yearLabel = (yearKey) => (yearKey === 'all' ? 'All-Time' : String(yearKey));
+
+        const getPercentilesForYearAndGender = (yearKey, gender) => {
+            const rows = percentileDataByYear[yearKey] || [];
+            return rows.filter((p) => p.gender === gender).sort((a, b) => eventRank(a.event) - eventRank(b.event));
+        };
+
         const renderPercentiles = (gender) => {
-            const filtered = currentPercData.filter(p => p.gender === gender);
-            if (filtered.length === 0) {
-                percContainer.innerHTML = '<p class="text-gray-500 italic">No percentile data available.</p>';
+            const selected = selectedPercentileYears.slice();
+            const eventMap = new Map();
+
+            selected.forEach((yearKey) => {
+                const rows = getPercentilesForYearAndGender(yearKey, gender);
+                rows.forEach((row) => {
+                    if (!eventMap.has(row.event)) {
+                        eventMap.set(row.event, { event: row.event, is_relay: row.is_relay, event_type: row.event_type, byYear: {} });
+                    }
+                    eventMap.get(row.event).byYear[yearKey] = row;
+                });
+            });
+
+            const events = [...eventMap.values()].sort((a, b) => eventRank(a.event) - eventRank(b.event));
+            if (!events.length) {
+                percContainer.innerHTML = '<p class="text-gray-500 italic">No percentile data available for current comparison.</p>';
+                return;
+            }
+
+            if (selected.length === 1) {
+                const yearKey = selected[0];
+                const rows = getPercentilesForYearAndGender(yearKey, gender);
+                let html = `
+                    <table class="table table-compact sm:table-normal w-full text-sm">
+                        <thead>
+                            <tr class="text-primary text-xs sm:text-sm uppercase border-b-2 border-primary/20">
+                                <th>Event</th>
+                                <th>Mark</th>
+                                <th>Athlete</th>
+                                <th>Season</th>
+                                <th>Percentile</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                rows.forEach((p) => {
+                    const percentile = Number(p.state_percentile || 0);
+                    const relayBadge = p.is_relay ? ' <span class="badge badge-xs badge-outline">Relay</span>' : '';
+                    const holderLink = p.holder_id
+                        ? `<a href="/athlete-dashboard/${p.holder_id}" class="text-primary font-semibold underline decoration-solid underline-offset-2 hover:text-primary/80">${esc(p.holder)}</a>`
+                        : esc(p.holder || '-');
+
+                    html += `
+                            <tr class="hover:bg-primary/5">
+                                <td class="font-semibold">${esc(p.event)}${relayBadge}</td>
+                                <td class="font-mono">${esc(p.school_best || '-')}</td>
+                                <td>${holderLink}</td>
+                                <td>${p.year || '-'}</td>
+                                <td class="w-52">
+                                    ${renderPercentileBar(percentile, p.rank, p.total_marks)}
+                                </td>
+                            </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+                percContainer.innerHTML = html;
+                return;
+            }
+
+            let compareBanner = '';
+            if (selected.length > 1) {
+                const compareYears = selected.map((yearKey) => `<span class="font-semibold text-base-content">${esc(yearLabel(yearKey))}</span>`).join(' vs ');
+                compareBanner = `
+                    <div class="mb-3 rounded-xl border border-base-300 bg-base-100 px-3 py-2 text-xs sm:text-sm text-base-content/80">
+                        Comparing ${compareYears}. Best mark per event is highlighted.
+                    </div>
+                `;
+            }
+
+            let headerCols = '';
+            selected.forEach((yearKey, idx) => {
+                headerCols += `<th class="text-center whitespace-nowrap px-4 w-24" style="border: 0;">${esc(yearLabel(yearKey))}</th>`;
+                if (idx < selected.length - 1) {
+                    headerCols += '<th class="w-4" style="border: 0;"></th>';
+                }
+            });
+
+            let html = `
+                <table class="table table-compact sm:table-normal w-auto text-sm" style="border-collapse: separate; border-spacing: 0;">
+                    <thead>
+                        <tr class="text-primary text-xs sm:text-sm uppercase border-b-2 border-primary/20">
+                            <th class="min-w-[16rem] pr-8" style="border: 0;">Event</th>
+                            ${headerCols}
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            events.forEach((eventRow) => {
+                const relayBadge = eventRow.is_relay ? ' <span class="badge badge-xs badge-outline">Relay</span>' : '';
+                let yearCells = '';
+
+                const eventType = eventRow.event_type || 'Track';
+                const lowerIsBetter = eventType !== 'Field';
+                const yearMarks = selected
+                    .map((yearKey) => {
+                        const cell = eventRow.byYear[yearKey];
+                        return {
+                            yearKey,
+                            mark: cell && cell.school_best_raw !== null && cell.school_best_raw !== undefined
+                                ? Number(cell.school_best_raw)
+                                : null,
+                        };
+                    })
+                    .filter((item) => item.mark !== null);
+
+                const bestMark = yearMarks.length
+                    ? (lowerIsBetter
+                        ? Math.min(...yearMarks.map((item) => item.mark))
+                        : Math.max(...yearMarks.map((item) => item.mark)))
+                    : null;
+
+                selected.forEach((yearKey) => {
+                    const idx = selected.indexOf(yearKey);
+                    const cell = eventRow.byYear[yearKey];
+                    if (!cell) {
+                        yearCells += `<td class="text-center whitespace-nowrap px-4 w-24" style="border: 0;">-</td>`;
+                        if (idx < selected.length - 1) {
+                            yearCells += '<td class="w-4" style="border: 0;"></td>';
+                        }
+                        return;
+                    }
+
+                    const markValue = cell.school_best_raw !== null && cell.school_best_raw !== undefined
+                        ? Number(cell.school_best_raw)
+                        : null;
+                    const isBest = bestMark !== null && markValue !== null && markValue === bestMark;
+                    const bestClass = isBest ? 'bg-emerald-100 text-emerald-900 font-semibold rounded-md' : '';
+                    yearCells += `<td class="font-mono text-center whitespace-nowrap px-4 w-24 ${bestClass}" style="border: 0;">${esc(cell.school_best || '-')}</td>`;
+                    if (idx < selected.length - 1) {
+                        yearCells += '<td class="w-4" style="border: 0;"></td>';
+                    }
+                });
+
+                html += `
+                    <tr class="hover:bg-primary/5" style="border: 0;">
+                        <td class="font-semibold min-w-[16rem] pr-8" style="border: 0;">${esc(eventRow.event)}${relayBadge}</td>
+                        ${yearCells}
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            percContainer.innerHTML = compareBanner + html;
+        };
+
+        const ensurePercentileDataLoaded = async (yearKeys) => {
+            const missing = yearKeys.filter((key) => !Object.prototype.hasOwnProperty.call(percentileDataByYear, key));
+            if (!missing.length) {
+                return;
+            }
+
+            await Promise.all(missing.map(async (key) => {
+                const url = key === 'all'
+                    ? `/api/schools/${schoolId}/percentiles`
+                    : `/api/schools/${schoolId}/percentiles?year=${key}`;
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                    throw new Error('Failed to load percentiles');
+                }
+                const payload = await resp.json();
+                percentileDataByYear[key] = (payload || []).slice().sort((a, b) => eventRank(a.event) - eventRank(b.event));
+            }));
+        };
+
+        const renderPercentileYearButtons = () => {
+            if (!percYearToggle) return;
+            percYearToggle.innerHTML = '';
+            if (percCompareStatus) {
+                percCompareStatus.textContent = '';
+            }
+            const chipBase = 'btn btn-sm border border-base-300 rounded-full px-4 py-1.5 text-sm transition-all shadow-none hover:shadow-none';
+            const options = ['all', ...percentileYears.map((y) => String(y))];
+
+            options.forEach((key) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `${chipBase} cursor-pointer`;
+                btn.dataset.year = key;
+                btn.textContent = yearLabel(key);
+                const active = selectedPercentileYears.includes(key);
+                btn.classList.toggle('btn-primary', active);
+                btn.classList.toggle('text-white', active);
+                btn.classList.toggle('btn-ghost', !active);
+
+                btn.addEventListener('click', async (event) => {
+                    const multiSelect = event.ctrlKey || event.metaKey;
+                    if (multiSelect) {
+                        if (selectedPercentileYears.includes(key)) {
+                            if (selectedPercentileYears.length === 1) return;
+                            selectedPercentileYears = selectedPercentileYears.filter((item) => item !== key);
+                        } else {
+                            selectedPercentileYears = [...selectedPercentileYears, key];
+                        }
+                    } else {
+                        selectedPercentileYears = [key];
+                    }
+
+                    selectedPercentileYears.sort((a, b) => {
+                        if (a === 'all') return -1;
+                        if (b === 'all') return 1;
+                        return Number(b) - Number(a);
+                    });
+
+                    renderPercentileYearButtons();
+                    percContainer.innerHTML = '<p class="text-gray-500 italic">Loading comparison…</p>';
+                    try {
+                        await ensurePercentileDataLoaded(selectedPercentileYears);
+                        if (currentGlobalGender) {
+                            renderPercentiles(currentGlobalGender);
+                        }
+                    } catch {
+                        percContainer.innerHTML = '<p class="text-red-500 italic">Error loading percentiles.</p>';
+                    }
+                });
+
+                percYearToggle.appendChild(btn);
+            });
+        };
+
+        renderPercentileYearButtons();
+
+        // ── Relay Results ──
+        const getRelayRowsForGender = (gender) => relayResults.filter(r => r.gender === gender);
+
+        const renderRelayChips = (container, options, activeValue, onSelect) => {
+            if (!container) return;
+            container.innerHTML = '';
+            const chipBase = 'btn btn-sm border border-base-300 rounded-full px-4 py-1.5 text-sm transition-all shadow-none hover:shadow-none';
+            const allOptions = [{ label: 'All', value: 'all' }, ...options.map(opt => ({ label: String(opt), value: String(opt) }))];
+
+            allOptions.forEach(({ label, value }) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `${chipBase} cursor-pointer`;
+                btn.textContent = label;
+                btn.dataset.value = value;
+                const active = String(activeValue) === String(value);
+                btn.classList.toggle('btn-primary', active);
+                btn.classList.toggle('text-white', active);
+                btn.classList.toggle('btn-ghost', !active);
+                btn.addEventListener('click', () => onSelect(value));
+                container.appendChild(btn);
+            });
+        };
+
+        const getRelayRowsForSummary = (gender) => {
+            let rows = getRelayRowsForGender(gender);
+            if (relayFilterState.year !== 'all') {
+                rows = rows.filter(r => String(r.year) === String(relayFilterState.year));
+            }
+            if (relayFilterState.meetType !== 'all') {
+                rows = rows.filter(r => String(r.meet_type) === String(relayFilterState.meetType));
+            }
+            return rows;
+        };
+
+        const getRelayRowsForTable = (gender) => {
+            let rows = getRelayRowsForSummary(gender);
+            if (relayFilterState.event !== 'all') {
+                rows = rows.filter(r => String(r.event) === String(relayFilterState.event));
+            }
+
+            return rows.slice().sort((a, b) => {
+                const byEvent = eventRank(a.event) - eventRank(b.event);
+                if (byEvent !== 0) return byEvent;
+                const byYear = (b.year || 0) - (a.year || 0);
+                if (byYear !== 0) return byYear;
+                const byMeet = relayMeetRank(b.meet_type) - relayMeetRank(a.meet_type);
+                if (byMeet !== 0) return byMeet;
+                return (a.result_value ?? Number.POSITIVE_INFINITY) - (b.result_value ?? Number.POSITIVE_INFINITY);
+            });
+        };
+
+        const renderRelaySummary = (gender) => {
+            if (!relaySummaryCards) return;
+            const summaryRows = getRelayRowsForSummary(gender);
+            relaySummaryCards.innerHTML = '';
+
+            RELAY_EVENTS.forEach((eventName) => {
+                const rowsForEvent = summaryRows.filter(r => r.event === eventName && r.result_value !== null && r.result_value !== undefined);
+                const best = rowsForEvent.reduce((acc, row) => {
+                    if (!acc) return row;
+                    if (row.result_value < acc.result_value) return row;
+                    if (row.result_value === acc.result_value && (row.year || 0) > (acc.year || 0)) return row;
+                    return acc;
+                }, null);
+
+                const card = document.createElement('article');
+                card.className = 'rounded-2xl border border-base-200 bg-base-100 p-4 shadow-sm';
+
+                if (!best) {
+                    card.innerHTML = `
+                        <p class="text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-base-content/50 mb-2">${esc(eventName)} &middot; Best Mark</p>
+                        <p class="text-3xl sm:text-4xl font-extrabold text-base-content leading-none">-</p>
+                        <p class="text-xs text-base-content/50 mt-2">No marks for current filters</p>
+                    `;
+                } else {
+                    const placeText = best.place ? ` · ${ordinal(best.place)}` : '';
+                    card.innerHTML = `
+                        <p class="text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-base-content/50 mb-2">${esc(eventName)} &middot; Best Mark</p>
+                        <p class="text-3xl sm:text-4xl font-extrabold text-base-content leading-none">${esc(best.result || '-')}</p>
+                        <p class="text-xs text-base-content/60 mt-3">${esc(best.meet_type || 'Meet')} ${best.year || ''}${placeText}</p>
+                    `;
+                }
+
+                relaySummaryCards.appendChild(card);
+            });
+        };
+
+        const renderRelayTable = (gender) => {
+            if (!relayResultsContainer) return;
+            const rows = getRelayRowsForTable(gender);
+            if (!rows.length) {
+                relayResultsContainer.innerHTML = '<p class="text-gray-500 italic">No relay results for current filters.</p>';
                 return;
             }
 
@@ -365,91 +754,76 @@ document.addEventListener('DOMContentLoaded', async function () {
                         <tr class="text-primary text-xs sm:text-sm uppercase">
                             <th>Event</th>
                             <th>Mark</th>
-                            <th>Athlete</th>
-                            <th>Season</th>
+                            <th>Place</th>
+                            <th>Meet</th>
                             <th>Percentile</th>
                         </tr>
                     </thead>
-                    <tbody>`;
+                    <tbody>
+            `;
 
-            filtered.forEach(p => {
-                const percentile = p.state_percentile || 0;
-                const relayBadge = p.is_relay ? ' <span class="badge badge-xs badge-outline">Relay</span>' : '';
-                const holderLink = p.holder_id
-                    ? `<a href="/athlete-dashboard/${p.holder_id}" class="text-primary font-semibold underline decoration-solid underline-offset-2 hover:text-primary/80">${esc(p.holder)}</a>`
-                    : esc(p.holder || '–');
+            rows.forEach((row) => {
+                const placeText = row.place ? ordinal(row.place) : '-';
+                const meetLabel = `${esc(row.meet_type || 'Meet')} ${row.year || ''}`;
+                const hostLabel = esc(row.meet_host || (row.meet_num ? `Meet ${row.meet_num}` : 'Host TBD'));
+                const percentile = Number(row.state_percentile || 0);
+                const percentileHtml = row.state_percentile === null || row.state_percentile === undefined
+                    ? '-'
+                    : renderPercentileBar(percentile, row.rank, row.total_marks);
 
                 html += `
-                        <tr class="hover:bg-primary/5">
-                            <td class="font-semibold">${esc(p.event)}${relayBadge}</td>
-                            <td class="font-mono">${esc(p.school_best)}</td>
-                            <td>${holderLink}</td>
-                            <td>${p.year || '–'}</td>
-                            <td class="w-36">
-                                <div class="relative group cursor-pointer">
-                                    <div class="h-3 bg-base-200 rounded-full overflow-hidden">
-                                        <div class="h-full rounded-full transition-all" style="width: ${percentile}%; background: linear-gradient(to right, #8c0327, #b0042f);"></div>
-                                    </div>
-                                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                                        ${percentile}%
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>`;
+                    <tr class="hover:bg-primary/5">
+                        <td class="font-semibold">${esc(row.event || '-')}</td>
+                        <td class="font-mono">${esc(row.result || '-')}</td>
+                        <td>${placeText}</td>
+                        <td>
+                            <div>${meetLabel}</div>
+                            <div class="text-xs text-base-content/60">${hostLabel}</div>
+                        </td>
+                        <td>${percentileHtml}</td>
+                    </tr>
+                `;
             });
 
             html += '</tbody></table>';
-            percContainer.innerHTML = html;
+            relayResultsContainer.innerHTML = html;
         };
 
-        const loadPercentilesForYear = async (year) => {
-            percContainer.innerHTML = '<p class="text-gray-500 italic">Loading…</p>';
-            try {
-                const url = year === 'all'
-                    ? `/api/schools/${schoolId}/percentiles`
-                    : `/api/schools/${schoolId}/percentiles?year=${year}`;
-                const resp = await fetch(url);
-                if (!resp.ok) throw new Error('Failed to load percentiles');
-                currentPercData = (await resp.json()).sort((a, b) => eventRank(a.event) - eventRank(b.event));
-                renderPercentiles(currentGlobalGender);
-            } catch (err) {
-                percContainer.innerHTML = '<p class="text-red-500 italic">Error loading percentiles.</p>';
+        const renderRelayResults = (gender) => {
+            const genderRows = getRelayRowsForGender(gender);
+
+            const yearOptions = relayYears.length
+                ? relayYears
+                : [...new Set(genderRows.map(r => r.year).filter(y => y !== null && y !== undefined))].sort((a, b) => b - a);
+            const meetTypeOptions = RELAY_MEET_TYPES.filter(mt => genderRows.some(r => r.meet_type === mt));
+            const eventOptions = RELAY_EVENTS.filter(ev => genderRows.some(r => r.event === ev));
+
+            if (relayFilterState.year !== 'all' && !yearOptions.map(String).includes(String(relayFilterState.year))) {
+                relayFilterState.year = 'all';
             }
-        };
+            if (relayFilterState.meetType !== 'all' && !meetTypeOptions.includes(relayFilterState.meetType)) {
+                relayFilterState.meetType = 'all';
+            }
+            if (relayFilterState.event !== 'all' && !eventOptions.includes(relayFilterState.event)) {
+                relayFilterState.event = 'all';
+            }
 
-        // Build year toggle: "All" + each individual year
-        if (percentileYears.length > 0) {
-            const chipBase = 'btn btn-sm border border-base-300 rounded-full px-4 py-1.5 text-sm transition-all shadow-none hover:shadow-none';
-            const yearOptions = ['All-Time', ...percentileYears];
-            let activeYear = 'All';
-
-            yearOptions.forEach(yr => {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = chipBase;
-                btn.textContent = yr;
-                btn.dataset.year = yr;
-                btn.addEventListener('click', () => {
-                    if (String(yr) === String(activeYear)) return;
-                    activeYear = yr;
-                    percYearToggle.querySelectorAll('button').forEach(b => {
-                        const active = String(b.dataset.year) === String(yr);
-                        b.classList.toggle('btn-primary', active);
-                        b.classList.toggle('text-white', active);
-                        b.classList.toggle('btn-ghost', !active);
-                    });
-                    loadPercentilesForYear(yr === 'All-Time' ? 'all' : yr);
-                });
-                percYearToggle.appendChild(btn);
+            renderRelayChips(relayYearToggle, yearOptions, relayFilterState.year, (value) => {
+                relayFilterState.year = value;
+                renderRelayResults(gender);
+            });
+            renderRelayChips(relayMeetToggle, meetTypeOptions, relayFilterState.meetType, (value) => {
+                relayFilterState.meetType = value;
+                renderRelayResults(gender);
+            });
+            renderRelayChips(relayEventToggle, eventOptions, relayFilterState.event, (value) => {
+                relayFilterState.event = value;
+                renderRelayResults(gender);
             });
 
-            // Auto-select "All"
-            const firstBtn = percYearToggle.querySelector('button');
-            if (firstBtn) {
-                firstBtn.classList.add('btn-primary', 'text-white');
-                firstBtn.classList.remove('btn-ghost');
-            }
-        }
+            renderRelaySummary(gender);
+            renderRelayTable(gender);
+        };
 
         // ── Render Roster ──
         const renderRoster = (gender, searchFilter = '') => {
@@ -503,6 +877,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             currentGlobalGender = gender;
             renderTeamStats(gender);
             renderPercentiles(gender);
+            renderRelayResults(gender);
             renderRoster(gender, rosterSearch?.value || '');
         };
 

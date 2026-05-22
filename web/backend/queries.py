@@ -2415,6 +2415,8 @@ def get_school_dashboard_data(school_id: int):
     cumulative_points = _compute_cumulative_points(school_id)
     school_percentiles = _compute_school_percentiles(school_id)
     percentile_years = _get_school_percentile_years(school_id)
+    relay_results = _compute_school_relay_results(school_id)
+    relay_years = sorted({row["year"] for row in relay_results if row.get("year") is not None}, reverse=True)
 
     return {
         "school": school_info,
@@ -2422,6 +2424,8 @@ def get_school_dashboard_data(school_id: int):
         "cumulative_points": cumulative_points,
         "school_percentiles": school_percentiles,
         "percentile_years": percentile_years,
+        "relay_results": relay_results,
+        "relay_years": relay_years,
     }
 
 
@@ -2450,6 +2454,101 @@ def _build_school_roster(school_id: int):
 
     roster.sort(key=lambda r: (-(r["graduation_year"] or 0), r["name"]))
     return roster
+
+
+def _compute_school_relay_results(school_id: int):
+    """Return school relay performances for dashboard display."""
+    rows = (
+        db.session.query(
+            RelayResult.event,
+            RelayResult.result,
+            RelayResult.result2,
+            RelayResult.place,
+            RelayResult.athlete_names,
+            Meet.meet_id,
+            Meet.host,
+            Meet.meet_type,
+            Meet.meet_num,
+            Meet.gender,
+            Meet.year,
+            Event.event_type,
+        )
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .join(Event, RelayResult.event == Event.event)
+        .filter(
+            RelayResult.school_id == school_id,
+            RelayResult.result2.isnot(None),
+            Meet.year.isnot(None),
+            Meet.year >= MIN_RECORDS_YEAR,
+        )
+        .all()
+    )
+
+    statewide_rows = (
+        db.session.query(
+            RelayResult.event,
+            Meet.gender,
+            Meet.year,
+            RelayResult.result2,
+        )
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .filter(
+            RelayResult.result2.isnot(None),
+            Meet.year.isnot(None),
+            Meet.year >= MIN_RECORDS_YEAR,
+        )
+        .all()
+    )
+
+    statewide_marks = {}
+    for item in statewide_rows:
+        key = (item.event, item.gender, item.year)
+        statewide_marks.setdefault(key, []).append(item.result2)
+
+    meet_order = {"Sectional": 1, "Regional": 2, "State": 3}
+    results = []
+    for row in rows:
+        event_type = row.event_type or "Relay"
+        lineup = _extract_relay_names(row.athlete_names or "")
+        marks = statewide_marks.get((row.event, row.gender, row.year), [])
+        total_marks = len(marks)
+        better_or_equal = sum(1 for mark in marks if mark <= row.result2) if total_marks else None
+        percentile = round((1 - (better_or_equal / total_marks)) * 100, 1) if total_marks else None
+        results.append(
+            {
+                "event": row.event,
+                "result": row.result or _format_result_display(row.result2, event_type),
+                "result_value": row.result2,
+                "place": row.place,
+                "athlete_names": row.athlete_names,
+                "lineup": lineup,
+                "meet_id": row.meet_id,
+                "meet_host": row.host,
+                "meet_type": row.meet_type,
+                "meet_num": row.meet_num,
+                "gender": row.gender,
+                "year": row.year,
+                "event_type": event_type,
+                "state_percentile": max(percentile, 0) if percentile is not None else None,
+                "rank": better_or_equal,
+                "total_marks": total_marks,
+                "_meet_order": meet_order.get(row.meet_type, 0),
+            }
+        )
+
+    results.sort(
+        key=lambda item: (
+            -(item.get("year") or 0),
+            -(item.get("_meet_order") or 0),
+            item.get("event") or "",
+            item.get("result_value") if item.get("result_value") is not None else float("inf"),
+        )
+    )
+
+    for item in results:
+        item.pop("_meet_order", None)
+
+    return results
 
 
 def _compute_cumulative_points(school_id: int):
@@ -2521,13 +2620,39 @@ def _compute_cumulative_points(school_id: int):
 
     # Compute rankings for each meet
     # {meet_id: {school_id: {"rank": int, "total_teams": int}}}
+    # total_teams = all schools that competed at the meet (not just scorers)
+    all_competing_indiv = (
+        db.session.query(Athlete.school_id, AthleteResult.meet_id)
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .filter(
+            Meet.year >= MIN_RECORDS_YEAR,
+            Meet.meet_type.in_(("Sectional", "Regional", "State")),
+        )
+        .distinct()
+        .all()
+    )
+    all_competing_relay = (
+        db.session.query(RelayResult.school_id, RelayResult.meet_id)
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .filter(
+            Meet.year >= MIN_RECORDS_YEAR,
+            Meet.meet_type.in_(("Sectional", "Regional", "State")),
+        )
+        .distinct()
+        .all()
+    )
+    meet_total_schools = {}
+    for sid, mid in all_competing_indiv + all_competing_relay:
+        meet_total_schools.setdefault(mid, set()).add(sid)
+
     meet_rankings = {}
     for meet_id, schools_data in meet_school_stats.items():
-        # Rank by points descending
         sorted_schools = sorted(schools_data.items(), key=lambda x: -x[1]["points"])
+        total = len(meet_total_schools.get(meet_id, set()) | set(schools_data.keys()))
         rankings = {}
         for rank, (sid, _) in enumerate(sorted_schools, start=1):
-            rankings[sid] = {"rank": rank, "total_teams": len(sorted_schools)}
+            rankings[sid] = {"rank": rank, "total_teams": total}
         meet_rankings[meet_id] = rankings
 
     # Now extract data for the specific school
