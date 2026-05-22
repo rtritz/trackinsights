@@ -31,7 +31,7 @@
         <div id="status-grid" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2"></div>
       </section>
 
-      <section id="event-jump-wrap" class="hidden sticky top-20 sm:top-24 z-30 bg-base-100/90 backdrop-blur-sm border-y border-x border-base-300/70 px-2 py-2 sm:px-3 sm:py-3" style="border-left-width: 1.5px; border-right-width: 1.5px;">
+      <section id="event-jump-wrap" class="hidden bg-base-100/90 backdrop-blur-sm border-y border-x border-base-300/70 px-2 py-2 sm:px-3 sm:py-3" style="border-left-width: 1.5px; border-right-width: 1.5px;">
         <div id="event-jump-bar" class="flex flex-wrap gap-2"></div>
       </section>
 
@@ -53,6 +53,7 @@
 
     </div>
   </div>
+
 </div>
 
 <script>
@@ -220,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const chip = document.createElement('button');
       chip.type = 'button';
-      chip.className = 'rounded-lg border px-3 py-2 text-xs sm:text-sm font-semibold bg-white text-base-content border-base-300 hover:border-primary/50 transition-colors cursor-pointer';
+      chip.className = 'rounded-lg border px-3 py-2 text-xs sm:text-sm font-semibold bg-white text-base-content border-base-300 hover:border-primary hover:bg-primary/10 focus:bg-primary/20 focus:border-primary transition-colors cursor-pointer outline-none';
       chip.dataset.targetId = targetId;
       chip.dataset.chipKey = chipKey;
       chip.textContent = shortEventLabel(event);
@@ -235,20 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
       eventJumpBar.appendChild(chip);
     });
 
-    const topChip = document.createElement('button');
-    topChip.type = 'button';
-    topChip.className = 'rounded-lg border px-3 py-2 text-xs sm:text-sm font-semibold bg-white text-base-content border-base-300 hover:border-primary/50 transition-colors cursor-pointer';
-    topChip.setAttribute('aria-label', 'Back to top');
-    topChip.setAttribute('title', 'Back to top');
-    topChip.innerHTML = `
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-        <path fill-rule="evenodd" d="M10.707 3.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414L9 6.414V17a1 1 0 102 0V6.414l4.293 4.293a1 1 0 001.414-1.414l-6-6z" clip-rule="evenodd" />
-      </svg>
-    `;
-    topChip.addEventListener('click', () => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-    eventJumpBar.appendChild(topChip);
+    // Removed 'Back to top' button from event jump bar
 
     eventJumpWrap.classList.remove('hidden');
     setActiveEventChip(targets[0]?.chipKey || '');
@@ -324,7 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const card = document.createElement('article');
       card.className = 'rounded-lg border p-3 text-center transition-all';
       if (ready) {
-        card.classList.add('border-2', 'border-primary', 'bg-white', 'cursor-pointer', 'shadow-md', 'hover:border-primary', 'hover:shadow-lg');
+        card.classList.add('border-primary', 'bg-white', 'cursor-pointer', 'hover:border-2', 'hover:shadow-lg', 'hover:border-primary');
       } else {
         card.classList.add('border-warning/40', 'bg-warning/5', 'cursor-pointer', 'hover:border-warning', 'hover:shadow-md', 'opacity-80');
       }
@@ -397,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
       section.dataset.chipKey = chipKey;
 
       const headerWrap = document.createElement('div');
-      headerWrap.className = 'flex flex-wrap items-center gap-2';
+      headerWrap.className = 'flex flex-wrap items-center gap-2 relative';
 
       const header = document.createElement('h3');
       header.className = 'text-base font-semibold text-base-content';
@@ -410,6 +398,22 @@ document.addEventListener('DOMContentLoaded', () => {
         standard.textContent = `Standard: ${eventBlock.standard_mark}`;
         headerWrap.appendChild(standard);
       }
+
+      // Up arrow button at top right of section header
+      const upArrowBtn = document.createElement('button');
+      upArrowBtn.type = 'button';
+      upArrowBtn.setAttribute('aria-label', 'Back to top');
+      upArrowBtn.setAttribute('title', 'Back to top');
+      upArrowBtn.className = 'up-arrow-btn absolute right-0 top-0 bg-white border border-base-300 rounded-full p-0.5 shadow-sm hover:border-primary hover:bg-primary/10 focus:bg-primary/20 focus:border-primary transition-colors outline-none cursor-pointer';
+      upArrowBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M10.707 3.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414L9 6.414V17a1 1 0 102 0V6.414l4.293 4.293a1 1 0 001.414-1.414l-6-6z" clip-rule="evenodd" />
+        </svg>
+      `;
+      upArrowBtn.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+      headerWrap.appendChild(upArrowBtn);
 
       section.appendChild(headerWrap);
 
@@ -424,12 +428,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const wrap = document.createElement('div');
-      wrap.className = 'overflow-x-auto border border-base-200 rounded-lg';
+      wrap.className = 'overflow-x-auto border border-base-200 rounded-lg relative';
       const isRelayEvent = String(eventBlock.event || '').startsWith('4 x ');
       const nameHeader = isRelayEvent ? 'School' : 'Name';
       const gradeHeader = isRelayEvent ? '' : 'Grade';
       wrap.innerHTML = `
-        <table class="table table-xs sm:table-sm w-full bg-white">
+        <table class="table table-xs sm:table-sm w-full bg-white group/event-table">
           <thead>
             <tr>
               <th class="w-10"></th>
