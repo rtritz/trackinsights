@@ -13,14 +13,25 @@
 # ---------------------------------------------------------------------------
 
 INTERVIEW_VIDEOS = [
-    # { 
-    #     "youtube_id": "QQk0jn3UQcE",
-    #     "title": "Interview with Jane Smith",
-    #     "athlete_name": "Jane Smith",
-    #     "athlete_id": 302793,
-    #     "school": "Indianapolis Cathedral",
-    #     "event": "1600 Meters",
-    #     "year": 2026,
-    #     "description": "We sat down with Jane to talk about her record-breaking season and goals for state.",
-    # },
+    { 
+        "youtube_id": "e_T8IFLk5OY",
+        "title": " Mallory Weller Interview",
+        "athlete_name": "Mallory Weller",
+        "athlete_id": 291895,
+        "school": "Ft. Wayne Concordia Lutheran HS",
+        "event": "Distance",
+        "year": 2026,
+        "description": "Mallory Weller, a standout distance runner from Ft. Wayne Concordia Lutheran HS, shares her running journey with us.",
+    },
+
+        { 
+        "youtube_id": "Rxy_l8pqRZo ",
+        "title": "Noah Bontrager Interview",
+        "athlete_name": "Noah Bontrager",
+        "athlete_id": 297373,
+        "school": "Westview HS",
+        "event": "Distance",
+        "year": 2026,
+        "description": "We sat down with Westview HS distance runner Noah Bontrager to talk all things running — from training to racing to goals!"
+    },
 ]
