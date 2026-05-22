@@ -21,17 +21,17 @@
 
     {% if videos %}
     <!-- Video Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10 justify-center">
       {% for video in videos %}
-      <div class="card bg-base-100 shadow-lg rounded-2xl overflow-hidden border border-gray-100">
+      <div class="card bg-base-100 shadow-lg rounded-2xl overflow-hidden border border-gray-100 max-w-md mx-auto">
         <!-- YouTube Embed (privacy-enhanced) -->
-        <div class="relative w-full" style="padding-bottom: 56.25%;">
+        <div class="relative w-full" style="padding-bottom: 40%;">
           <iframe
             class="absolute inset-0 w-full h-full"
             src="https://www.youtube-nocookie.com/embed/{{ video.youtube_id }}"
             title="{{ video.title | e }}"
             frameborder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; web-share"
             allowfullscreen
             loading="lazy">
           </iframe>
