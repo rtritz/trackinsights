@@ -153,6 +153,38 @@
               <p class="text-xs text-base-content/60 leading-snug">Report highlighting top returning athletes across events.</p>
             </div>
           </a>
+
+          <a href="{{ url_for('main.regional_predictions_2026_report_page') }}"
+            class="group flex items-center gap-4 bg-white border border-base-200 rounded-xl p-4 hover:border-primary hover:shadow-md transition-all">
+            <div
+              class="w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center shrink-0 shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" />
+              </svg>
+            </div>
+            <div class="min-w-0">
+              <h2 class="text-base font-semibold group-hover:text-primary transition-colors">2026 Regional Predictions</h2>
+              <p class="text-xs text-base-content/60 leading-snug">Projected team scores for each regional, simulated from sectional finals.</p>
+            </div>
+          </a>
+
+          {% if show_2025_regional_predictions %}
+          <a href="{{ url_for('main.regional_predictions_2025_report_page') }}"
+            class="group flex items-center gap-4 bg-white border border-dashed border-base-300 rounded-xl p-4 hover:border-primary hover:shadow-md transition-all">
+            <div
+              class="w-11 h-11 rounded-full bg-base-200 text-primary flex items-center justify-center shrink-0 shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div class="min-w-0">
+              <h2 class="text-base font-semibold group-hover:text-primary transition-colors">2025 Regional Predictions <span class="text-[0.65rem] uppercase tracking-wider text-base-content/40 ml-1">Test</span></h2>
+              <p class="text-xs text-base-content/60 leading-snug">Accuracy check: projected 2025 Boys & Girls regional scores.</p>
+            </div>
+          </a>
+          {% endif %}
         </div>
       </section>
     </div>

@@ -9,4 +9,5 @@ env/
 .mypy_cache/
 .vscode/
 .DS_Store
+.claude
 

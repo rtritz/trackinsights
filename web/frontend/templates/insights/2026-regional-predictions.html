@@ -1,0 +1,300 @@
+{% extends 'base.html' %}
+
+{% block title %}2026 Regional Predictions - Track Insights{% endblock %}
+{% block meta_description %}A simulated look at the 2026 Indiana High School Girls Track & Field regionals — projected team scores built from the four feeder sectionals.{% endblock %}
+
+{% block content %}
+<style>
+  .rp-kicker {
+    font-family: 'Staatliches', 'Oswald', sans-serif;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+  .rp-headline {
+    font-family: 'Oswald', 'Arial Narrow', sans-serif;
+    font-weight: 700;
+    font-style: italic;
+    line-height: 0.95;
+    letter-spacing: -0.01em;
+  }
+  .rp-dek {
+    font-family: 'Oswald', 'Arial Narrow', sans-serif;
+    font-weight: 400;
+    font-style: italic;
+  }
+  .rp-byline {
+    font-family: 'Staatliches', sans-serif;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .rp-body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    line-height: 1.7;
+    font-size: 1.05rem;
+    color: #1f1f1f;
+  }
+  .rp-body p { margin-bottom: 1.1em; }
+  .rp-dropcap::first-letter {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-style: italic;
+    float: left;
+    font-size: 4.6em;
+    line-height: 0.85;
+    padding: 0.06em 0.12em 0 0;
+    color: #8c0327;
+  }
+  .rp-section-label {
+    font-family: 'Staatliches', sans-serif;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #8c0327;
+    font-size: 0.78rem;
+  }
+  .rp-section-title {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-style: italic;
+    line-height: 1.05;
+  }
+  .rp-callout {
+    border-left: 4px solid #8c0327;
+    background: linear-gradient(90deg, rgba(140,3,39,0.06), rgba(140,3,39,0));
+  }
+  .rp-pullquote {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-style: italic;
+    line-height: 1.15;
+    color: #8c0327;
+  }
+  .rp-regional-card {
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 14px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 12px 24px -18px rgba(0,0,0,0.18);
+  }
+  .rp-regional-card header {
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .rp-table { width: 100%; border-collapse: collapse; }
+  .rp-table th {
+    font-family: 'Staatliches', sans-serif;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    text-align: left;
+    color: rgba(0,0,0,0.55);
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+  }
+  .rp-table td {
+    font-family: 'Georgia', serif;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px dotted rgba(0,0,0,0.08);
+    font-size: 0.97rem;
+  }
+  .rp-table tr:last-child td { border-bottom: none; }
+  .rp-place {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-style: italic;
+    color: #8c0327;
+    width: 2.6rem;
+  }
+  .rp-score {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    text-align: right;
+    width: 4.6rem;
+  }
+  .rp-leader td {
+    background: rgba(140,3,39,0.04);
+  }
+  .rp-leader .rp-place { font-size: 1.05rem; }
+  .rp-hero {
+    background: linear-gradient(180deg, rgba(140,3,39,0.05) 0%, rgba(255,255,255,0) 60%);
+  }
+  @media (min-width: 768px) {
+    .rp-headline { font-size: 4.5rem; }
+  }
+</style>
+
+<div class="min-h-screen bg-white pt-16 sm:pt-20 pb-20 px-4 sm:px-6">
+  <div class="max-w-4xl mx-auto">
+
+    <button onclick="history.back()" class="back-btn" aria-label="Go back">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd"
+          d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+          clip-rule="evenodd" />
+      </svg>
+    </button>
+
+    <article class="rp-hero pt-2 pb-6">
+      <p class="rp-kicker text-xs sm:text-sm text-primary text-center">Track Insights · Regional Preview</p>
+      <h1 class="rp-headline text-5xl sm:text-6xl md:text-7xl text-center mt-3 text-base-content">
+        2026 Regional Predictions
+      </h1>
+      <p class="rp-dek text-lg sm:text-2xl text-base-content/70 text-center mt-4 max-w-2xl mx-auto">
+        Eight regionals, one weekend — here is how Indiana's {{ year }} Girls field
+        could shake out if every sectional finalist toed the line again.
+      </p>
+      <div class="rp-byline text-[0.7rem] sm:text-xs text-base-content/50 text-center mt-5">
+        <span>By Track Insights</span>
+        <span class="mx-2">·</span>
+        <span>Updated {{ updated_label }}</span>
+      </div>
+    </article>
+
+    <hr class="border-t border-base-200 my-2" />
+
+    <!-- LEDE -->
+    <section class="rp-body rp-dropcap mt-8">
+      <p>
+        Every May, four sectional meets feed each of Indiana's eight regionals — and
+        the regional roster is, in essence, a remix of the sectional results from the
+        prior week. <strong>Regional Predictions</strong> takes the {{ year }} Girls sectional
+        results we already have in the books and asks a simple what-if: if those same
+        finalists ran their same marks one week later, on the regional stage, who would
+        come out on top?
+      </p>
+      <p>
+        It is not a forecast of who <em>will</em> win. Wind, weather, injury, scratch sheets
+        and rivalry adrenaline can swing a score by twenty points. But as a baseline —
+        a measuring stick that uses real, recorded performances from this season — it is
+        the closest thing we have to a side-by-side.
+      </p>
+    </section>
+
+    {% if boys_unavailable %}
+    <aside class="rp-callout my-10 p-5 sm:p-6 rounded-r-xl">
+      <p class="rp-section-label mb-1">Editor's Note</p>
+      <p class="rp-body !mb-0">
+        The Boys sectional results for {{ year }} are not yet posted, so this edition runs
+        Girls only. Boys predictions will appear here once the sectional results land in
+        the database — check back after Boys Sectionals weekend.
+      </p>
+    </aside>
+    {% endif %}
+
+    <!-- HOW IT WORKS -->
+    <section class="mt-12">
+      <p class="rp-section-label mb-1">The Method</p>
+      <h2 class="rp-section-title text-3xl sm:text-4xl mb-4">How the math works</h2>
+      <div class="rp-body">
+        <p>
+          The model is intentionally plain. For each of the eight regionals, it grabs the
+          final-round results from the four sectionals that feed it — Regional 1 from
+          Sectionals 1–4, Regional 2 from 5–8, and so on. Inside each event it re-ranks
+          every athlete by their sectional mark (fastest time wins for track events; best
+          mark wins for field events), then hands out points the way Indiana scores at
+          regionals:
+        </p>
+        <p class="text-center font-semibold text-base-content/80">
+          10 · 8 · 6 · 5 · 4 · 3 · 2 · 1
+        </p>
+        <p>
+          Ties split the points evenly. Relays score the same way as individual events.
+          Add it all up across thirteen individual events and three relays, and the team
+          totals fall out. Note: in events where athletes run a preliminary heat to qualify
+          for the final (100m, 200m, and sprint hurdles), only the final-round marks are used for
+          scoring.
+        </p>
+      </div>
+    </section>
+
+    <!-- PULL QUOTE -->
+    <figure class="my-12 max-w-2xl mx-auto text-center">
+      <blockquote class="rp-pullquote text-2xl sm:text-3xl px-4">
+        "Eight regionals. Four feeder sectionals each. One scoreboard built from marks
+        that already happened."
+      </blockquote>
+    </figure>
+
+    <!-- THE PREDICTIONS -->
+    <section class="mt-4">
+      <p class="rp-section-label mb-1">The Predictions</p>
+      <h2 class="rp-section-title text-3xl sm:text-4xl mb-2">{{ year }} Girls — Projected Team Scores</h2>
+      <p class="rp-body text-base-content/70 !mb-6">
+        Top {{ top_n }} teams per regional. Scores reflect what each school would have
+        earned if last week's sectional finals had been rerun as the regional, with the
+        usual 10-8-6-5-4-3-2-1 scoring.
+      </p>
+
+      {% if predictions %}
+      <div class="grid gap-5 sm:grid-cols-2">
+        {% for regional in predictions %}
+        <div class="rp-regional-card overflow-hidden">
+          <header class="px-5 py-3 flex items-baseline justify-between">
+            <div>
+              <p class="rp-kicker text-[0.65rem] text-primary">Regional {{ regional.regional_num }}</p>
+              <p class="rp-section-title text-xl mt-0.5">
+                {% if regional.host %}{{ regional.host }}{% else %}Regional {{ regional.regional_num }}{% endif %}
+              </p>
+            </div>
+            <p class="rp-byline text-[0.65rem] text-base-content/40 hidden sm:block">
+              Sectionals {{ (regional.regional_num - 1) * 4 + 1 }}–{{ regional.regional_num * 4 }}
+            </p>
+          </header>
+          {% if regional.rows %}
+          <table class="rp-table">
+            <thead>
+              <tr>
+                <th>Pl.</th>
+                <th>Team</th>
+                <th class="text-right">Pts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in regional.rows %}
+              <tr class="{% if loop.first %}rp-leader{% endif %}">
+                <td class="rp-place">{{ row.place }}</td>
+                <td>{{ row.team }}</td>
+                <td class="rp-score">{{ '%g' % row.score }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="px-5 py-6 text-sm text-base-content/50 italic font-serif">
+            Sectional results for this regional are not in the database yet.
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="rp-callout p-6 rounded-r-xl">
+        <p class="rp-body !mb-0">
+          No {{ year }} Girls sectional results were found in the database. Once the
+          sectional results land, refresh this page to see the projections.
+        </p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- METHODOLOGY -->
+    <section class="mt-14">
+      <p class="rp-section-label mb-1">Methodology</p>
+      <h2 class="rp-section-title text-2xl sm:text-3xl mb-3">The fine print</h2>
+      <ul class="rp-body list-disc pl-5 text-base-content/80">
+        <li>Each regional is fed by the four sectionals numbered <em>(N−1)·4+1</em> through <em>(N−1)·4+4</em>.</li>
+        <li>Only final-round individual results are used; prelim times are excluded.</li>
+        <li>Relays are scored on the same 10-8-6-5-4-3-2-1 scale as individual events.</li>
+        <li>Ties at a placement average the points that would have been awarded.</li>
+        <li>Results with placeholder marks (0 or 9999) are filtered out.</li>
+        <li>This is a paper projection from sectional data — it does not account for scratches, weather, or athletes who chose not to enter an event.</li>
+      </ul>
+    </section>
+
+    <p class="text-center mt-12">
+      <a href="{{ url_for('main.insights_page') }}"
+        class="btn btn-sm btn-outline btn-primary rounded-full">
+        ← Back to Insights
+      </a>
+    </p>
+
+  </div>
+</div>
+{% endblock %}
