@@ -172,6 +172,18 @@ def get_regional_predictions(year, gender, top_n=10, hosts=None, db_path=None):
             return []
         results = []
         for regional_num in range(1, 9):
+            feeder_nums = _feeder_sectional_nums(regional_num)
+            # Check if all four feeder sectionals have at least one result
+            placeholders = ",".join(["?"] * len(feeder_nums))
+            sql = f"""
+                SELECT DISTINCT m.meet_num FROM athlete_result ar
+                JOIN meet m ON ar.meet_id = m.meet_id
+                WHERE m.year = ? AND m.gender = ? AND m.meet_type = 'Sectional' AND m.meet_num IN ({placeholders})
+            """
+            present = set(row[0] for row in conn.execute(sql, (year, gender, *feeder_nums)).fetchall())
+            if len(present) < 4:
+                # Skip this regional if any feeder is missing
+                continue
             rows = _project_regional(conn, year, gender, regional_num)
             if top_n is not None:
                 rows = rows[:top_n]

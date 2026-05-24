@@ -1,5 +1,14 @@
 import re
 import sys
+import logging
+# Set up module-level logger
+logger = logging.getLogger("trackinsights.queries")
+if not logger.hasHandlers():
+    handler = logging.StreamHandler(sys.stderr)
+    formatter = logging.Formatter('[%(levelname)s] %(asctime)s %(name)s: %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
 import html as html_lib
 from functools import lru_cache
 from pathlib import Path
@@ -3358,10 +3367,14 @@ def _regional_group_status(year: int, gender: str):
     regional_hosts = _regional_hosts_for_year(year, gender)
 
     regionals = []
+    import sys
+    logger.info(f"Loaded sectionals for {year} {gender}: {sorted(list(loaded))}")
+
     for regional_num, feeders in REGIONAL_SECTIONAL_GROUPS.items():
         feeder_set = set(feeders)
         completed = sorted(feeder_set.intersection(loaded))
         missing = sorted(feeder_set.difference(loaded))
+        logger.info(f"Regional {regional_num}: completed={completed}, missing={missing}")
         if len(completed) == len(feeders):
             status = "ready"
         elif completed:
@@ -3889,7 +3902,27 @@ def get_regional_qualifiers(gender: str, regional_num: int, year: int = CURRENT_
         "events": [],
     }
 
+
+    # Allow predictions for regionals with all feeders present, mark others as pending
     if regional_status["status"] != "ready":
+        response["context"]["note"] = "Pending: Not all feeder sectionals are loaded. Predictions below are only shown for completed sectionals."
+        # Only show predictions for completed feeders
+        feeder_meet_nums = REGIONAL_SECTIONAL_GROUPS[regional_num]
+        events = _regional_events_for_gender(clean_gender)
+        for event_name in events:
+            # Only include results for sectionals that are loaded
+            loaded_feeders = tuple(set(feeder_meet_nums).intersection(set(regional_status["loaded_sectionals"])))
+            if not loaded_feeders:
+                continue
+            qualifiers = _compute_event_qualifiers(event_name, clean_gender, year, loaded_feeders)
+            response["events"].append(
+                {
+                    "event": event_name,
+                    "event_type": _get_event_types_map().get(event_name, "Track"),
+                    "standard_mark": get_state_standard_display(clean_gender, event_name, year),
+                    "qualifiers": qualifiers,
+                }
+            )
         return response
 
     feeder_meet_nums = REGIONAL_SECTIONAL_GROUPS[regional_num]
