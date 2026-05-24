@@ -157,7 +157,7 @@
       {
         "place": 1,
         "team": "Warsaw Community",
-        "score": 70.0
+        "score": 71.0
       },
       {
         "place": 2,
@@ -167,7 +167,7 @@
       {
         "place": 3,
         "team": "Penn",
-        "score": 52.0
+        "score": 53.0
       },
       {
         "place": 4,
@@ -186,23 +186,18 @@
       },
       {
         "place": 7,
-        "team": "Churubusco",
-        "score": 28.0
-      },
-      {
-        "place": 8,
         "team": "Angola",
         "score": 25.0
       },
       {
-        "place": 8,
+        "place": 7,
         "team": "Manchester",
         "score": 25.0
       },
       {
-        "place": 10,
+        "place": 9,
         "team": "Concord",
-        "score": 21.0
+        "score": 23.0
       },
       {
         "place": 10,
@@ -210,29 +205,34 @@
         "score": 21.0
       },
       {
-        "place": 12,
+        "place": 11,
         "team": "Garrett",
         "score": 19.0
       },
       {
-        "place": 12,
+        "place": 11,
         "team": "Mishawaka",
         "score": 19.0
       },
       {
-        "place": 14,
+        "place": 13,
+        "team": "Churubusco",
+        "score": 18.0
+      },
+      {
+        "place": 13,
         "team": "LaVille",
-        "score": 17.0
+        "score": 18.0
       },
       {
-        "place": 15,
+        "place": 13,
         "team": "NorthWood",
-        "score": 16.0
+        "score": 18.0
       },
       {
-        "place": 15,
+        "place": 16,
         "team": "Wawasee",
-        "score": 16.0
+        "score": 17.0
       },
       {
         "place": 17,
@@ -240,9 +240,9 @@
         "score": 14.0
       },
       {
-        "place": 18,
+        "place": 17,
         "team": "West Noble",
-        "score": 13.0
+        "score": 14.0
       },
       {
         "place": 19,
@@ -313,6 +313,11 @@
         "place": 32,
         "team": "East Noble",
         "score": 2.0
+      },
+      {
+        "place": 33,
+        "team": "Glenn",
+        "score": 1.0
       }
     ]
   },
@@ -327,8 +332,8 @@
       },
       {
         "place": 2,
-        "team": "Fort Wayne Wayne",
-        "score": 81.0
+        "team": "Carroll (Fort Wayne)",
+        "score": 67.0
       },
       {
         "place": 3,
@@ -397,86 +402,91 @@
       },
       {
         "place": 16,
+        "team": "Fort Wayne Wayne",
+        "score": 14.0
+      },
+      {
+        "place": 16,
         "team": "Winchester Community",
         "score": 14.0
       },
       {
-        "place": 17,
+        "place": 18,
         "team": "Fort Wayne Bishop Dwenger",
         "score": 12.0
       },
       {
-        "place": 17,
+        "place": 18,
         "team": "Wabash",
         "score": 12.0
       },
       {
-        "place": 19,
+        "place": 20,
         "team": "Mississinewa",
         "score": 11.0
       },
       {
-        "place": 20,
+        "place": 21,
         "team": "Adams Central",
         "score": 10.0
       },
       {
-        "place": 20,
+        "place": 21,
         "team": "Bluffton",
         "score": 10.0
       },
       {
-        "place": 20,
+        "place": 21,
         "team": "Leo",
         "score": 10.0
       },
       {
-        "place": 23,
+        "place": 24,
         "team": "Marion",
         "score": 9.0
       },
       {
-        "place": 23,
+        "place": 24,
         "team": "Woodlan",
         "score": 9.0
       },
       {
-        "place": 25,
+        "place": 26,
         "team": "Eastbrook",
         "score": 7.0
       },
       {
-        "place": 26,
+        "place": 27,
         "team": "Columbia City",
         "score": 5.0
       },
       {
-        "place": 27,
+        "place": 28,
         "team": "Fort Wayne Bishop Luers",
         "score": 4.0
       },
       {
-        "place": 27,
+        "place": 28,
         "team": "Heritage",
         "score": 4.0
       },
       {
-        "place": 29,
+        "place": 30,
         "team": "Fort Wayne Blackhawk Christian",
         "score": 3.0
       },
       {
-        "place": 30,
+        "place": 31,
         "team": "Fort Wayne North Side",
         "score": 1.0
       },
       {
-        "place": 30,
+        "place": 31,
         "team": "Frankton",
         "score": 1.0
       },
       {
-        "place": 30,
+        "place": 31,
         "team": "Randolph Southern",
         "score": 1.0
       }

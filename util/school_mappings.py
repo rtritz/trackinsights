@@ -24,6 +24,15 @@ SCHOOL_MAPPINGS = {
     "Charles Tindley High School": "Tindley",  
     "Christel House Watanabe Manual HS": "Christel House",  
     "Mt. Vernon High School (Mt. Vernon)": "Mt. Vernon",  
+    "FW Carroll High School": "Carroll (Fort Wayne)",
+    "Thea Bowman Leadership Academy": "Bowman Leadership Academy",
+    "South Bend John Adams High School": "South Bend Adams",
+    "Brebeuf Jesuit Prep School": "Brebeuf Jesuit Preparatory",
+    "Arsenal Technical High School": "Indianapolis Arsenal Technical",
+    "Scecina Memorial High School": "Indianapolis Scecina Memorial",
+    "Evansville Memorial High School": "Evansville Reitz Memorial",
+    "George Washington High School": "Indianapolis George Washington Community",
+
 }
 
 def team_mapping(team):
