@@ -77,19 +77,25 @@ def hypothetical_query_page():
 @main_bp.route('/insights/reports/2026-regional-predictions')
 def regional_predictions_2026_report_page():
     year = 2026
-    gender = 'Girls'
     top_n = 10
-    hosts = get_configured_regional_hosts(year, gender)
-    predictions = get_regional_predictions(year, gender, top_n=top_n, hosts=hosts)
+    hosts_girls = get_configured_regional_hosts(year, 'Girls')
+    hosts_boys = get_configured_regional_hosts(year, 'Boys')
+    predictions_girls = get_regional_predictions(year, 'Girls', top_n=top_n, hosts=hosts_girls)
+    predictions_boys = get_regional_predictions(year, 'Boys', top_n=top_n, hosts=hosts_boys)
     now = datetime.now()
     updated_label = f"{now.strftime('%B')} {now.day}, {now.year}"
+
+    girls_unavailable = not any(r.get('rows') for r in predictions_girls)
+    boys_unavailable = not any(r.get('rows') for r in predictions_boys)
+
     return render_template(
         'insights/2026-regional-predictions.html',
         year=year,
-        gender=gender,
         top_n=top_n,
-        predictions=predictions,
-        boys_unavailable=True,
+        predictions_girls=predictions_girls,
+        predictions_boys=predictions_boys,
+        girls_unavailable=girls_unavailable,
+        boys_unavailable=boys_unavailable,
         updated_label=updated_label,
     )
 
