@@ -305,3 +305,76 @@ def api_state_qualifiers():
     except Exception as exc:
         return jsonify({'error': str(exc)}), 500
 
+
+@api_bp.route('/regional-qualifiers/top-list')
+def api_regional_top_list():
+    """Return combined, sorted event lists across all regionals (1-8) for a given gender/year.
+
+    For each event, qualifiers from all 8 regionals are merged and sorted best-to-worst
+    using result2 (lower is better for track events, higher for field events).
+    """
+    gender = (request.args.get('gender', 'Boys') or '').strip().title()
+    year = request.args.get('year', default=2026, type=int)
+    if year is None or year < 2000:
+        return jsonify({'error': 'year must be a valid season year'}), 400
+    if gender not in ('Boys', 'Girls'):
+        return jsonify({'error': 'gender must be Boys or Girls'}), 400
+
+    FIELD_EVENTS = {"High Jump", "Long Jump", "Triple Jump", "Shot Put", "Discus", "Pole Vault"}
+
+    combined = {}
+    event_meta = {}
+    for regional_num in range(1, 9):
+        try:
+            payload = get_regional_qualifiers(gender=gender, regional_num=regional_num, year=year)
+        except Exception:
+            continue
+        for event_block in payload.get('events', []):
+            event_name = event_block.get('event')
+            if not event_name:
+                continue
+            if event_name not in combined:
+                combined[event_name] = []
+                event_meta[event_name] = {
+                    'event': event_name,
+                    'event_type': event_block.get('event_type'),
+                    'standard_mark': event_block.get('standard_mark'),
+                }
+            for row in event_block.get('qualifiers', []):
+                if row.get('is_placeholder'):
+                    continue
+                enriched = dict(row)
+                enriched['regional_num'] = regional_num
+                combined[event_name].append(enriched)
+
+    events_out = []
+    for event_name, rows in combined.items():
+        is_field = event_name in FIELD_EVENTS
+        def sort_key(r, is_field=is_field):
+            val = r.get('result2')
+            if val is None:
+                return float('-inf') if is_field else float('inf')
+            return val
+        sorted_rows = sorted(rows, key=sort_key, reverse=is_field)
+        # De-duplicate: an athlete/school may appear multiple times across feeders; keep best result only
+        seen = set()
+        unique_rows = []
+        for r in sorted_rows:
+            key = (r.get('name') or r.get('school'), r.get('school'))
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_rows.append(r)
+        meta = event_meta[event_name]
+        events_out.append({
+            'event': event_name,
+            'event_type': meta.get('event_type'),
+            'standard_mark': meta.get('standard_mark'),
+            'qualifiers': unique_rows,
+        })
+
+    return jsonify({
+        'context': {'gender': gender, 'year': year},
+        'events': events_out,
+    })
+

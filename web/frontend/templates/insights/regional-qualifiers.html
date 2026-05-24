@@ -24,6 +24,20 @@
             <option value="2024">2024</option>
             <option value="2023">2023</option>
           </select>
+          <button id="top-list-btn" type="button"
+            class="ml-auto btn btn-sm btn-outline border-primary text-primary hover:bg-primary hover:text-primary-content gap-2"
+            title="Combined Regional Rankings" aria-label="Combined Regional Rankings">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M8 6h13" />
+              <path d="M8 12h13" />
+              <path d="M8 18h13" />
+              <path d="M4 5l1 1L4 7" />
+              <path d="M4 11l1 1-1 1" />
+              <path d="M4 17l1 1-1 1" />
+            </svg>
+            <span class="hidden sm:inline">Combined Regional Rankings</span>
+          </button>
         </div>
       </div>
 
@@ -32,7 +46,7 @@
       </section>
 
       <section id="event-jump-wrap" class="hidden bg-base-100/90 backdrop-blur-sm border-y border-x border-base-300/70 px-2 py-2 sm:px-3 sm:py-3" style="border-left-width: 1.5px; border-right-width: 1.5px;">
-        <div id="event-jump-bar" class="flex flex-wrap gap-2"></div>
+        <div id="event-jump-bar" class="flex flex-wrap justify-center gap-2"></div>
       </section>
 
       <section id="detail-section" class="hidden rounded-[24px] bg-white border border-base-200 p-4 sm:p-6 shadow-lg">
@@ -450,6 +464,22 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
 
       const tbody = wrap.querySelector('tbody');
+      // Compute tie-aware rankings: equal result2 values share the same rank.
+      const qRanks = new Array(qualifiers.length);
+      {
+        let lastVal = null;
+        let lastRank = 0;
+        for (let i = 0; i < qualifiers.length; i++) {
+          const v = qualifiers[i]?.result2;
+          if (i > 0 && v !== null && v !== undefined && v === lastVal) {
+            qRanks[i] = lastRank;
+          } else {
+            qRanks[i] = i + 1;
+            lastRank = i + 1;
+            lastVal = v;
+          }
+        }
+      }
       qualifiers.forEach((row, index) => {
         const tr = document.createElement('tr');
         const displayName = row.name || row.school || '-';
@@ -467,7 +497,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ? `${row.result || ''} <span class="text-emerald-700 font-bold ml-1">STAN</span>`
           : `${row.result || ''}`;
         tr.innerHTML = `
-          <td class="w-10 pr-1 font-semibold">${index + 1}</td>
+          <td class="w-10 pr-1 font-semibold">${qRanks[index]}</td>
           <td class="pl-1">${nameText}</td>
           <td>${row.grade || ''}</td>
           <td>${row.school || ''}</td>
@@ -523,6 +553,213 @@ document.addEventListener('DOMContentLoaded', () => {
 
   renderGenderButtons();
   fetchStatus();
+
+  // ---- Top List (combined across all regionals) ----
+  const topListBtn = document.getElementById('top-list-btn');
+  const topListState = { requestId: 0 };
+
+  function buildEventTable(eventBlock, rows, expanded) {
+    const wrap = document.createElement('div');
+    wrap.className = 'overflow-x-auto relative';
+    const isRelayEvent = String(eventBlock.event || '').startsWith('4 x ');
+    const nameHeader = isRelayEvent ? 'School' : 'Name';
+    const gradeHeader = isRelayEvent ? '' : 'Grade';
+    wrap.innerHTML = `
+      <table class="table table-xs sm:table-sm w-full bg-white group/event-table">
+        <thead>
+          <tr>
+            <th class="w-10"></th>
+            <th class="text-left pl-1">${nameHeader}</th>
+            <th>${gradeHeader}</th>
+            <th>School</th>
+            <th>Result</th>
+            <th>Place</th>
+            <th>Sectional Host</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    `;
+    const tbody = wrap.querySelector('tbody');
+    // Compute tie-aware rankings across the FULL list (so rank is consistent regardless of expansion)
+    const ranks = new Array(rows.length);
+    let lastVal = null;
+    let lastRank = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const v = rows[i]?.result2;
+      if (i > 0 && v !== null && v !== undefined && v === lastVal) {
+        ranks[i] = lastRank;
+      } else {
+        ranks[i] = i + 1;
+        lastRank = i + 1;
+        lastVal = v;
+      }
+    }
+    const visibleRows = expanded ? rows : rows.slice(0, 10);
+    visibleRows.forEach((row, idx) => {
+      const tr = document.createElement('tr');
+      const rank = ranks[idx];
+      const displayName = row.name || row.school || '-';
+      const metStandard = Boolean(row.met_standard) || row.qualifier_type === 'standard';
+      let nameText = displayName;
+      if (row.qualifier_type === 'fill' || row.is_callback) {
+        nameText = `${displayName} <span class="text-blue-600 font-semibold">(callback)</span>`;
+      }
+      if (row.is_placeholder) {
+        tr.classList.add('text-orange-600', 'bg-orange-50');
+      }
+      const resultText = metStandard
+        ? `${row.result || ''} <span class="text-emerald-700 font-bold ml-1">STAN</span>`
+        : `${row.result || ''}`;
+      tr.innerHTML = `
+        <td class="w-10 pr-1 font-semibold">${rank}</td>
+        <td class="pl-1">${nameText}</td>
+        <td>${row.grade || ''}</td>
+        <td>${row.school || ''}</td>
+        <td>${resultText}</td>
+        <td>${row.place || ''}</td>
+        <td>${row.sectional_host || ''}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+    return wrap;
+  }
+
+  function renderTopList(payload) {
+    const events = payload.events || [];
+    detailSection.classList.remove('hidden');
+    detailTitle.textContent = `${state.year} ${state.gender} Combined Regional Rankings`;
+    detailMessage.classList.add('hidden');
+
+    if (!events.length) {
+      clearDetailTable();
+      detailSection.classList.remove('hidden');
+      detailTitle.textContent = `${state.year} ${state.gender} Combined Regional Rankings`;
+      setMessage('No data available yet for any regional.', 'warning');
+      return;
+    }
+
+    initEventJump(events);
+    detailContent.classList.remove('hidden');
+    detailContent.innerHTML = '';
+
+    events.forEach((eventBlock, index) => {
+      const section = document.createElement('section');
+      section.className = 'space-y-2';
+      const chipKey = `${eventSlug(eventBlock.event)}-${index}`;
+      section.id = `event-${chipKey}`;
+      section.dataset.chipKey = chipKey;
+
+      const headerWrap = document.createElement('div');
+      headerWrap.className = 'flex flex-wrap items-center gap-2 relative';
+
+      const header = document.createElement('h3');
+      header.className = 'text-base font-semibold text-base-content';
+      header.textContent = eventBlock.event;
+      headerWrap.appendChild(header);
+
+      if (eventBlock.standard_mark) {
+        const standard = document.createElement('span');
+        standard.className = 'badge badge-sm text-xs font-semibold border-emerald-600/40 bg-emerald-50 text-emerald-700';
+        standard.textContent = `Standard: ${eventBlock.standard_mark}`;
+        headerWrap.appendChild(standard);
+      }
+
+      const upArrowBtn = document.createElement('button');
+      upArrowBtn.type = 'button';
+      upArrowBtn.setAttribute('aria-label', 'Back to top');
+      upArrowBtn.setAttribute('title', 'Back to top');
+      upArrowBtn.className = 'up-arrow-btn absolute right-0 top-0 bg-white border border-base-300 rounded-full p-0.5 shadow-sm hover:border-primary hover:bg-primary/10 focus:bg-primary/20 focus:border-primary transition-colors outline-none cursor-pointer';
+      upArrowBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M10.707 3.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414L9 6.414V17a1 1 0 102 0V6.414l4.293 4.293a1 1 0 001.414-1.414l-6-6z" clip-rule="evenodd" />
+        </svg>
+      `;
+      upArrowBtn.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+      headerWrap.appendChild(upArrowBtn);
+
+      section.appendChild(headerWrap);
+
+      const rows = Array.isArray(eventBlock.qualifiers) ? eventBlock.qualifiers : [];
+      if (!rows.length) {
+        const empty = document.createElement('p');
+        empty.className = 'text-sm text-base-content/60';
+        empty.textContent = 'No entries available.';
+        section.appendChild(empty);
+        detailContent.appendChild(section);
+        return;
+      }
+
+      let expanded = false;
+      const wrap = document.createElement('div');
+      wrap.className = 'overflow-x-auto border border-base-200 rounded-lg';
+      const tableHolder = document.createElement('div');
+      tableHolder.appendChild(buildEventTable(eventBlock, rows, expanded));
+      wrap.appendChild(tableHolder);
+
+      if (rows.length > 10) {
+        const footer = document.createElement('div');
+        footer.className = 'flex justify-center border-t border-base-200 bg-base-100/40 px-2 py-2';
+        const showAllBtn = document.createElement('button');
+        showAllBtn.type = 'button';
+        showAllBtn.className = 'btn btn-xs btn-ghost text-primary';
+        showAllBtn.textContent = `Show All (${rows.length})`;
+        showAllBtn.addEventListener('click', () => {
+          expanded = !expanded;
+          tableHolder.innerHTML = '';
+          tableHolder.appendChild(buildEventTable(eventBlock, rows, expanded));
+          showAllBtn.textContent = expanded ? 'Show Top 10' : `Show All (${rows.length})`;
+        });
+        footer.appendChild(showAllBtn);
+        wrap.appendChild(footer);
+      }
+
+      section.appendChild(wrap);
+
+      detailContent.appendChild(section);
+    });
+  }
+
+  async function fetchTopList() {
+    topListState.requestId += 1;
+    const requestId = topListState.requestId;
+    state.selectedRegional = null;
+    detailSection.classList.remove('hidden');
+    detailTitle.textContent = `${state.year} ${state.gender} Combined Regional Rankings`;
+    detailContent.classList.add('hidden');
+    detailContent.innerHTML = '';
+    detailMessage.classList.add('hidden');
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/regional-qualifiers/top-list?gender=${encodeURIComponent(state.gender)}&year=${state.year}`);
+      if (requestId !== topListState.requestId) return;
+      if (!response.ok) {
+        throw new Error('Unable to load top list.');
+      }
+      const payload = await response.json();
+      if (requestId !== topListState.requestId) return;
+      renderTopList(payload);
+    } catch (error) {
+      if (requestId !== topListState.requestId) return;
+      clearDetailTable();
+      detailSection.classList.remove('hidden');
+      detailTitle.textContent = `${state.year} ${state.gender} Combined Regional Rankings`;
+      setMessage(error.message || 'Unable to load rankings.', 'error');
+    } finally {
+      if (requestId === topListState.requestId) {
+        setLoading(false);
+      }
+    }
+  }
+
+  if (topListBtn) {
+    topListBtn.addEventListener('click', () => {
+      fetchTopList();
+      detailSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
 });
 </script>
 {% endblock %}
