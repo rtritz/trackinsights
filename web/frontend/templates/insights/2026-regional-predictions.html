@@ -204,24 +204,33 @@ Using results from the four Sectionals that feed into each Regional, we calculat
                     Pending — Not all feeder sectionals are available.
                   </div>
                 {% elif regional.rows %}
-                  <table class="rp-table">
-                    <thead>
-                      <tr>
-                        <th>Pl.</th>
-                        <th>Team</th>
-                        <th class="text-right">Pts</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for row in regional.rows %}
-                      <tr>
-                        <td class="rp-place">{{ row.place }}</td>
-                        <td>{{ row.team }}</td>
-                        <td class="rp-score">{{ '%g' % row.score }}</td>
-                      </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
+                      <table class="rp-table">
+                        <thead>
+                          <tr>
+                            <th>Pl.</th>
+                            <th>Team</th>
+                            <th class="text-right">Pts</th>
+                          </tr>
+                        </thead>
+                        <tbody id="girls-tbody-{{ regional_num }}">
+                          {% for row in regional.rows[:10] %}
+                          <tr>
+                            <td class="rp-place">{{ row.place }}</td>
+                            <td>{{ row.team }}</td>
+                            <td class="rp-score">{{ '%g' % row.score }}</td>
+                          </tr>
+                          {% endfor %}
+                        </tbody>
+                      </table>
+                      {% if regional.rows|length > 10 %}
+                        <div class="flex justify-end px-2 pb-2">
+                          <button class="btn btn-xs btn-outline btn-primary rounded-full show-all-btn" data-gender="girls" data-regional="{{ regional_num }}">Show All</button>
+                        </div>
+                        <script>
+                        window._regionalGirlsRows = window._regionalGirlsRows || {};
+                        window._regionalGirlsRows[{{ regional_num }}] = {{ regional.rows|tojson }};
+                        </script>
+                      {% endif %}
                 {% else %}
                   <div class="px-5 py-6 text-sm text-base-content/50 italic font-serif">
                     Sectional results for this regional are not in the database yet.
@@ -271,8 +280,8 @@ Using results from the four Sectionals that feed into each Regional, we calculat
                         <th class="text-right">Pts</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      {% for row in regional.rows %}
+                    <tbody id="boys-tbody-{{ regional_num }}">
+                      {% for row in regional.rows[:10] %}
                       <tr>
                         <td class="rp-place">{{ row.place }}</td>
                         <td>{{ row.team }}</td>
@@ -281,6 +290,43 @@ Using results from the four Sectionals that feed into each Regional, we calculat
                       {% endfor %}
                     </tbody>
                   </table>
+                  {% if regional.rows|length > 10 %}
+                    <div class="flex justify-end px-2 pb-2">
+                      <button class="btn btn-xs btn-outline btn-primary rounded-full show-all-btn" data-gender="boys" data-regional="{{ regional_num }}">Show All</button>
+                    </div>
+                    <script>
+                    window._regionalBoysRows = window._regionalBoysRows || {};
+                    window._regionalBoysRows[{{ regional_num }}] = {{ regional.rows|tojson }};
+                    </script>
+                  {% endif %}
+                <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                  function renderRows(tbody, rows) {
+                    tbody.innerHTML = '';
+                    rows.forEach(function(row) {
+                      var tr = document.createElement('tr');
+                      tr.innerHTML = `<td class="rp-place">${row.place}</td><td>${row.team}</td><td class="rp-score">${row.score}</td>`;
+                      tbody.appendChild(tr);
+                    });
+                  }
+                  document.querySelectorAll('.show-all-btn').forEach(function(btn) {
+                    btn.addEventListener('click', function () {
+                      var gender = btn.getAttribute('data-gender');
+                      var regional = btn.getAttribute('data-regional');
+                      var tbody = document.getElementById(gender + '-tbody-' + regional);
+                      var key = gender === 'girls' ? '_regionalGirlsRows' : '_regionalBoysRows';
+                      var allRows = window[key][regional];
+                      if (btn.textContent === 'Show All') {
+                        renderRows(tbody, allRows);
+                        btn.textContent = 'Show Top 10';
+                      } else {
+                        renderRows(tbody, allRows.slice(0, 10));
+                        btn.textContent = 'Show All';
+                      }
+                    });
+                  });
+                });
+                </script>
                 {% else %}
                   <div class="px-5 py-6 text-sm text-base-content/50 italic font-serif">
                     Sectional results for this regional are not in the database yet.
