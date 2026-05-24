@@ -74,14 +74,26 @@ def hypothetical_query_page():
     return render_template('insights/hypothetical.html')
 
 
+# Register the 2026 regional predictions report route
 @main_bp.route('/insights/reports/2026-regional-predictions')
 def regional_predictions_2026_report_page():
+    import os, json
+    from datetime import datetime
     year = 2026
     top_n = 10
-    hosts_girls = get_configured_regional_hosts(year, 'Girls')
-    hosts_boys = get_configured_regional_hosts(year, 'Boys')
-    predictions_girls = get_regional_predictions(year, 'Girls', top_n=top_n, hosts=hosts_girls)
-    predictions_boys = get_regional_predictions(year, 'Boys', top_n=top_n, hosts=hosts_boys)
+    static_dir = os.path.join(os.path.dirname(__file__), '../../frontend/static/data/regional_predictions')
+    girls_path = os.path.join(static_dir, f'regional_predictions_{year}_girls.json')
+    boys_path = os.path.join(static_dir, f'regional_predictions_{year}_boys.json')
+    try:
+        with open(girls_path, encoding='utf-8') as f:
+            predictions_girls = json.load(f)
+    except Exception:
+        predictions_girls = []
+    try:
+        with open(boys_path, encoding='utf-8') as f:
+            predictions_boys = json.load(f)
+    except Exception:
+        predictions_boys = []
     now = datetime.now()
     updated_label = f"{now.strftime('%B')} {now.day}, {now.year}"
 
