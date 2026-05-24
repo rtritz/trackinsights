@@ -3875,6 +3875,7 @@ def _compute_event_qualifiers(
     return sorted(formatted, key=lambda row: _qualifier_sort_key(row, lower_is_better), reverse=not lower_is_better)
 
 
+@lru_cache(maxsize=128)
 def get_regional_qualifiers(gender: str, regional_num: int, year: int = CURRENT_QUALIFIER_YEAR):
     clean_gender = (gender or "").strip().title()
     if clean_gender not in ("Boys", "Girls"):
