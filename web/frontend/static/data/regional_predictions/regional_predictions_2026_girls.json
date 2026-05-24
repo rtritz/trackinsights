@@ -122,17 +122,17 @@
       {
         "place": 1,
         "team": "Penn",
-        "score": 62.0
+        "score": 64.0
       },
       {
         "place": 2,
         "team": "Fairfield",
-        "score": 47.0
+        "score": 48.0
       },
       {
         "place": 2,
         "team": "Warsaw Community",
-        "score": 47.0
+        "score": 48.0
       },
       {
         "place": 4,
@@ -147,7 +147,7 @@
       {
         "place": 6,
         "team": "East Noble",
-        "score": 38.0
+        "score": 33.0
       },
       {
         "place": 7,
@@ -161,7 +161,7 @@
       },
       {
         "place": 9,
-        "team": "Tri",
+        "team": "Trinity School at Greenlawn",
         "score": 24.0
       },
       {
@@ -191,13 +191,18 @@
       },
       {
         "place": 15,
+        "team": "Fremont",
+        "score": 17.0
+      },
+      {
+        "place": 16,
         "team": "Bremen",
         "score": 16.0
       },
       {
-        "place": 15,
-        "team": "Fremont",
-        "score": 16.0
+        "place": 17,
+        "team": "Angola",
+        "score": 14.0
       },
       {
         "place": 17,
@@ -205,44 +210,34 @@
         "score": 14.0
       },
       {
-        "place": 18,
-        "team": "Angola",
-        "score": 13.0
-      },
-      {
-        "place": 18,
+        "place": 19,
         "team": "Culver Academies",
         "score": 13.0
       },
       {
-        "place": 18,
-        "team": "West Noble",
-        "score": 13.0
-      },
-      {
-        "place": 21,
+        "place": 20,
         "team": "NorthWood",
         "score": 12.0
       },
       {
-        "place": 22,
+        "place": 21,
         "team": "Churubusco",
-        "score": 10.0
+        "score": 11.0
       },
       {
-        "place": 22,
+        "place": 21,
         "team": "Lakeland",
-        "score": 10.0
+        "score": 11.0
       },
       {
-        "place": 24,
+        "place": 23,
         "team": "South Bend Riley",
         "score": 9.0
       },
       {
-        "place": 25,
+        "place": 24,
         "team": "Lakeland Christian Academy",
-        "score": 6.0
+        "score": 8.0
       },
       {
         "place": 25,
@@ -250,28 +245,43 @@
         "score": 6.0
       },
       {
-        "place": 27,
+        "place": 26,
+        "team": "Eastside",
+        "score": 5.0
+      },
+      {
+        "place": 26,
         "team": "Mishawaka Marian",
         "score": 5.0
       },
       {
-        "place": 28,
-        "team": "Eastside",
-        "score": 4.0
+        "place": 26,
+        "team": "West Noble",
+        "score": 5.0
       },
       {
-        "place": 28,
+        "place": 29,
         "team": "Elkhart Christian Academy",
         "score": 4.0
       },
       {
-        "place": 28,
+        "place": 29,
         "team": "Mishawaka",
         "score": 4.0
       },
       {
         "place": 31,
+        "team": "Central Noble",
+        "score": 3.0
+      },
+      {
+        "place": 31,
         "team": "DeKalb",
+        "score": 3.0
+      },
+      {
+        "place": 31,
+        "team": "North Miami",
         "score": 3.0
       },
       {
@@ -285,18 +295,8 @@
         "score": 3.0
       },
       {
-        "place": 34,
-        "team": "Central Noble",
-        "score": 2.0
-      },
-      {
-        "place": 34,
+        "place": 36,
         "team": "Glenn",
-        "score": 2.0
-      },
-      {
-        "place": 34,
-        "team": "North Miami",
         "score": 2.0
       }
     ]
@@ -307,8 +307,8 @@
     "rows": [
       {
         "place": 1,
-        "team": "Fort Wayne Wayne",
-        "score": 80.0
+        "team": "Carroll (Fort Wayne)",
+        "score": 82.0
       },
       {
         "place": 2,
@@ -318,7 +318,7 @@
       {
         "place": 3,
         "team": "Fort Wayne Concordia Lutheran",
-        "score": 71.0
+        "score": 70.0
       },
       {
         "place": 4,
@@ -332,13 +332,13 @@
       },
       {
         "place": 6,
-        "team": "Delta",
-        "score": 47.0
+        "team": "Fort Wayne Bishop Dwenger",
+        "score": 44.0
       },
       {
         "place": 7,
-        "team": "Fort Wayne Bishop Dwenger",
-        "score": 43.0
+        "team": "Delta",
+        "score": 42.0
       },
       {
         "place": 8,
@@ -412,22 +412,32 @@
       },
       {
         "place": 22,
+        "team": "Northfield",
+        "score": 3.0
+      },
+      {
+        "place": 22,
         "team": "Woodlan",
         "score": 3.0
       },
       {
-        "place": 23,
+        "place": 24,
         "team": "Muncie Burris",
-        "score": 2.0
-      },
-      {
-        "place": 23,
-        "team": "Northfield",
         "score": 2.0
       },
       {
         "place": 25,
         "team": "Bellmont",
+        "score": 1.0
+      },
+      {
+        "place": 25,
+        "team": "Fort Wayne Wayne",
+        "score": 1.0
+      },
+      {
+        "place": 25,
+        "team": "Frankton",
         "score": 1.0
       },
       {
@@ -449,7 +459,7 @@
       {
         "place": 1,
         "team": "Carmel",
-        "score": 103.0
+        "score": 104.0
       },
       {
         "place": 2,
@@ -464,20 +474,20 @@
       {
         "place": 4,
         "team": "Noblesville",
-        "score": 60.0
+        "score": 62.0
       },
       {
         "place": 5,
         "team": "Harrison (West Lafayette)",
-        "score": 53.0
+        "score": 56.0
       },
       {
         "place": 6,
         "team": "Fishers",
-        "score": 47.0
+        "score": 49.0
       },
       {
-        "place": 6,
+        "place": 7,
         "team": "Hamilton Heights",
         "score": 47.0
       },
@@ -489,7 +499,7 @@
       {
         "place": 9,
         "team": "North White",
-        "score": 20.0
+        "score": 21.0
       },
       {
         "place": 10,
@@ -502,28 +512,28 @@
         "score": 18.0
       },
       {
-        "place": 11,
-        "team": "Western",
-        "score": 18.0
-      },
-      {
-        "place": 13,
+        "place": 12,
         "team": "Lewis Cass",
         "score": 14.0
       },
       {
-        "place": 14,
+        "place": 12,
         "team": "West Lafayette",
-        "score": 13.0
+        "score": 14.0
       },
       {
-        "place": 15,
+        "place": 14,
         "team": "Faith Christian",
         "score": 11.0
       },
       {
-        "place": 16,
+        "place": 15,
         "team": "Lafayette Jefferson",
+        "score": 8.0
+      },
+      {
+        "place": 15,
+        "team": "Western",
         "score": 8.0
       },
       {
