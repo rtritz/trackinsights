@@ -1,0 +1,334 @@
+{
+  "year": 2026,
+  "gender": "Girls",
+  "ready": true,
+  "regionals_loaded": 8,
+  "missing_regionals": [],
+  "rows": [
+    {
+      "place": 1,
+      "team": "Carmel",
+      "score": 54.0
+    },
+    {
+      "place": 2,
+      "team": "Bloomington South",
+      "score": 44.0
+    },
+    {
+      "place": 3,
+      "team": "Hamilton Southeastern",
+      "score": 42.0
+    },
+    {
+      "place": 4,
+      "team": "Fort Wayne Concordia Lutheran",
+      "score": 28.0
+    },
+    {
+      "place": 5,
+      "team": "Brownsburg",
+      "score": 25.0
+    },
+    {
+      "place": 6,
+      "team": "Merrillville",
+      "score": 24.0
+    },
+    {
+      "place": 7,
+      "team": "Goshen",
+      "score": 23.0
+    },
+    {
+      "place": 8,
+      "team": "Avon",
+      "score": 22.0
+    },
+    {
+      "place": 9,
+      "team": "Franklin Community",
+      "score": 21.0
+    },
+    {
+      "place": 10,
+      "team": "Indianapolis Bishop Chatard",
+      "score": 20.0
+    },
+    {
+      "place": 11,
+      "team": "Whiteland Community",
+      "score": 19.0
+    },
+    {
+      "place": 12,
+      "team": "Western",
+      "score": 18.0
+    },
+    {
+      "place": 13,
+      "team": "Carroll (Fort Wayne)",
+      "score": 16.0
+    },
+    {
+      "place": 13,
+      "team": "Chesterton",
+      "score": 16.0
+    },
+    {
+      "place": 13,
+      "team": "Fishers",
+      "score": 16.0
+    },
+    {
+      "place": 13,
+      "team": "Zionsville",
+      "score": 16.0
+    },
+    {
+      "place": 17,
+      "team": "Evansville North",
+      "score": 15.0
+    },
+    {
+      "place": 17,
+      "team": "Lawrence Central",
+      "score": 15.0
+    },
+    {
+      "place": 17,
+      "team": "Pendleton Heights",
+      "score": 15.0
+    },
+    {
+      "place": 20,
+      "team": "Hamilton Heights",
+      "score": 14.0
+    },
+    {
+      "place": 20,
+      "team": "South Bend Washington",
+      "score": 14.0
+    },
+    {
+      "place": 22,
+      "team": "Eastern Hancock",
+      "score": 13.0
+    },
+    {
+      "place": 23,
+      "team": "North Central (Indianapolis)",
+      "score": 12.0
+    },
+    {
+      "place": 24,
+      "team": "Columbia City",
+      "score": 11.0
+    },
+    {
+      "place": 24,
+      "team": "Harrison (West Lafayette)",
+      "score": 11.0
+    },
+    {
+      "place": 26,
+      "team": "Guerin Catholic",
+      "score": 10.0
+    },
+    {
+      "place": 26,
+      "team": "Northview",
+      "score": 10.0
+    },
+    {
+      "place": 26,
+      "team": "Terre Haute North Vigo",
+      "score": 10.0
+    },
+    {
+      "place": 29,
+      "team": "Columbus North",
+      "score": 9.0
+    },
+    {
+      "place": 30,
+      "team": "Fairfield",
+      "score": 8.0
+    },
+    {
+      "place": 30,
+      "team": "Lake Central",
+      "score": 8.0
+    },
+    {
+      "place": 30,
+      "team": "Mt. Vernon (Fortville)",
+      "score": 8.0
+    },
+    {
+      "place": 30,
+      "team": "Terre Haute South Vigo",
+      "score": 8.0
+    },
+    {
+      "place": 30,
+      "team": "Warren Central",
+      "score": 8.0
+    },
+    {
+      "place": 35,
+      "team": "Center Grove",
+      "score": 7.0
+    },
+    {
+      "place": 35,
+      "team": "East Central",
+      "score": 7.0
+    },
+    {
+      "place": 35,
+      "team": "Jasper",
+      "score": 7.0
+    },
+    {
+      "place": 35,
+      "team": "Noblesville",
+      "score": 7.0
+    },
+    {
+      "place": 35,
+      "team": "Waldron",
+      "score": 7.0
+    },
+    {
+      "place": 35,
+      "team": "Westfield",
+      "score": 7.0
+    },
+    {
+      "place": 41,
+      "team": "Brebeuf Jesuit Preparatory",
+      "score": 6.0
+    },
+    {
+      "place": 41,
+      "team": "Delta",
+      "score": 6.0
+    },
+    {
+      "place": 41,
+      "team": "Edgewood",
+      "score": 6.0
+    },
+    {
+      "place": 41,
+      "team": "Northwestern",
+      "score": 6.0
+    },
+    {
+      "place": 41,
+      "team": "Orleans",
+      "score": 6.0
+    },
+    {
+      "place": 41,
+      "team": "Pike",
+      "score": 6.0
+    },
+    {
+      "place": 47,
+      "team": "Highland",
+      "score": 5.0
+    },
+    {
+      "place": 47,
+      "team": "Kokomo",
+      "score": 5.0
+    },
+    {
+      "place": 47,
+      "team": "Valparaiso",
+      "score": 5.0
+    },
+    {
+      "place": 50,
+      "team": "Faith Christian",
+      "score": 4.0
+    },
+    {
+      "place": 50,
+      "team": "Franklin Central",
+      "score": 4.0
+    },
+    {
+      "place": 50,
+      "team": "South Bend Saint Joseph",
+      "score": 4.0
+    },
+    {
+      "place": 50,
+      "team": "Tri-West Hendricks",
+      "score": 4.0
+    },
+    {
+      "place": 54,
+      "team": "Batesville",
+      "score": 3.0
+    },
+    {
+      "place": 54,
+      "team": "Corydon Central",
+      "score": 3.0
+    },
+    {
+      "place": 54,
+      "team": "Fort Wayne Northrop",
+      "score": 3.0
+    },
+    {
+      "place": 54,
+      "team": "Homestead",
+      "score": 3.0
+    },
+    {
+      "place": 54,
+      "team": "Kankakee Valley",
+      "score": 3.0
+    },
+    {
+      "place": 59,
+      "team": "Boonville",
+      "score": 2.0
+    },
+    {
+      "place": 59,
+      "team": "Danville Community",
+      "score": 2.0
+    },
+    {
+      "place": 61,
+      "team": "Bremen",
+      "score": 1.0
+    },
+    {
+      "place": 61,
+      "team": "Indian Creek",
+      "score": 1.0
+    },
+    {
+      "place": 61,
+      "team": "Monrovia",
+      "score": 1.0
+    },
+    {
+      "place": 61,
+      "team": "Northridge",
+      "score": 1.0
+    },
+    {
+      "place": 61,
+      "team": "Penn",
+      "score": 1.0
+    }
+  ]
+}

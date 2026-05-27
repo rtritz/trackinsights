@@ -1,0 +1,308 @@
+{% extends 'base.html' %}
+
+{% block title %}2026 State Predictions - Track Insights{% endblock %}
+{% block meta_description %}A simulated look at the 2026 Indiana High School Track & Field State Finals — projected team scores built from regional finals.{% endblock %}
+
+{% block content %}
+<style>
+  .rp-kicker {
+    font-family: 'Staatliches', 'Oswald', sans-serif;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+  .rp-headline {
+    font-family: 'Oswald', 'Arial Narrow', sans-serif;
+    font-weight: 700;
+    font-style: italic;
+    line-height: 0.95;
+    letter-spacing: -0.01em;
+  }
+  .rp-dek {
+    font-family: 'Oswald', 'Arial Narrow', sans-serif;
+    font-weight: 400;
+    font-style: italic;
+  }
+  .rp-byline {
+    font-family: 'Staatliches', sans-serif;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .rp-body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    line-height: 1.7;
+    font-size: 1.05rem;
+    color: #1f1f1f;
+  }
+  .rp-body p { margin-bottom: 1.1em; }
+  .rp-dropcap::first-letter {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-style: italic;
+    float: left;
+    font-size: 4.6em;
+    line-height: 0.85;
+    padding: 0.06em 0.12em 0 0;
+    color: #8c0327;
+  }
+  .rp-section-label {
+    font-family: 'Staatliches', sans-serif;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #8c0327;
+    font-size: 0.78rem;
+  }
+  .rp-section-title {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-style: italic;
+    line-height: 1.05;
+  }
+  .rp-callout {
+    border-left: 4px solid #8c0327;
+    background: linear-gradient(90deg, rgba(140,3,39,0.06), rgba(140,3,39,0));
+  }
+  .rp-pullquote {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-style: italic;
+    line-height: 1.15;
+    color: #8c0327;
+  }
+  .rp-regional-card {
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 14px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 12px 24px -18px rgba(0,0,0,0.18);
+  }
+  .rp-regional-card header {
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .rp-table { width: 100%; border-collapse: collapse; }
+  .rp-table th {
+    font-family: 'Staatliches', sans-serif;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    text-align: left;
+    color: rgba(0,0,0,0.55);
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+  }
+  .rp-table td {
+    font-family: 'Georgia', serif;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px dotted rgba(0,0,0,0.08);
+    font-size: 0.97rem;
+  }
+  .rp-table tr:last-child td { border-bottom: none; }
+  .rp-place {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-style: italic;
+    color: #8c0327;
+    width: 2.6rem;
+  }
+  .rp-score {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    text-align: right;
+    width: 4.6rem;
+  }
+  .rp-hero {
+    background: linear-gradient(180deg, rgba(140,3,39,0.05) 0%, rgba(255,255,255,0) 60%);
+  }
+  @media (min-width: 768px) {
+    .rp-headline { font-size: 4.5rem; }
+  }
+</style>
+
+<div class="min-h-screen bg-white pt-16 sm:pt-20 pb-20 px-4 sm:px-6">
+  <div class="max-w-4xl mx-auto">
+
+    <article class="rp-hero pt-2 pb-6">
+      <p class="rp-kicker text-xs sm:text-sm text-primary text-center">Track Insights · State Preview</p>
+      <h1 class="rp-headline text-5xl sm:text-6xl md:text-7xl text-center mt-3 text-base-content">
+        {{ year }} State Predictions
+      </h1>
+      <p class="rp-dek text-lg sm:text-2xl text-base-content/70 text-center mt-4 max-w-2xl mx-auto">
+        Eight regionals in. One state title at stake.
+      </p>
+      <div class="rp-byline text-[0.7rem] sm:text-xs text-base-content/50 text-center mt-5">
+        <span>By Track Insights</span>
+        <span class="mx-2">·</span>
+        <span>Updated {{ updated_label }}</span>
+      </div>
+    </article>
+
+    <hr class="border-t border-base-200 my-2" />
+
+    <!-- LEDE -->
+    <section class="rp-body rp-dropcap mt-8">
+      <p>
+        Using finals from all eight Regionals, we calculated projected State team scores to get an early look at the teams expected to contend for a State title. Scoring follows the IHSAA State convention — nine places deep (10, 8, 7, 6, 5, 4, 3, 2, 1).
+      </p>
+      <p>
+        Of course, only a fraction of regional finishers actually qualify to State, and championship races rarely run to form. Treat these as a projection, not a prophecy — the actual order will be written on the track.
+      </p>
+    </section>
+
+    {% if girls_unavailable and boys_unavailable %}
+      <aside class="rp-callout my-10 p-5 sm:p-6 rounded-r-xl">
+        <p class="rp-section-label mb-1">Editor's Note</p>
+        <p class="rp-body !mb-0">
+          Regional results for {{ year }} are not fully posted yet. Predictions will appear here once all eight regionals are in the database.
+        </p>
+      </aside>
+    {% endif %}
+
+    <figure class="my-12 max-w-2xl mx-auto text-center">
+      <blockquote class="rp-pullquote text-2xl sm:text-3xl px-4">
+        "Pool the regionals. Score the top nine. Here is the projected podium."
+      </blockquote>
+    </figure>
+
+    <!-- THE PREDICTIONS -->
+    <section class="mt-4">
+      <p class="rp-section-label mb-1">The Projections</p>
+
+      {# Girls Section #}
+      <h2 class="rp-section-title text-3xl sm:text-4xl mb-2">{{ year }} Girls — Projected Team Scores</h2>
+      {% if girls_unavailable %}
+        <div class="rp-callout p-6 rounded-r-xl mb-10">
+          <p class="rp-body !mb-0">
+            {% if girls.missing_regionals %}
+              Awaiting regional results. Missing regional{% if girls.missing_regionals|length > 1 %}s{% endif %}:
+              {{ girls.missing_regionals | join(', ') }}.
+            {% else %}
+              No {{ year }} Girls regional results were found in the database.
+            {% endif %}
+          </p>
+        </div>
+      {% else %}
+        <div class="rp-regional-card overflow-hidden mb-10">
+          <header class="px-5 py-3 flex items-baseline justify-between">
+            <div>
+              <p class="rp-kicker text-[0.65rem] text-primary">State Finals</p>
+              <p class="rp-section-title text-xl mt-0.5">{{ year }} Girls Projected</p>
+            </div>
+            <p class="rp-byline text-[0.65rem] text-base-content/40 hidden sm:block">
+              From Regionals 1–8
+            </p>
+          </header>
+          <table class="rp-table">
+            <thead>
+              <tr>
+                <th>Pl.</th>
+                <th>Team</th>
+                <th class="text-right">Pts</th>
+              </tr>
+            </thead>
+            <tbody id="girls-tbody">
+              {% for row in girls.rows[:10] %}
+              <tr>
+                <td class="rp-place">{{ row.place }}</td>
+                <td>{{ row.team }}</td>
+                <td class="rp-score">{{ '%g' % row.score }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% if girls.rows|length > 10 %}
+            <div class="flex justify-end px-2 pb-2">
+              <button class="btn btn-xs btn-outline btn-primary rounded-full show-all-btn" data-gender="girls">Show All</button>
+            </div>
+            <script>
+              window._stateGirlsRows = {{ girls.rows|tojson }};
+            </script>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {# Boys Section #}
+      <h2 class="rp-section-title text-3xl sm:text-4xl mb-2">{{ year }} Boys — Projected Team Scores</h2>
+      {% if boys_unavailable %}
+        <div class="rp-callout p-6 rounded-r-xl mb-10">
+          <p class="rp-body !mb-0">
+            {% if boys.missing_regionals %}
+              Awaiting regional results. Missing regional{% if boys.missing_regionals|length > 1 %}s{% endif %}:
+              {{ boys.missing_regionals | join(', ') }}.
+            {% else %}
+              No {{ year }} Boys regional results were found in the database.
+            {% endif %}
+          </p>
+        </div>
+      {% else %}
+        <div class="rp-regional-card overflow-hidden mb-10">
+          <header class="px-5 py-3 flex items-baseline justify-between">
+            <div>
+              <p class="rp-kicker text-[0.65rem] text-blue-700">State Finals</p>
+              <p class="rp-section-title text-xl mt-0.5">{{ year }} Boys Projected</p>
+            </div>
+            <p class="rp-byline text-[0.65rem] text-base-content/40 hidden sm:block">
+              From Regionals 1–8
+            </p>
+          </header>
+          <table class="rp-table">
+            <thead>
+              <tr>
+                <th>Pl.</th>
+                <th>Team</th>
+                <th class="text-right">Pts</th>
+              </tr>
+            </thead>
+            <tbody id="boys-tbody">
+              {% for row in boys.rows[:10] %}
+              <tr>
+                <td class="rp-place">{{ row.place }}</td>
+                <td>{{ row.team }}</td>
+                <td class="rp-score">{{ '%g' % row.score }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% if boys.rows|length > 10 %}
+            <div class="flex justify-end px-2 pb-2">
+              <button class="btn btn-xs btn-outline btn-primary rounded-full show-all-btn" data-gender="boys">Show All</button>
+            </div>
+            <script>
+              window._stateBoysRows = {{ boys.rows|tojson }};
+            </script>
+          {% endif %}
+        </div>
+      {% endif %}
+    </section>
+
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    function renderRows(tbody, rows) {
+      tbody.innerHTML = '';
+      rows.forEach(function (row) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td class="rp-place">' + row.place + '</td>' +
+          '<td>' + row.team + '</td>' +
+          '<td class="rp-score">' + row.score + '</td>';
+        tbody.appendChild(tr);
+      });
+    }
+    document.querySelectorAll('.show-all-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var gender = btn.getAttribute('data-gender');
+        var tbody = document.getElementById(gender + '-tbody');
+        var allRows = gender === 'girls' ? window._stateGirlsRows : window._stateBoysRows;
+        if (!allRows) return;
+        if (btn.textContent === 'Show All') {
+          renderRows(tbody, allRows);
+          btn.textContent = 'Show Top 10';
+        } else {
+          renderRows(tbody, allRows.slice(0, 10));
+          btn.textContent = 'Show All';
+        }
+      });
+    });
+  });
+</script>
+{% endblock %}
