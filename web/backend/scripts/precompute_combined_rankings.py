@@ -92,12 +92,12 @@ def build_combined_payload(gender: str, year: int) -> dict:
     }
 
 
-def main():
+def main(output_prefix: str = 'combined_rankings'):
     app = create_app()
     with app.app_context():
         for year in YEARS:
             for gender in GENDERS:
-                print(f"Computing combined regional rankings for {year} {gender}...")
+                print(f"Computing {output_prefix} for {year} {gender}...")
                 # Bypass lru_cache so we always recompute against fresh DB state.
                 target = get_regional_qualifiers
                 if hasattr(target, 'cache_clear'):
@@ -106,7 +106,7 @@ def main():
                 payload = build_combined_payload(gender, year)
                 out_path = os.path.join(
                     OUTPUT_DIR,
-                    f"combined_rankings_{year}_{gender.lower()}.json",
+                    f"{output_prefix}_{year}_{gender.lower()}.json",
                 )
                 with open(out_path, "w", encoding="utf-8") as f:
                     json.dump(payload, f, indent=2)
