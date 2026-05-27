@@ -2498,6 +2498,8 @@ def _compute_school_relay_results(school_id: int):
             RelayResult.event,
             Meet.gender,
             Meet.year,
+            Meet.meet_type,
+            RelayResult.school_id,
             RelayResult.result2,
         )
         .join(Meet, RelayResult.meet_id == Meet.meet_id)
@@ -2509,17 +2511,28 @@ def _compute_school_relay_results(school_id: int):
         .all()
     )
 
-    statewide_marks = {}
+    # Dedupe by school within each (event, gender, year, meet_type) bucket:
+    # keep each school's best (lowest time) mark at that meet level so
+    # ranking reflects teams that competed at that level, not raw
+    # performance counts. Each row on the dashboard is ranked against the
+    # pool of teams that ran the event at the same meet_type that year.
+    best_by_school = {}
     for item in statewide_rows:
-        key = (item.event, item.gender, item.year)
-        statewide_marks.setdefault(key, []).append(item.result2)
+        key = (item.event, item.gender, item.year, item.meet_type, item.school_id)
+        existing = best_by_school.get(key)
+        if existing is None or item.result2 < existing:
+            best_by_school[key] = item.result2
+
+    statewide_marks = {}
+    for (event, gender, year, meet_type, _sid), mark in best_by_school.items():
+        statewide_marks.setdefault((event, gender, year, meet_type), []).append(mark)
 
     meet_order = {"Sectional": 1, "Regional": 2, "State": 3}
     results = []
     for row in rows:
         event_type = row.event_type or "Relay"
         lineup = _extract_relay_names(row.athlete_names or "")
-        marks = statewide_marks.get((row.event, row.gender, row.year), [])
+        marks = statewide_marks.get((row.event, row.gender, row.year, row.meet_type), [])
         total_marks = len(marks)
         better_or_equal = sum(1 for mark in marks if mark <= row.result2) if total_marks else None
         percentile = round((1 - (better_or_equal / total_marks)) * 100, 1) if total_marks else None
