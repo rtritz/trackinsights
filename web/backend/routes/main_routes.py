@@ -112,6 +112,41 @@ def regional_predictions_2026_report_page():
     )
 
 
+@main_bp.route('/insights/reports/2026-state-predictions')
+def state_predictions_2026_report_page():
+    import os, json
+    from datetime import datetime
+    year = 2026
+    static_dir = os.path.join(os.path.dirname(__file__), '../../frontend/static/data/state_predictions')
+    girls_path = os.path.join(static_dir, f'state_predictions_{year}_girls.json')
+    boys_path = os.path.join(static_dir, f'state_predictions_{year}_boys.json')
+
+    def _load(path):
+        try:
+            with open(path, encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return {"ready": False, "rows": [], "missing_regionals": [], "regionals_loaded": 0}
+
+    girls = _load(girls_path)
+    boys = _load(boys_path)
+    now = datetime.now()
+    updated_label = f"{now.strftime('%B')} {now.day}, {now.year}"
+
+    girls_unavailable = not girls.get('ready') or not girls.get('rows')
+    boys_unavailable = not boys.get('ready') or not boys.get('rows')
+
+    return render_template(
+        'insights/2026-state-predictions.html',
+        year=year,
+        girls=girls,
+        boys=boys,
+        girls_unavailable=girls_unavailable,
+        boys_unavailable=boys_unavailable,
+        updated_label=updated_label,
+    )
+
+
 @main_bp.route('/insights/reports/2025-regional-predictions')
 def regional_predictions_2025_report_page():
     if not SHOW_2025_REGIONAL_PREDICTIONS:
