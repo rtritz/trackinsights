@@ -723,7 +723,7 @@ document.addEventListener('DOMContentLoaded', () => {
           expanded = !expanded;
           tableHolder.innerHTML = '';
           tableHolder.appendChild(buildEventTable(eventBlock, rows, expanded));
-          showAllBtn.textContent = expanded ? 'Show Top 10' : `Show All (${rows.length})`;
+          showAllBtn.textContent = expanded ? 'Collapse' : `Show All (${rows.length})`;
         });
         footer.appendChild(showAllBtn);
         wrap.appendChild(footer);

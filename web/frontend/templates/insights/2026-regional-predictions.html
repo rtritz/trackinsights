@@ -318,7 +318,7 @@ Using results from the four Sectionals that feed into each Regional, we calculat
                       var allRows = window[key][regional];
                       if (btn.textContent === 'Show All') {
                         renderRows(tbody, allRows);
-                        btn.textContent = 'Show Top 10';
+                        btn.textContent = 'Collapse';
                       } else {
                         renderRows(tbody, allRows.slice(0, 10));
                         btn.textContent = 'Show All';

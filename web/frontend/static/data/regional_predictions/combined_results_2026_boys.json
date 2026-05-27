@@ -1,0 +1,104 @@
+{
+  "context": {
+    "gender": "Boys",
+    "year": 2026
+  },
+  "events": [
+    {
+      "event": "100 Meters",
+      "event_type": "Track",
+      "standard_mark": "10.97",
+      "qualifiers": []
+    },
+    {
+      "event": "200 Meters",
+      "event_type": "Track",
+      "standard_mark": "22.15",
+      "qualifiers": []
+    },
+    {
+      "event": "400 Meters",
+      "event_type": "Track",
+      "standard_mark": "48.87",
+      "qualifiers": []
+    },
+    {
+      "event": "800 Meters",
+      "event_type": "Track",
+      "standard_mark": "1:55.30",
+      "qualifiers": []
+    },
+    {
+      "event": "1600 Meters",
+      "event_type": "Track",
+      "standard_mark": "4:15.49",
+      "qualifiers": []
+    },
+    {
+      "event": "3200 Meters",
+      "event_type": "Track",
+      "standard_mark": "9:09.20",
+      "qualifiers": []
+    },
+    {
+      "event": "110 Hurdles",
+      "event_type": "Track",
+      "standard_mark": "14.62",
+      "qualifiers": []
+    },
+    {
+      "event": "300 Hurdles",
+      "event_type": "Track",
+      "standard_mark": "39.10",
+      "qualifiers": []
+    },
+    {
+      "event": "High Jump",
+      "event_type": "Field",
+      "standard_mark": "6' 6\"",
+      "qualifiers": []
+    },
+    {
+      "event": "Long Jump",
+      "event_type": "Field",
+      "standard_mark": "22' 3\"",
+      "qualifiers": []
+    },
+    {
+      "event": "Shot Put",
+      "event_type": "Field",
+      "standard_mark": "56' 3.25\"",
+      "qualifiers": []
+    },
+    {
+      "event": "Discus",
+      "event_type": "Field",
+      "standard_mark": "165' 8\"",
+      "qualifiers": []
+    },
+    {
+      "event": "Pole Vault",
+      "event_type": "Field",
+      "standard_mark": "14' 9\"",
+      "qualifiers": []
+    },
+    {
+      "event": "4 x 100 Relay",
+      "event_type": "Relay",
+      "standard_mark": "42.36",
+      "qualifiers": []
+    },
+    {
+      "event": "4 x 400 Relay",
+      "event_type": "Relay",
+      "standard_mark": "3:21.72",
+      "qualifiers": []
+    },
+    {
+      "event": "4 x 800 Relay",
+      "event_type": "Relay",
+      "standard_mark": "7:55.14",
+      "qualifiers": []
+    }
+  ]
+}

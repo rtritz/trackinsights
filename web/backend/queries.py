@@ -3449,6 +3449,18 @@ def _state_group_status(year: int, gender: str):
 
     regional_hosts = _regional_hosts_for_year(year, gender)
 
+    state_host_row = (
+        db.session.query(Meet.host)
+        .filter(
+            Meet.meet_type == "State",
+            Meet.year == year,
+            Meet.gender == gender,
+            Meet.host.isnot(None),
+        )
+        .first()
+    )
+    state_host = state_host_row[0] if state_host_row else ""
+
     all_regionals = sorted(REGIONAL_SECTIONAL_GROUPS.keys())
     loaded_regionals = [regional_num for regional_num in all_regionals if regional_num in loaded]
     missing_regionals = [regional_num for regional_num in all_regionals if regional_num not in loaded]
@@ -3464,6 +3476,7 @@ def _state_group_status(year: int, gender: str):
         "missing_regionals": missing_regionals,
         "loaded_regionals": loaded_regionals,
         "regional_hosts": regional_hosts,
+        "state_host": state_host,
         "generated_at": func.now(),
     }
 
