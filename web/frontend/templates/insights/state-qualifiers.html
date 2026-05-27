@@ -366,18 +366,31 @@ document.addEventListener('DOMContentLoaded', () => {
         const tr = document.createElement('tr');
         const displayName = row.name || row.school || '-';
         const metStandard = Boolean(row.met_standard) || row.qualifier_type === 'standard';
-        let nameText = displayName;
+        const linkClass = 'text-inherit hover:underline';
+        let linkedName = displayName;
+        if (!row.is_placeholder && displayName !== '-') {
+          if (isRelayEvent && row.school_id) {
+            linkedName = `<a href="/school-dashboard/${row.school_id}" class="${linkClass}">${displayName}</a>`;
+          } else if (!isRelayEvent && row.athlete_id) {
+            linkedName = `<a href="/athlete-dashboard/${row.athlete_id}" class="${linkClass}">${displayName}</a>`;
+          }
+        }
+        let nameText = linkedName;
         if (row.qualifier_type === 'fill' || row.is_callback) {
-          nameText = `${displayName} <span class="text-blue-600 font-semibold">(callback)</span>`;
+          nameText = `${linkedName} <span class="text-blue-600 font-semibold">(callback)</span>`;
         }
         const resultText = metStandard
           ? `${row.result || ''} <span class="text-emerald-700 font-bold ml-1">STAN</span>`
           : `${row.result || ''}`;
+        const schoolDisplay = row.school || '';
+        const schoolCell = (!row.is_placeholder && row.school_id && schoolDisplay && schoolDisplay !== '-')
+          ? `<a href="/school-dashboard/${row.school_id}" class="${linkClass}">${schoolDisplay}</a>`
+          : schoolDisplay;
         tr.innerHTML = `
           <td class="w-10 pr-1 font-semibold">${index + 1}</td>
           <td class="pl-1">${nameText}</td>
           <td>${row.grade || ''}</td>
-          <td>${row.school || ''}</td>
+          <td>${schoolCell}</td>
           <td>${resultText}</td>
           <td>${row.place || ''}</td>
           <td>${row.sectional_host || ''}</td>
