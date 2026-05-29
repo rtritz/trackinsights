@@ -74,9 +74,17 @@
 
         <!-- School Percentiles Section (includes records) -->
         <div class="mb-6 sm:mb-8">
-            <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
-                Best Marks
-            </h2>
+            <div class="flex flex-wrap items-baseline gap-3 mb-4 sm:mb-6">
+                <button type="button" data-metric="best"
+                    class="perc-metric-tab font-impact italic text-2xl sm:text-3xl md:text-4xl font-bold transition-colors cursor-pointer">
+                    Best Marks
+                </button>
+                <span class="text-base-content/30 font-impact italic text-2xl sm:text-3xl md:text-4xl">·</span>
+                <button type="button" data-metric="avg"
+                    class="perc-metric-tab font-impact italic text-2xl sm:text-3xl md:text-4xl font-bold transition-colors cursor-pointer">
+                    Avg Marks
+                </button>
+            </div>
 
             <!-- Year Toggle -->
             <div id="percentiles-year-toggle" class="flex flex-wrap gap-2 mb-4"></div>
@@ -323,6 +331,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         const percYearToggle = document.getElementById('percentiles-year-toggle');
         const percCompareStatus = document.getElementById('percentiles-compare-status');
         const percContainer = document.getElementById('school-percentiles-container');
+        const percMetricTabs = document.querySelectorAll('.perc-metric-tab');
+        let percMetric = 'best'; // 'best' | 'avg'
         const relayYearToggle = document.getElementById('relay-year-toggle');
         const relayMeetToggle = document.getElementById('relay-meet-toggle');
         const relayEventToggle = document.getElementById('relay-event-toggle');
@@ -450,14 +460,16 @@ document.addEventListener('DOMContentLoaded', async function () {
             if (selected.length === 1) {
                 const yearKey = selected[0];
                 const rows = getPercentilesForYearAndGender(yearKey, gender);
+                const metricLabel = percMetric === 'avg' ? 'Avg' : 'Mark';
+                const showSeasonCol = yearKey === 'all';
                 let html = `
                     <table class="table table-compact sm:table-normal w-full text-sm">
                         <thead>
                             <tr class="text-primary text-xs sm:text-sm uppercase border-b-2 border-primary/20">
                                 <th>Event</th>
-                                <th>Mark</th>
-                                <th>Athlete</th>
-                                <th>Season</th>
+                                <th>${metricLabel}</th>
+                                <th>Athlete${percMetric === 'avg' ? 's' : ''}</th>
+                                ${showSeasonCol ? '<th>Season</th>' : ''}
                                 <th>Percentile</th>
                             </tr>
                         </thead>
@@ -467,16 +479,51 @@ document.addEventListener('DOMContentLoaded', async function () {
                 rows.forEach((p) => {
                     const percentile = Number(p.state_percentile || 0);
                     const relayBadge = p.is_relay ? ' <span class="badge badge-xs badge-outline">Relay</span>' : '';
-                    const holderLink = p.holder_id
-                        ? `<a href="/athlete-dashboard/${p.holder_id}" class="text-primary font-semibold underline decoration-solid underline-offset-2 hover:text-primary/80">${esc(p.holder)}</a>`
-                        : esc(p.holder || '-');
+
+                    const topAthletes = Array.isArray(p.top_athletes) ? p.top_athletes : [];
+                    const athleteCount = Number(p.avg_athlete_count || topAthletes.length || (p.holder ? 1 : 0));
+                    const renderAthleteLink = (a) => a && a.athlete_id
+                        ? `<a href="/athlete-dashboard/${a.athlete_id}" class="text-primary font-semibold underline decoration-solid underline-offset-2 hover:text-primary/80">${esc(a.name)}</a>`
+                        : esc((a && a.name) || '-');
+
+                    let markCell;
+                    let athleteCell;
+                    let seasonCell;
+                    const markCellClass = 'font-mono';
+
+                    if (percMetric === 'avg' && !p.is_relay) {
+                        if (p.school_avg_top2 && athleteCount >= 2) {
+                            markCell = esc(p.school_avg_top2);
+                        } else {
+                            // Only 1 athlete — use their mark; styling matches a normal mark cell.
+                            markCell = esc(p.school_best || '-');
+                        }
+                        if (topAthletes.length) {
+                            athleteCell = topAthletes.map(renderAthleteLink).join(', ');
+                            if (athleteCount < 2) {
+                                athleteCell += ' <span class="text-xs text-base-content/50">(1 athlete)</span>';
+                            }
+                        } else {
+                            athleteCell = p.holder_id
+                                ? `<a href="/athlete-dashboard/${p.holder_id}" class="text-primary font-semibold underline decoration-solid underline-offset-2 hover:text-primary/80">${esc(p.holder)}</a>`
+                                : esc(p.holder || '-');
+                        }
+                        // Peak-season year: both top athletes share the same year.
+                        seasonCell = (topAthletes[0] && topAthletes[0].year) || p.year || '-';
+                    } else {
+                        markCell = esc(p.school_best || '-');
+                        athleteCell = p.holder_id
+                            ? `<a href="/athlete-dashboard/${p.holder_id}" class="text-primary font-semibold underline decoration-solid underline-offset-2 hover:text-primary/80">${esc(p.holder)}</a>`
+                            : esc(p.holder || '-');
+                        seasonCell = p.year || '-';
+                    }
 
                     html += `
                             <tr class="hover:bg-primary/5">
                                 <td class="font-semibold">${esc(p.event)}${relayBadge}</td>
-                                <td class="font-mono">${esc(p.school_best || '-')}</td>
-                                <td>${holderLink}</td>
-                                <td>${p.year || '-'}</td>
+                                <td class="${markCellClass}">${markCell}</td>
+                                <td>${athleteCell}</td>
+                                ${showSeasonCol ? `<td>${seasonCell}</td>` : ''}
                                 <td class="w-52">
                                     ${renderPercentileBar(percentile, p.rank, p.total_marks)}
                                 </td>
@@ -492,9 +539,10 @@ document.addEventListener('DOMContentLoaded', async function () {
             let compareBanner = '';
             if (selected.length > 1) {
                 const compareYears = selected.map((yearKey) => `<span class="font-semibold text-base-content">${esc(yearLabel(yearKey))}</span>`).join(' vs ');
+                const metricLabel = percMetric === 'avg' ? 'Avg of top 2 athletes' : 'Best mark';
                 compareBanner = `
                     <div class="mb-3 rounded-xl border border-base-300 bg-base-100 px-3 py-2 text-xs sm:text-sm text-base-content/80">
-                        Comparing ${compareYears}. Best mark per event is highlighted.
+                        Comparing ${compareYears}. ${metricLabel} per event is highlighted.
                     </div>
                 `;
             }
@@ -518,6 +566,33 @@ document.addEventListener('DOMContentLoaded', async function () {
                     <tbody>
             `;
 
+            const useAvg = percMetric === 'avg';
+            const cellMarkRaw = (cell) => {
+                if (!cell) return null;
+                if (useAvg && !cell.is_relay) {
+                    const raw = cell.school_avg_top2_raw;
+                    if (raw !== null && raw !== undefined) return Number(raw);
+                    // Only 1 athlete — use best as the displayed mark but flag.
+                    if (cell.school_best_raw !== null && cell.school_best_raw !== undefined) {
+                        return Number(cell.school_best_raw);
+                    }
+                    return null;
+                }
+                if (cell.school_best_raw !== null && cell.school_best_raw !== undefined) {
+                    return Number(cell.school_best_raw);
+                }
+                return null;
+            };
+            const cellMarkDisplay = (cell) => {
+                if (!cell) return '-';
+                if (useAvg && !cell.is_relay) {
+                    if (cell.school_avg_top2 && (cell.avg_athlete_count || 0) >= 2) return cell.school_avg_top2;
+                    return cell.school_best || '-';
+                }
+                return cell.school_best || '-';
+            };
+            const cellIsIncomplete = (cell) => useAvg && cell && !cell.is_relay && (cell.avg_athlete_count || 0) < 2;
+
             events.forEach((eventRow) => {
                 const relayBadge = eventRow.is_relay ? ' <span class="badge badge-xs badge-outline">Relay</span>' : '';
                 let yearCells = '';
@@ -525,15 +600,11 @@ document.addEventListener('DOMContentLoaded', async function () {
                 const eventType = eventRow.event_type || 'Track';
                 const lowerIsBetter = eventType !== 'Field';
                 const yearMarks = selected
-                    .map((yearKey) => {
-                        const cell = eventRow.byYear[yearKey];
-                        return {
-                            yearKey,
-                            mark: cell && cell.school_best_raw !== null && cell.school_best_raw !== undefined
-                                ? Number(cell.school_best_raw)
-                                : null,
-                        };
-                    })
+                    .map((yearKey) => ({
+                        yearKey,
+                        cell: eventRow.byYear[yearKey],
+                        mark: cellMarkRaw(eventRow.byYear[yearKey]),
+                    }))
                     .filter((item) => item.mark !== null);
 
                 const bestMark = yearMarks.length
@@ -553,12 +624,12 @@ document.addEventListener('DOMContentLoaded', async function () {
                         return;
                     }
 
-                    const markValue = cell.school_best_raw !== null && cell.school_best_raw !== undefined
-                        ? Number(cell.school_best_raw)
-                        : null;
+                    const markValue = cellMarkRaw(cell);
                     const isBest = bestMark !== null && markValue !== null && markValue === bestMark;
+                    const incomplete = cellIsIncomplete(cell);
                     const bestClass = isBest ? 'bg-emerald-100 text-emerald-900 font-semibold rounded-md' : '';
-                    yearCells += `<td class="font-mono text-center whitespace-nowrap px-4 w-24 ${bestClass}" style="border: 0;">${esc(cell.school_best || '-')}</td>`;
+                    const titleAttr = incomplete ? ' title="Only 1 athlete competed in this event"' : '';
+                    yearCells += `<td class="font-mono text-center whitespace-nowrap px-4 w-24 ${bestClass}" style="border: 0;"${titleAttr}>${esc(cellMarkDisplay(cell))}</td>`;
                     if (idx < selected.length - 1) {
                         yearCells += '<td class="w-4" style="border: 0;"></td>';
                     }
@@ -651,6 +722,30 @@ document.addEventListener('DOMContentLoaded', async function () {
         };
 
         renderPercentileYearButtons();
+
+        const updatePercMetricUI = () => {
+            percMetricTabs.forEach((tab) => {
+                const active = tab.dataset.metric === percMetric;
+                tab.classList.toggle('text-primary', active);
+                tab.classList.toggle('text-base-content/40', !active);
+                tab.classList.toggle('hover:text-primary/70', !active);
+                tab.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+        };
+
+        percMetricTabs.forEach((tab) => {
+            tab.addEventListener('click', () => {
+                const next = tab.dataset.metric;
+                if (!next || next === percMetric) return;
+                percMetric = next;
+                updatePercMetricUI();
+                if (currentGlobalGender) {
+                    renderPercentiles(currentGlobalGender);
+                }
+            });
+        });
+
+        updatePercMetricUI();
 
         // ── Relay Results ──
         const getRelayRowsForGender = (gender) => relayResults.filter(r => r.gender === gender);
@@ -881,8 +976,10 @@ document.addEventListener('DOMContentLoaded', async function () {
             renderRoster(gender, rosterSearch?.value || '');
         };
 
+        
         // ── Setup global gender toggle ──
         const globalToggleContainer = document.getElementById('global-gender-toggle');
+        
         if (genderOptions.length === 2 && genderOptions.includes('Boys') && genderOptions.includes('Girls')) {
             // Create minimalist text toggle with underline indicator
             globalToggleContainer.innerHTML = `

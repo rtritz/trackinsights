@@ -1,17 +1,394 @@
 {
   "year": 2026,
   "gender": "Boys",
-  "ready": false,
-  "regionals_loaded": 0,
-  "missing_regionals": [
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7,
-    8
-  ],
-  "rows": []
+  "ready": true,
+  "regionals_loaded": 8,
+  "missing_regionals": [],
+  "rows": [
+    {
+      "place": 1,
+      "team": "Brownsburg",
+      "score": 30.0
+    },
+    {
+      "place": 1,
+      "team": "Franklin Central",
+      "score": 30.0
+    },
+    {
+      "place": 3,
+      "team": "Avon",
+      "score": 28.0
+    },
+    {
+      "place": 4,
+      "team": "Bloomington North",
+      "score": 24.0
+    },
+    {
+      "place": 4,
+      "team": "Indianapolis Bishop Chatard",
+      "score": 24.0
+    },
+    {
+      "place": 6,
+      "team": "Chesterton",
+      "score": 22.0
+    },
+    {
+      "place": 6,
+      "team": "Fishers",
+      "score": 22.0
+    },
+    {
+      "place": 8,
+      "team": "Churubusco",
+      "score": 20.0
+    },
+    {
+      "place": 9,
+      "team": "New Haven",
+      "score": 19.0
+    },
+    {
+      "place": 10,
+      "team": "Danville Community",
+      "score": 18.0
+    },
+    {
+      "place": 10,
+      "team": "Westview",
+      "score": 18.0
+    },
+    {
+      "place": 12,
+      "team": "Homestead",
+      "score": 17.0
+    },
+    {
+      "place": 12,
+      "team": "Northridge",
+      "score": 17.0
+    },
+    {
+      "place": 14,
+      "team": "Warsaw Community",
+      "score": 16.0
+    },
+    {
+      "place": 15,
+      "team": "Evansville Harrison",
+      "score": 15.0
+    },
+    {
+      "place": 15,
+      "team": "Kokomo",
+      "score": 15.0
+    },
+    {
+      "place": 17,
+      "team": "Hammond Morton",
+      "score": 14.0
+    },
+    {
+      "place": 17,
+      "team": "Merrillville",
+      "score": 14.0
+    },
+    {
+      "place": 17,
+      "team": "Mt. Vernon (Fortville)",
+      "score": 14.0
+    },
+    {
+      "place": 20,
+      "team": "McCutcheon",
+      "score": 13.0
+    },
+    {
+      "place": 21,
+      "team": "Center Grove",
+      "score": 12.0
+    },
+    {
+      "place": 21,
+      "team": "Harrison (West Lafayette)",
+      "score": 12.0
+    },
+    {
+      "place": 21,
+      "team": "South Bend Saint Joseph",
+      "score": 12.0
+    },
+    {
+      "place": 24,
+      "team": "Bloomington South",
+      "score": 11.0
+    },
+    {
+      "place": 24,
+      "team": "Carmel",
+      "score": 11.0
+    },
+    {
+      "place": 24,
+      "team": "New Albany",
+      "score": 11.0
+    },
+    {
+      "place": 24,
+      "team": "Westfield",
+      "score": 11.0
+    },
+    {
+      "place": 28,
+      "team": "Columbus North",
+      "score": 10.0
+    },
+    {
+      "place": 28,
+      "team": "Crown Point",
+      "score": 10.0
+    },
+    {
+      "place": 28,
+      "team": "Hamilton Southeastern",
+      "score": 10.0
+    },
+    {
+      "place": 28,
+      "team": "Lebanon",
+      "score": 10.0
+    },
+    {
+      "place": 28,
+      "team": "South Putnam",
+      "score": 10.0
+    },
+    {
+      "place": 28,
+      "team": "Western",
+      "score": 10.0
+    },
+    {
+      "place": 28,
+      "team": "Whiteland Community",
+      "score": 10.0
+    },
+    {
+      "place": 35,
+      "team": "Charlestown",
+      "score": 8.0
+    },
+    {
+      "place": 35,
+      "team": "Elkhart",
+      "score": 8.0
+    },
+    {
+      "place": 35,
+      "team": "Evansville F.J. Reitz",
+      "score": 8.0
+    },
+    {
+      "place": 35,
+      "team": "Evansville North",
+      "score": 8.0
+    },
+    {
+      "place": 35,
+      "team": "Indianapolis Cathedral",
+      "score": 8.0
+    },
+    {
+      "place": 35,
+      "team": "Lakewood Park Christian",
+      "score": 8.0
+    },
+    {
+      "place": 41,
+      "team": "Frankfort",
+      "score": 7.0
+    },
+    {
+      "place": 41,
+      "team": "Noblesville",
+      "score": 7.0
+    },
+    {
+      "place": 41,
+      "team": "Providence",
+      "score": 7.0
+    },
+    {
+      "place": 41,
+      "team": "Sullivan",
+      "score": 7.0
+    },
+    {
+      "place": 45,
+      "team": "Hamilton Heights",
+      "score": 6.0
+    },
+    {
+      "place": 45,
+      "team": "Manchester",
+      "score": 6.0
+    },
+    {
+      "place": 45,
+      "team": "Mishawaka",
+      "score": 6.0
+    },
+    {
+      "place": 45,
+      "team": "Signature",
+      "score": 6.0
+    },
+    {
+      "place": 45,
+      "team": "Zionsville",
+      "score": 6.0
+    },
+    {
+      "place": 50,
+      "team": "Carroll (Fort Wayne)",
+      "score": 5.0
+    },
+    {
+      "place": 50,
+      "team": "East Central",
+      "score": 5.0
+    },
+    {
+      "place": 50,
+      "team": "Floyd Central",
+      "score": 5.0
+    },
+    {
+      "place": 50,
+      "team": "Fort Wayne Bishop Dwenger",
+      "score": 5.0
+    },
+    {
+      "place": 50,
+      "team": "Greenfield-Central",
+      "score": 5.0
+    },
+    {
+      "place": 50,
+      "team": "New Castle",
+      "score": 5.0
+    },
+    {
+      "place": 50,
+      "team": "Perry Meridian",
+      "score": 5.0
+    },
+    {
+      "place": 50,
+      "team": "Pike",
+      "score": 5.0
+    },
+    {
+      "place": 50,
+      "team": "Springs Valley",
+      "score": 5.0
+    },
+    {
+      "place": 59,
+      "team": "Concord",
+      "score": 4.0
+    },
+    {
+      "place": 59,
+      "team": "Franklin Community",
+      "score": 4.0
+    },
+    {
+      "place": 59,
+      "team": "NorthWood",
+      "score": 4.0
+    },
+    {
+      "place": 62,
+      "team": "Alexandria Monroe",
+      "score": 3.0
+    },
+    {
+      "place": 62,
+      "team": "Ben Davis",
+      "score": 3.0
+    },
+    {
+      "place": 62,
+      "team": "Greensburg",
+      "score": 3.0
+    },
+    {
+      "place": 62,
+      "team": "Jeffersonville",
+      "score": 3.0
+    },
+    {
+      "place": 62,
+      "team": "Northwestern",
+      "score": 3.0
+    },
+    {
+      "place": 62,
+      "team": "Penn",
+      "score": 3.0
+    },
+    {
+      "place": 68,
+      "team": "Jennings County",
+      "score": 2.0
+    },
+    {
+      "place": 68,
+      "team": "Madison-Grant",
+      "score": 2.0
+    },
+    {
+      "place": 68,
+      "team": "Mississinewa",
+      "score": 2.0
+    },
+    {
+      "place": 68,
+      "team": "Owen Valley",
+      "score": 2.0
+    },
+    {
+      "place": 68,
+      "team": "Wabash",
+      "score": 2.0
+    },
+    {
+      "place": 73,
+      "team": "Angola",
+      "score": 1.0
+    },
+    {
+      "place": 73,
+      "team": "Beech Grove",
+      "score": 1.0
+    },
+    {
+      "place": 73,
+      "team": "Castle",
+      "score": 1.0
+    },
+    {
+      "place": 73,
+      "team": "Lawrence Central",
+      "score": 1.0
+    },
+    {
+      "place": 73,
+      "team": "Wapahani",
+      "score": 1.0
+    }
+  ]
 }

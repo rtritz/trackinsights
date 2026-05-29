@@ -32,6 +32,7 @@ SCHOOL_MAPPINGS = {
     "Scecina Memorial High School": "Indianapolis Scecina Memorial",
     "Evansville Memorial High School": "Evansville Reitz Memorial",
     "George Washington High School": "Indianapolis George Washington Community",
+    "Trinity Academy South Bend": "Trinity School at Greenlawn",
 
 }
 
