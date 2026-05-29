@@ -39,16 +39,15 @@
 
       <section class="rounded-[24px] bg-white border border-base-200 p-4 sm:p-6 shadow-lg space-y-4">
         <div id="status-line" class="text-sm text-base-content/60 px-1 hidden"></div>
-        <div id="status-loading" class="hidden text-sm text-base-content/50 px-1">
-          Loading state qualifiers...
-        </div>
+
 
         <h2 id="detail-title" class="hidden text-lg sm:text-xl font-semibold text-primary"></h2>
+
+
 
         <div id="detail-loading" class="hidden py-8 text-center">
           <span class="loading loading-spinner loading-lg text-primary"></span>
         </div>
-
         <div id="detail-content" class="hidden space-y-6"></div>
       </section>
 
@@ -83,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const yearSelect = document.getElementById('year-select');
   const genderGroup = document.getElementById('gender-group');
   const statusLine = document.getElementById('status-line');
-  const statusLoading = document.getElementById('status-loading');
+  // Removed loading indicators
   const detailLoading = document.getElementById('detail-loading');
   const detailContent = document.getElementById('detail-content');
   const detailTitle = document.getElementById('detail-title');
@@ -113,7 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function setBanner(text, tone = 'info') {
-    statusLoading.classList.add('hidden');
     if (!text) {
       statusLine.classList.add('hidden');
       statusLine.textContent = '';
@@ -131,9 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
     statusLine.textContent = text;
   }
 
-  function setLoading(isLoading) {
-    detailLoading.classList.toggle('hidden', !isLoading);
-  }
+
 
   function renderGenderButtons() {
     genderGroup.innerHTML = '';
@@ -425,11 +421,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function fetchStatus() {
-    setLoading(true);
     clearResults();
     statusLine.classList.add('hidden');
     statusLine.textContent = '';
-    statusLoading.classList.remove('hidden');
+
+    let spinnerTimeout = setTimeout(() => {
+      detailLoading.classList.remove('hidden');
+    }, 500);
 
     try {
       const response = await fetch(`${apiStatusUrl}?gender=${encodeURIComponent(state.gender)}&year=${state.year}`);
@@ -449,15 +447,13 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (state.view === 'combined') {
-        statusLoading.classList.add('hidden');
+        clearTimeout(spinnerTimeout);
+        detailLoading.classList.add('hidden');
         await fetchTopList();
         return;
       }
 
       if (payload.status !== 'ready') {
-        // If this gender is pending and we haven't already tried, probe the
-        // other gender — if it's ready, switch to it automatically so the
-        // user lands on data instead of a "Pending" banner.
         if (!state.autoSwitchTried) {
           state.autoSwitchTried = true;
           const otherGender = state.gender === 'Boys' ? 'Girls' : 'Boys';
@@ -468,30 +464,34 @@ document.addEventListener('DOMContentLoaded', () => {
               if (otherPayload.status === 'ready') {
                 state.gender = otherGender;
                 renderGenderButtons();
+                clearTimeout(spinnerTimeout);
+                detailLoading.classList.add('hidden');
                 await fetchStatus();
                 return;
               }
             }
           } catch (_) { /* ignore probe failure, fall through to Pending */ }
         }
+        clearTimeout(spinnerTimeout);
+        detailLoading.classList.add('hidden');
         renderPending(payload);
         return;
       }
-
-      statusLoading.classList.add('hidden');
 
       const detailResponse = await fetch(`${apiDetailUrl}?gender=${encodeURIComponent(state.gender)}&year=${state.year}`);
       if (!detailResponse.ok) {
         throw new Error(loadErrorMessage);
       }
       const detailPayload = await detailResponse.json();
+      clearTimeout(spinnerTimeout);
+      detailLoading.classList.add('hidden');
       renderDetail(detailPayload);
     } catch (error) {
+      clearTimeout(spinnerTimeout);
+      detailLoading.classList.add('hidden');
       clearResults();
       renderViewTabs();
       setBanner(error.message || loadErrorMessage, 'error');
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -587,7 +587,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const events = payload.events || [];
 
     setBanner('', 'info');
-    statusLoading.classList.add('hidden');
 
     if (detailTitle) {
       detailTitle.classList.remove('hidden');
@@ -698,30 +697,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const cached = state.combinedCache[cacheKey];
     if (cached) {
       renderTopList(cached);
-      setLoading(false);
+      detailLoading.classList.add('hidden');
       return;
     }
-    setLoading(true);
+    let spinnerTimeout = setTimeout(() => {
+      detailLoading.classList.remove('hidden');
+    }, 500);
     try {
       const response = await fetch(`/api/regional-qualifiers/top-list?gender=${encodeURIComponent(state.gender)}&year=${state.year}&source=results`);
-      if (requestId !== topListState.requestId) return;
+      if (requestId !== topListState.requestId) {
+        clearTimeout(spinnerTimeout);
+        detailLoading.classList.add('hidden');
+        return;
+      }
       if (!response.ok) {
         throw new Error('Unable to load combined regional results.');
       }
       const payload = await response.json();
-      if (requestId !== topListState.requestId) return;
+      if (requestId !== topListState.requestId) {
+        clearTimeout(spinnerTimeout);
+        detailLoading.classList.add('hidden');
+        return;
+      }
       state.combinedCache[cacheKey] = payload;
+      clearTimeout(spinnerTimeout);
+      detailLoading.classList.add('hidden');
       renderTopList(payload);
     } catch (error) {
-      if (requestId !== topListState.requestId) return;
+      if (requestId !== topListState.requestId) {
+        clearTimeout(spinnerTimeout);
+        detailLoading.classList.add('hidden');
+        return;
+      }
       detailContent.classList.add('hidden');
       detailContent.innerHTML = '';
       resetEventJump();
+      clearTimeout(spinnerTimeout);
+      detailLoading.classList.add('hidden');
       setBanner(error.message || 'Unable to load combined regional results.', 'error');
-    } finally {
-      if (requestId === topListState.requestId) {
-        setLoading(false);
-      }
     }
   }
 
