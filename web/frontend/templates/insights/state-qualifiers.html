@@ -21,11 +21,11 @@
           <select id="year-select" class="select select-sm select-bordered w-24">
             <option value="2026">2026</option>
           </select>
-          <button id="top-list-btn" type="button" data-view="combined"
-            class="hidden ml-auto btn btn-sm btn-outline border-primary text-primary hover:bg-primary hover:text-primary-content gap-2"
-            title="View Combined Regional Results" aria-label="View Combined Regional Results">
+          <button id="top-list-btn" type="button"
+            class="ml-auto btn btn-sm btn-outline border-primary text-primary hover:bg-primary hover:text-primary-content gap-2"
+            title="Combined Regional Results" aria-label="Combined Regional Results">
             <span id="top-list-btn-icon" aria-hidden="true" class="inline-flex"></span>
-            <span id="top-list-btn-label">View Combined Regional Results</span>
+            <span id="top-list-btn-label" class="hidden sm:inline">Combined Regional Results</span>
           </button>
         </div>
       </div>
@@ -770,7 +770,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const labelText = isActive
         ? 'Back to Unofficial State Qualifiers'
-        : 'View Combined Regional Results';
+        : 'Combined Regional Results';
       topListBtn.title = labelText;
       topListBtn.setAttribute('aria-label', labelText);
       const labelEl = document.getElementById('top-list-btn-label');
