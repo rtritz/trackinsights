@@ -291,14 +291,31 @@ def api_state_qualifiers_status():
         return jsonify({'error': str(exc)}), 500
 
 
+
 @api_bp.route('/state-qualifiers')
 def api_state_qualifiers():
-    """Return state qualifier list for a specific gender and year."""
-    gender = request.args.get('gender', 'Boys').strip()
+    """Return state qualifier list for a specific gender and year, using precomputed JSON if available."""
+    gender = request.args.get('gender', 'Boys').strip().title()
     year = request.args.get('year', default=2026, type=int)
     if year is None or year < 2000:
         return jsonify({'error': 'year must be a valid season year'}), 400
+    if gender not in ("Boys", "Girls"):
+        return jsonify({'error': 'gender must be Boys or Girls'}), 400
 
+    # Prefer precomputed JSON for speed
+    precomputed_path = os.path.join(
+        current_app.root_path,
+        '..', 'frontend', 'static', 'data', 'state_predictions',
+        f'state_qualifiers_{year}_{gender.lower()}.json',
+    )
+    if os.path.exists(precomputed_path):
+        try:
+            with open(precomputed_path, 'r', encoding='utf-8') as f:
+                return jsonify(json.load(f))
+        except Exception:
+            pass  # Fall through to live computation if file is unreadable
+
+    # Fallback to live computation if file missing or unreadable
     try:
         payload = get_state_qualifiers(gender=gender, year=year)
         return jsonify(payload)
