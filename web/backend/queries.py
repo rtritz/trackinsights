@@ -2536,6 +2536,10 @@ def _compute_school_relay_results(school_id: int):
         total_marks = len(marks)
         better_or_equal = sum(1 for mark in marks if mark <= row.result2) if total_marks else None
         percentile = round((1 - (better_or_equal / total_marks)) * 100, 1) if total_marks else None
+        # Cap at 99.9: an athlete is included in their own pool, so they can
+        # never beat themselves (true max is (1 - 1/total) * 100 < 100).
+        if percentile is not None:
+            percentile = min(percentile, 99.9)
         results.append(
             {
                 "event": row.event,
@@ -2728,22 +2732,72 @@ def _compute_cumulative_points(school_id: int):
 def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
     """
     For each event+gender (individual AND relay), compute the school's
-    best mark percentile relative to all statewide results, and also
-    return the record holder info.
+    best mark percentile relative to all statewide results, plus the
+    top-2 athletes per individual event (for "Avg of Top 2" metric).
+
+    Per-athlete season mark rule (individual events):
+      • Per meet, prefer the athlete's Final result; fall back to Prelim
+        when no Final exists (relevant for 100, 200, 100H, 110H).
+      • Season best = best of those per-meet marks across all meets.
 
     If *year* is given, only results from that single season are
     considered (for both the school and statewide comparison).
     Otherwise all results since MIN_RECORDS_YEAR are used.
-    
-    OPTIMIZED: Pre-fetches all statewide bests in bulk queries instead of per-event.
     """
 
     year_filter = (Meet.year == year) if year else (Meet.year >= MIN_RECORDS_YEAR)
 
-    # ── Individual events ──
-    indiv_rows = (
+    def _athlete_season_marks(rows):
+        """
+        Collapse rows to per-athlete-per-year season-best marks using
+        the Final-preferred / Prelim-fallback rule per meet.
+
+        rows: iterable of objects exposing
+            athlete_id, event, meet_id, result_type, result2,
+            event_type, year (Meet.year)
+
+        Returns dict: (event, year, athlete_id) -> {
+            "mark_raw": float,
+            "event_type": str,
+        }
+        """
+        # Step 1: per (athlete, event, meet) keep one mark — Final preferred.
+        per_meet = {}  # (athlete_id, event, meet_id) -> {result_type: (result2, year)}
+        event_type_map = {}
+        for r in rows:
+            key = (r.athlete_id, r.event, r.meet_id)
+            per_meet.setdefault(key, {})[r.result_type] = (r.result2, r.year)
+            event_type_map[r.event] = r.event_type
+
+        # Step 2: per (athlete, event, year) take season best across that year's meets.
+        season = {}  # (event, year, athlete_id) -> best dict
+        for (athlete_id, event, _meet_id), marks in per_meet.items():
+            picked = marks.get("Final") or marks.get("Prelim")
+            if picked is None:
+                # Fallback for any other result_type values — take first available.
+                picked = next(iter(marks.values()), None)
+            if picked is None:
+                continue
+            mark_val, mark_year = picked
+            event_type = event_type_map[event]
+            lower = _is_lower_better(event_type)
+            existing = season.get((event, mark_year, athlete_id))
+            if existing is None or (
+                (lower and mark_val < existing["mark_raw"])
+                or (not lower and mark_val > existing["mark_raw"])
+            ):
+                season[(event, mark_year, athlete_id)] = {
+                    "mark_raw": mark_val,
+                    "event_type": event_type,
+                }
+        return season
+
+    # ── School individual results ──
+    school_indiv_rows = (
         db.session.query(
             AthleteResult.event,
+            AthleteResult.meet_id,
+            AthleteResult.result_type,
             AthleteResult.result2,
             AthleteResult.athlete_id,
             Athlete.first,
@@ -2764,24 +2818,107 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
         .all()
     )
 
-    # Find best mark per (event, gender) for individual events
-    indiv_best = {}  # key: (event, gender) -> dict
-    for row in indiv_rows:
-        key = (row.event, row.gender)
-        lower_is_better = _is_lower_better(row.event_type)
-        existing = indiv_best.get(key)
-        if existing is None or (
-            (lower_is_better and row.result2 < existing["raw"])
-            or (not lower_is_better and row.result2 > existing["raw"])
-        ):
-            indiv_best[key] = {
-                "raw": row.result2,
-                "event_type": row.event_type,
-                "holder": "{} {}".format(row.first, row.last).strip(),
-                "holder_id": row.athlete_id,
-                "year": row.year,
-                "is_relay": False,
-            }
+    # athlete metadata for name + gender lookups
+    school_athlete_meta = {}  # athlete_id -> (name, gender)
+    for r in school_indiv_rows:
+        if r.athlete_id not in school_athlete_meta:
+            school_athlete_meta[r.athlete_id] = (
+                "{} {}".format(r.first, r.last).strip(),
+                r.gender,
+            )
+
+    school_season = _athlete_season_marks(school_indiv_rows)
+
+    # Group school season-bests by (event, gender, year) → list of athlete entries.
+    school_event_year_athletes = {}  # (event, gender, year) -> list of dicts
+    for (event, season_year, athlete_id), info in school_season.items():
+        name, gender = school_athlete_meta[athlete_id]
+        school_event_year_athletes.setdefault((event, gender, season_year), []).append({
+            "athlete_id": athlete_id,
+            "name": name,
+            "mark_raw": info["mark_raw"],
+            "year": season_year,
+            "event_type": info["event_type"],
+        })
+
+    # Collect unique (event, gender) pairs.
+    event_gender_pairs = {(e, g) for (e, g, _y) in school_event_year_athletes.keys()}
+
+    # For each (event, gender):
+    #   • Best = single best mark across all athletes/seasons → that holder + year.
+    #   • Avg of Top 2 = pick the season with the strongest top-2 avg
+    #     (peak duo) → those two athletes + that year.
+    #     Fallback: if no season ever had ≥2 athletes, use just the single
+    #     best athlete (avg = None, 1 athlete shown).
+    indiv_best = {}
+    for (event, gender) in event_gender_pairs:
+        year_groups = {
+            y: lst for (e, g, y), lst in school_event_year_athletes.items()
+            if e == event and g == gender
+        }
+        # event_type is consistent across rows for this event.
+        event_type = next(iter(year_groups.values()))[0]["event_type"]
+        lower = _is_lower_better(event_type)
+
+        # ── Best (single best mark across all years) ──
+        best_athlete = None
+        best_year = None
+        for y, athletes in year_groups.items():
+            for a in athletes:
+                if (
+                    best_athlete is None
+                    or (lower and a["mark_raw"] < best_athlete["mark_raw"])
+                    or (not lower and a["mark_raw"] > best_athlete["mark_raw"])
+                ):
+                    best_athlete = a
+                    best_year = y
+
+        # ── Peak duo: pick the single season with the best top-2 average ──
+        peak_top2 = None
+        peak_avg = None
+        peak_year = None
+        for y, athletes in year_groups.items():
+            if len(athletes) < 2:
+                continue
+            sorted_athletes = sorted(
+                athletes, key=lambda a: a["mark_raw"], reverse=not lower
+            )
+            top2 = sorted_athletes[:2]
+            avg = (top2[0]["mark_raw"] + top2[1]["mark_raw"]) / 2.0
+            if peak_avg is None or (
+                (lower and avg < peak_avg) or (not lower and avg > peak_avg)
+            ):
+                peak_avg = avg
+                peak_top2 = top2
+                peak_year = y
+
+        if peak_top2 is not None:
+            top_athletes = peak_top2
+            avg_raw = peak_avg
+        else:
+            # No season had ≥2 athletes — fall back to the single best athlete.
+            top_athletes = [best_athlete]
+            avg_raw = None
+
+        indiv_best[(event, gender)] = {
+            "raw": best_athlete["mark_raw"],
+            "event_type": event_type,
+            "holder": best_athlete["name"],
+            "holder_id": best_athlete["athlete_id"],
+            "year": best_year,
+            "is_relay": False,
+            "top_athletes": [
+                {
+                    "name": a["name"],
+                    "athlete_id": a["athlete_id"],
+                    "mark_raw": a["mark_raw"],
+                    "mark": _format_result_display(a["mark_raw"], event_type),
+                    "year": a["year"],
+                }
+                for a in top_athletes
+            ],
+            "avg_top2_raw": avg_raw,
+        }
 
     # ── Relay events ──
     relay_rows = (
@@ -2819,6 +2956,16 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
                 "holder_id": None,
                 "year": row.year,
                 "is_relay": True,
+                "top_athletes": [
+                    {
+                        "name": row.athlete_names or "Relay Team",
+                        "athlete_id": None,
+                        "mark_raw": row.result2,
+                        "mark": _format_result_display(row.result2, row.event_type),
+                        "year": row.year,
+                    }
+                ],
+                "avg_top2_raw": None,
             }
 
     # ── Merge individual + relay bests ──
@@ -2838,15 +2985,19 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
     statewide_relay_bests = {}
 
     if indiv_events:
-        # Get all individual athlete bests grouped by event+gender in one query
+        # Pull all statewide individual results (with result_type + meet_id) and
+        # collapse to per-athlete season bests using the Final-preferred /
+        # Prelim-fallback rule — same logic used for the school above.
         all_indiv_rows = (
             db.session.query(
                 AthleteResult.event,
-                Athlete.gender,
+                AthleteResult.meet_id,
+                AthleteResult.result_type,
+                AthleteResult.result2,
                 AthleteResult.athlete_id,
-                func.min(AthleteResult.result2).label("best_running"),
-                func.max(AthleteResult.result2).label("best_field"),
+                Athlete.gender,
                 Event.event_type,
+                Meet.year,
             )
             .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
             .join(Meet, AthleteResult.meet_id == Meet.meet_id)
@@ -2856,17 +3007,32 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
                 year_filter,
                 Event.event_type != "Relay",
             )
-            .group_by(AthleteResult.event, Athlete.gender, AthleteResult.athlete_id, Event.event_type)
             .all()
         )
-        
-        for row in all_indiv_rows:
-            key = (row.event, row.gender)
-            if key not in statewide_indiv_bests:
-                statewide_indiv_bests[key] = []
-            # Use min for running events, max for field events
-            best = row.best_running if _is_lower_better(row.event_type) else row.best_field
-            statewide_indiv_bests[key].append(best)
+
+        sw_athlete_gender = {}
+        for r in all_indiv_rows:
+            if r.athlete_id not in sw_athlete_gender:
+                sw_athlete_gender[r.athlete_id] = r.gender
+
+        sw_season = _athlete_season_marks(all_indiv_rows)
+        # Aggregate each athlete's overall best across seasons (matches the
+        # school's "best ever" measure used for the percentile comparison).
+        sw_athlete_best = {}  # (event, gender, athlete_id) -> best mark
+        for (event, _season_year, athlete_id), info in sw_season.items():
+            gender = sw_athlete_gender.get(athlete_id)
+            if gender is None:
+                continue
+            lower = _is_lower_better(info["event_type"])
+            key = (event, gender, athlete_id)
+            existing = sw_athlete_best.get(key)
+            if existing is None or (
+                (lower and info["mark_raw"] < existing)
+                or (not lower and info["mark_raw"] > existing)
+            ):
+                sw_athlete_best[key] = info["mark_raw"]
+        for (event, gender, _aid), mark in sw_athlete_best.items():
+            statewide_indiv_bests.setdefault((event, gender), []).append(mark)
 
     if relay_events:
         # Get all relay school bests grouped by event+gender in one query
@@ -2914,8 +3080,14 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
             better_or_equal = sum(1 for m in all_marks if m >= school_best_val)
 
         percentile = round((1 - better_or_equal / total) * 100, 1)
+        # Cap at 99.9: the school's own athlete is in the statewide pool, so
+        # they can never beat themselves (true max is (1 - 1/total) * 100 < 100).
+        percentile = min(percentile, 99.9)
 
         display_result = _format_result_display(school_best_val, event_type)
+        avg_raw = info.get("avg_top2_raw")
+        avg_display = _format_result_display(avg_raw, event_type) if avg_raw is not None else None
+        top_athletes = info.get("top_athletes", [])
 
         results.append({
             "event": event_name,
@@ -2923,6 +3095,10 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
             "event_type": event_type,
             "school_best": display_result,
             "school_best_raw": school_best_val,
+            "school_avg_top2": avg_display,
+            "school_avg_top2_raw": avg_raw,
+            "top_athletes": top_athletes,
+            "avg_athlete_count": len(top_athletes),
             "state_percentile": max(percentile, 0),
             "rank": better_or_equal,
             "total_marks": total,
