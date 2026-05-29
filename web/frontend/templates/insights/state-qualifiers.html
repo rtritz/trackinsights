@@ -20,9 +20,6 @@
           <label for="year-select" class="text-xs sm:text-sm text-base-content/70">Year</label>
           <select id="year-select" class="select select-sm select-bordered w-24">
             <option value="2026">2026</option>
-            <option value="2025">2025</option>
-            <option value="2024">2024</option>
-            <option value="2023">2023</option>
           </select>
           <button id="top-list-btn" type="button" data-view="combined"
             class="hidden ml-auto btn btn-sm btn-outline border-primary text-primary hover:bg-primary hover:text-primary-content gap-2"
@@ -37,14 +34,9 @@
         <div id="event-jump-bar" class="flex flex-wrap justify-center gap-2"></div>
       </section>
 
-      <section class="rounded-[24px] bg-white border border-base-200 p-4 sm:p-6 shadow-lg space-y-4">
+
+      <section id="results-outer" class="hidden rounded-[24px] bg-white border border-base-200 p-4 sm:p-6 shadow-lg space-y-4">
         <div id="status-line" class="text-sm text-base-content/60 px-1 hidden"></div>
-
-
-        <h2 id="detail-title" class="hidden text-lg sm:text-xl font-semibold text-primary"></h2>
-
-
-
         <div id="detail-loading" class="hidden py-8 text-center">
           <span class="loading loading-spinner loading-lg text-primary"></span>
         </div>
@@ -83,9 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const genderGroup = document.getElementById('gender-group');
   const statusLine = document.getElementById('status-line');
   // Removed loading indicators
+  const resultsOuter = document.getElementById('results-outer');
   const detailLoading = document.getElementById('detail-loading');
   const detailContent = document.getElementById('detail-content');
-  const detailTitle = document.getElementById('detail-title');
   const topListBtn = document.getElementById('top-list-btn');
   const eventJumpWrap = document.getElementById('event-jump-wrap');
   const eventJumpBar = document.getElementById('event-jump-bar');
@@ -150,12 +142,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function clearResults() {
+    if (resultsOuter) resultsOuter.classList.add('hidden');
     detailContent.classList.add('hidden');
     detailContent.innerHTML = '';
-    if (detailTitle) {
-      detailTitle.classList.add('hidden');
-      detailTitle.textContent = '';
-    }
     resetEventJump();
   }
 
@@ -303,10 +292,25 @@ document.addEventListener('DOMContentLoaded', () => {
     initEventJump(events);
 
     setBanner('', 'info');
+    if (resultsOuter) resultsOuter.classList.remove('hidden');
     detailContent.classList.remove('hidden');
     detailContent.innerHTML = '';
 
     events.forEach((eventBlock, index) => {
+      // Insert header above the 100 Meters event only, for Boys or Girls 2026 qualifiers view
+      if (
+        index === 0 &&
+        eventBlock.event === '100 Meters' &&
+        state.year === 2026 &&
+        (state.gender === 'Boys' || state.gender === 'Girls') &&
+        state.view === 'qualifiers'
+      ) {
+        const qualifiersHeader = document.createElement('h2');
+        qualifiersHeader.className = 'text-base sm:text-lg font-semibold text-primary mb-2 text-left';
+        qualifiersHeader.textContent = `2026 ${state.gender} Unofficial State Qualifiers`;
+        detailContent.appendChild(qualifiersHeader);
+      }
+
       const section = document.createElement('section');
       section.className = 'space-y-2';
       const chipKey = `${eventSlug(eventBlock.event)}-${index}`;
@@ -588,10 +592,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setBanner('', 'info');
 
-    if (detailTitle) {
-      detailTitle.classList.remove('hidden');
-      detailTitle.textContent = `${state.year} ${state.gender} Combined Regional Results`;
-    }
+
 
     if (!events.length) {
       detailContent.classList.add('hidden');
@@ -601,11 +602,30 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+
+
+    if (resultsOuter) resultsOuter.classList.remove('hidden');
+    detailContent.classList.add('hidden');
+    detailContent.innerHTML = '';
     initEventJump(events);
     detailContent.classList.remove('hidden');
-    detailContent.innerHTML = '';
 
     events.forEach((eventBlock, index) => {
+
+      // Insert header above the 100 Meters event only, for Boys or Girls 2026 combined view
+      if (
+        index === 0 &&
+        eventBlock.event === '100 Meters' &&
+        state.year === 2026 &&
+        (state.gender === 'Boys' || state.gender === 'Girls') &&
+        state.view === 'combined'
+      ) {
+        const combinedHeader = document.createElement('h2');
+        combinedHeader.className = 'text-base sm:text-lg font-semibold text-primary mb-2 text-left';
+        combinedHeader.textContent = `2026 ${state.gender} Combined Regional Results`;
+        detailContent.appendChild(combinedHeader);
+      }
+
       const section = document.createElement('section');
       section.className = 'space-y-2';
       const chipKey = `${eventSlug(eventBlock.event)}-${index}`;
@@ -689,10 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearResults();
     statusLine.classList.add('hidden');
     statusLine.textContent = '';
-    if (detailTitle) {
-      detailTitle.classList.remove('hidden');
-      detailTitle.textContent = `${state.year} ${state.gender} Combined Regional Results`;
-    }
+
     const cacheKey = `${state.gender}|${state.year}`;
     const cached = state.combinedCache[cacheKey];
     if (cached) {
@@ -769,7 +786,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setView(view, { fetch = true } = {}) {
     if (view !== 'qualifiers' && view !== 'combined') return;
-    if (view === 'combined' && state.regionalsLoaded <= 0) return;
     if (state.view === view) return;
     state.view = view;
     const nextUrl = new URL(window.location.href);
