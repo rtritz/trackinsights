@@ -3025,11 +3025,29 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
             (top2[0]["mark_raw"] + top2[1]["mark_raw"]) / 2.0
         )
 
-    # Avg percentile pool: include every qualifying school-year duo value in scope.
-    # For a specific year, scope is that year only. For all-time, scope is all years.
+    # Avg percentile pool:
+    # - Year-specific views use qualifying school-year duo values for that season.
+    # - All-time views collapse to each school's single best duo average across all years in scope.
     statewide_duo_dist = {}  # (event, gender) -> [avg_raw]
-    for (event, gender, _season_year, _sid), duo_avg in sw_duo_by_schoolyear.items():
-        statewide_duo_dist.setdefault((event, gender), []).append(duo_avg)
+    if year is not None:
+        for (event, gender, _season_year, _sid), duo_avg in sw_duo_by_schoolyear.items():
+            statewide_duo_dist.setdefault((event, gender), []).append(duo_avg)
+    else:
+        sw_best_duo_by_school = {}  # (event, gender, school_id) -> avg_raw
+        for (event, gender, _season_year, sid), duo_avg in sw_duo_by_schoolyear.items():
+            athletes = sw_school_event_year[(event, gender, _season_year, sid)]
+            event_type = athletes[0]["event_type"]
+            lower = _is_lower_better(event_type)
+            key = (event, gender, sid)
+            existing = sw_best_duo_by_school.get(key)
+            if existing is None or (
+                (lower and duo_avg < existing)
+                or (not lower and duo_avg > existing)
+            ):
+                sw_best_duo_by_school[key] = duo_avg
+
+        for (event, gender, _sid), duo_avg in sw_best_duo_by_school.items():
+            statewide_duo_dist.setdefault((event, gender), []).append(duo_avg)
 
     # ── Statewide relay best distributions (school best relay marks) ──
     statewide_relay_dist = {}

@@ -143,9 +143,11 @@
                         </svg>
                     </button>
                     <span id="percentiles-help-popover"
-                        class="absolute right-0 top-full z-20 mt-2 hidden w-[26rem] rounded-xl border border-base-300 bg-base-100 px-3 py-2 text-left text-xs text-base-content/80 shadow-lg group-hover:block group-focus-within:block">
-                        <span class="block"><span class="font-semibold">Best Mark:</span> The best playoff mark for the selected season. Percentile compares against each athlete's/relay's single best playoff mark statewide.</span>
-                        <span class="block mt-1"><span class="font-semibold">Avg Mark:</span> The average playoff mark for the selected season. Percentile compares against other schools' averages statewide. Must have at least 2 athletes in an individual event to show average.</span>
+                        class="absolute right-0 top-full z-20 mt-2 hidden w-[30rem] rounded-xl border border-base-300 bg-base-100 px-3 py-2 text-left text-xs text-base-content/80 shadow-lg group-hover:block group-focus-within:block">
+                        <span class="block"><span class="font-semibold">Scope:</span> Playoff meets only (Sectional, Regional, State).</span>
+                        <span class="block mt-1"><span class="font-semibold">Best Mark:</span> School’s single best playoff mark. Percentile compares against statewide playoff best marks.</span>
+                        <span class="block mt-1"><span class="font-semibold">Avg Mark (individual events only):</span> The average of the top 2 athletes’ best playoff marks for the school in a season. The two marks may come from different meets. Requires at least 2 athletes in that event/season for the school. Percentile compares against statewide average marks.</span>
+                        <span class="block mt-1"><span class="font-semibold">Year vs All-Time:</span> A selected year uses only that season. All-Time uses all seasons in scope. In All-Time Best Mark views, athletes and relay teams are counted once using their best playoff mark across all years. In All-Time Avg Mark views, each school is counted once using its best top-2 playoff average across all years.</span>
                     </span>
                 </span>
             </div>
@@ -407,12 +409,15 @@ document.addEventListener('DOMContentLoaded', async function () {
         // ── Shared percentile bar renderer ──
         const renderPercentileBar = (percentile, rank, total, options = {}) => {
             const compact = Boolean(options.compact);
+            const scopeLabel = options.scopeLabel || 'Playoff';
+            const cohortLabel = options.cohortLabel || 'entries';
             const value = Number(percentile || 0);
             const safeWidth = Math.max(0, Math.min(100, value));
             const labelPos = Math.max(6, Math.min(94, safeWidth));
-            const tooltipText = (rank !== undefined && rank !== null && total)
-                ? `${value}% · Rank ${rank} of ${total}`
-                : `${value}%`;
+            const tooltipPrimary = (rank !== undefined && rank !== null && total)
+                ? `${scopeLabel} rank ${rank} of ${total} ${cohortLabel}`
+                : `${scopeLabel} percentile`;
+            const tooltipSecondary = `${value}% percentile`;
             return `
                 <div class="relative group ${compact ? 'min-w-[6.5rem]' : 'min-w-[8rem]'} cursor-pointer">
                     <div class="relative h-3 bg-base-200 rounded-md overflow-hidden border border-base-300/60">
@@ -422,7 +427,8 @@ document.addEventListener('DOMContentLoaded', async function () {
                         <div class="h-full rounded-md transition-all" style="width: ${safeWidth}%; background: linear-gradient(to right, #8c0327, #b0042f);"></div>
                     </div>
                     <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                        ${tooltipText}
+                        <span class="block">${tooltipPrimary}</span>
+                        <span class="block">${tooltipSecondary}</span>
                     </div>
                     <div class="relative h-4 mt-0.5">
                         <span class="absolute text-[10px] sm:text-xs font-semibold tabular-nums text-base-content/80 whitespace-nowrap" style="left: ${labelPos}%; transform: translateX(-50%);">
@@ -438,7 +444,10 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         const getPercentilesForYearAndGender = (yearKey, gender) => {
             const rows = percentileDataByYear[yearKey] || [];
-            return rows.filter((p) => p.gender === gender).sort((a, b) => eventRank(a.event) - eventRank(b.event));
+            return rows
+                .filter((p) => p.gender === gender)
+                .filter((p) => !(percMetric === 'avg' && p.is_relay))
+                .sort((a, b) => eventRank(a.event) - eventRank(b.event));
         };
 
         const renderPercentiles = (gender) => {
@@ -499,6 +508,9 @@ document.addEventListener('DOMContentLoaded', async function () {
                     const percentileValue = isAvgMetric ? p.avg_state_percentile : p.best_state_percentile;
                     const rankValue = isAvgMetric ? p.avg_rank : p.best_rank;
                     const totalValue = isAvgMetric ? p.avg_total_marks : p.best_total_marks;
+                    const percentileScopeLabel = yearKey === 'all'
+                        ? 'All-Time Playoff'
+                        : `${yearKey} Playoff`;
                     const relayBadge = p.is_relay ? ' <span class="badge badge-xs badge-outline">Relay</span>' : '';
                     const renderAthleteLink = (a) => a && a.athlete_id
                         ? `<a href="/athlete-dashboard/${a.athlete_id}" class="text-primary font-semibold underline decoration-solid underline-offset-2 hover:text-primary/80">${esc(a.name)}</a>`
@@ -535,7 +547,10 @@ document.addEventListener('DOMContentLoaded', async function () {
                         ? '<span class="text-gray-400 text-sm">-</span>'
                         : (percentileValue === null || percentileValue === undefined
                         ? '<span class="text-gray-400 text-sm">N/A</span>'
-                        : renderPercentileBar(Number(percentileValue || 0), rankValue, totalValue));
+                        : renderPercentileBar(Number(percentileValue || 0), rankValue, totalValue, {
+                            scopeLabel: percentileScopeLabel,
+                            cohortLabel: isAvgMetric ? 'schools' : (p.is_relay ? 'teams' : 'athletes'),
+                        }));
 
                     html += `
                             <tr class="hover:bg-primary/5">
@@ -1022,7 +1037,10 @@ document.addEventListener('DOMContentLoaded', async function () {
                 const percentile = Number(row.state_percentile || 0);
                 const percentileHtml = row.state_percentile === null || row.state_percentile === undefined
                     ? '-'
-                    : renderPercentileBar(percentile, row.rank, row.total_marks);
+                    : renderPercentileBar(percentile, row.rank, row.total_marks, {
+                        scopeLabel: row.year ? `${row.year} ${row.meet_type || 'Meet'}` : (row.meet_type || 'Meet'),
+                        cohortLabel: 'teams',
+                    });
 
                 html += `
                     <tr class="hover:bg-primary/5">
