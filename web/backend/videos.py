@@ -14,8 +14,28 @@
 
 INTERVIEW_VIDEOS = [
     { 
+        "youtube_id": "jAC3aATeewU ",
+        "title": "Kira Smith Interview",
+        "athlete_name": "Kira Smith",
+        "athlete_id": 302984,
+        "school": "Warren Central HS",
+        "event": "High Jump",
+        "year": 2027,
+        "description": "Kira Smith, a standout high jumper from Warren Central HS, shares her journey with us.",
+    },
+    { 
+        "youtube_id": "C5RwhfOZcCU",
+        "title": "Caleb Winders Interview",
+        "athlete_name": "Caleb Winders",
+        "athlete_id": 299660,
+        "school": "Bloomington North HS",
+        "event": "800m",
+        "year": 2026,
+        "description": "Caleb Winders, a standout 800 meter runner from Bloomington North HS, shares his running journey with us.",
+    },
+    { 
         "youtube_id": "e_T8IFLk5OY",
-        "title": " Mallory Weller Interview",
+        "title": "Mallory Weller Interview",
         "athlete_name": "Mallory Weller",
         "athlete_id": 291895,
         "school": "Ft. Wayne Concordia Lutheran HS",

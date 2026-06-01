@@ -6,6 +6,38 @@
 {% block og_description %}Watch interviews with Indiana high school track and field athletes. Hear their stories, training insights, and goals.{% endblock %}
 
 {% block content %}
+<style>
+  .interviews-grid {
+    gap: 2rem;
+  }
+
+  @media (min-width: 640px) {
+    .interviews-grid {
+      gap: 2.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .interviews-grid {
+      column-gap: 2.5rem;
+    }
+
+    .interviews-grid > .card {
+      width: 100%;
+      max-width: 30rem;
+      margin-left: 0;
+      margin-right: 0;
+    }
+
+    .interviews-grid > .card:nth-child(odd) {
+      justify-self: end;
+    }
+
+    .interviews-grid > .card:nth-child(even) {
+      justify-self: start;
+    }
+  }
+</style>
 <div class="min-h-screen bg-white pt-20 sm:pt-24 pb-24 sm:pb-32 px-4 sm:px-6">
   <div class="max-w-6xl mx-auto">
 
@@ -21,11 +53,11 @@
 
     {% if videos %}
     <!-- Video Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10 justify-center">
+    <div class="grid grid-cols-1 lg:grid-cols-2 interviews-grid justify-center">
       {% for video in videos %}
-      <div class="card bg-base-100 shadow-lg rounded-2xl overflow-hidden border border-gray-100 max-w-md mx-auto">
+      <div class="card bg-base-100 shadow-lg rounded-2xl overflow-hidden border border-gray-100 max-w-lg mx-auto">
         <!-- YouTube Embed (privacy-enhanced) -->
-        <div class="relative w-full" style="padding-bottom: 40%;">
+        <div class="relative w-full" style="padding-bottom: 72%;">
           <iframe
             class="absolute inset-0 w-full h-full"
             src="https://www.youtube-nocookie.com/embed/{{ video.youtube_id }}"
