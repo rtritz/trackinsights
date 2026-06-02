@@ -81,33 +81,37 @@
             <div class="space-y-4">
                 <div id="relay-summary-cards" class="grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
 
-                <div class="rounded-2xl border border-base-200 bg-base-100 p-3 sm:p-4">
-                    <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-                        <div class="min-w-0 flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <div class="rounded-2xl border border-base-300 bg-base-200/60 p-2 sm:p-2.5">
+                    <div class="overflow-x-auto">
+                    <div class="grid grid-cols-3 gap-3 sm:gap-4 min-w-[58rem] pb-1">
+                        <div class="flex items-center gap-2 rounded-xl border border-base-300/70 bg-base-100 px-3 py-2.5 min-w-0 shadow-sm">
                             <span class="inline-flex text-[10px] sm:text-xs uppercase tracking-wide font-bold text-black">Year:</span>
-                            <button type="button" id="relay-year-all"
-                                class="btn btn-sm rounded-full border border-base-300 px-3 py-1.5 text-xs sm:text-sm">All</button>
-                            <div id="relay-year-stepper" tabindex="0" role="group" aria-label="Relay year selector"
-                                class="inline-flex items-center gap-1 rounded-full border border-base-300 bg-base-100 px-1 py-1">
-                                <button type="button" id="relay-year-prev"
-                                    class="btn btn-ghost btn-xs rounded-full px-2" aria-label="Previous year">&#8249;</button>
-                                <button type="button" id="relay-year-label"
-                                    class="min-w-[3.2rem] text-center text-xs sm:text-sm font-semibold tabular-nums text-base-content bg-transparent border-0 px-1"
-                                    aria-label="Selected year">-</button>
-                                <button type="button" id="relay-year-next"
-                                    class="btn btn-ghost btn-xs rounded-full px-2" aria-label="Next year">&#8250;</button>
+                            <div class="flex items-center gap-2">
+                                <button type="button" id="relay-year-all"
+                                    class="btn btn-sm rounded-full border border-base-300 px-3 py-1.5 text-xs sm:text-sm">All</button>
+                                <div id="relay-year-stepper" tabindex="0" role="group" aria-label="Relay year selector"
+                                    class="inline-flex items-center gap-1 rounded-full border border-base-300 bg-base-100 px-1 py-1">
+                                    <button type="button" id="relay-year-prev"
+                                        class="btn btn-ghost btn-xs rounded-full px-2" aria-label="Previous year"><span class="inline-block h-0 w-0 border-y-[5px] border-y-transparent border-r-[8px] border-r-white" style="filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.95));" aria-hidden="true"></span></button>
+                                    <button type="button" id="relay-year-label"
+                                        class="min-w-[3.2rem] text-center text-xs sm:text-sm font-semibold tabular-nums text-base-content bg-transparent border-0 px-1"
+                                        aria-label="Selected year">-</button>
+                                    <button type="button" id="relay-year-next"
+                                        class="btn btn-ghost btn-xs rounded-full px-2" aria-label="Next year"><span class="inline-block h-0 w-0 border-y-[5px] border-y-transparent border-l-[8px] border-l-white" style="filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.95));" aria-hidden="true"></span></button>
+                                </div>
                             </div>
                         </div>
-                        <span class="hidden sm:inline-block h-8 w-[2px] bg-gray-400 rounded-full"></span>
-                        <div class="min-w-0 flex flex-wrap items-center gap-1.5 sm:gap-2">
+
+                        <div class="flex items-center gap-2 rounded-xl border border-base-300/70 bg-base-100 px-3 py-2.5 min-w-0 shadow-sm">
                             <span class="inline-flex text-[10px] sm:text-xs uppercase tracking-wide font-bold text-black">Meet:</span>
-                            <div id="relay-meet-toggle" class="flex flex-wrap gap-1"></div>
+                            <div id="relay-meet-toggle" class="flex flex-nowrap gap-1.5"></div>
                         </div>
-                        <span class="hidden sm:inline-block h-8 w-[2px] bg-gray-400 rounded-full"></span>
-                        <div class="min-w-0 flex flex-wrap items-center gap-1.5 sm:gap-2">
+
+                        <div class="flex items-center gap-2 rounded-xl border border-base-300/70 bg-base-100 px-3 py-2.5 min-w-0 shadow-sm">
                             <span class="inline-flex text-[10px] sm:text-xs uppercase tracking-wide font-bold text-black">Event:</span>
-                            <div id="relay-event-toggle" class="flex flex-wrap gap-1"></div>
+                            <div id="relay-event-toggle" class="flex flex-nowrap gap-1.5"></div>
                         </div>
+                    </div>
                     </div>
                 </div>
 
@@ -117,7 +121,7 @@
 
         <!-- School Percentiles Section (includes records) -->
         <div class="mb-6 sm:mb-8">
-            <div class="flex flex-wrap items-center justify-between gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 sm:gap-3 mb-2 sm:mb-3">
                 <div class="flex flex-wrap items-baseline gap-2 sm:gap-3">
                     <div class="flex flex-wrap items-baseline gap-3">
                         <button type="button" data-metric="best"
@@ -132,25 +136,16 @@
                     </div>
                     <span id="percentiles-gender-label" class="badge badge-outline badge-sm sm:badge-md font-sans font-semibold text-xs sm:text-sm">Boys</span>
                 </div>
-                <span class="relative inline-flex self-center group">
-                    <button type="button" id="percentiles-help-toggle"
-                        class="inline-flex h-7 w-7 items-center justify-center text-yellow-400 hover:text-yellow-500 transition-colors"
-                        aria-label="Best/Avg mark help"
-                        aria-controls="percentiles-help-popover">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3.75a6.75 6.75 0 0 0-4.636 11.655c.72.664 1.136 1.583 1.136 2.563V18.75h7v-.782c0-.98.416-1.899 1.136-2.563A6.75 6.75 0 0 0 12 3.75Z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 18.75h4.5m-4.125 2.25h3.75" />
-                        </svg>
-                    </button>
-                    <span id="percentiles-help-popover"
-                        class="absolute right-0 top-full z-20 mt-2 hidden w-[30rem] rounded-xl border border-base-300 bg-base-100 px-3 py-2 text-left text-xs text-base-content/80 shadow-lg group-hover:block group-focus-within:block">
-                        <span class="block"><span class="font-semibold">Scope:</span> Playoff meets only (Sectional, Regional, State).</span>
-                        <span class="block mt-1"><span class="font-semibold">Best Mark:</span> School’s single best playoff mark. Percentile compares against statewide playoff best marks.</span>
-                        <span class="block mt-1"><span class="font-semibold">Avg Mark (individual events only):</span> The average of the top 2 athletes’ best playoff marks for the school in a season. The two marks may come from different meets. Requires at least 2 athletes in that event/season for the school. Percentile compares against statewide average marks.</span>
-                        <span class="block mt-1"><span class="font-semibold">Year vs All-Time:</span> A selected year uses only that season. All-Time uses all seasons in scope. In All-Time Best Mark views, athletes and relay teams are counted once using their best playoff mark across all years. In All-Time Avg Mark views, each school is counted once using its best top-2 playoff average across all years.</span>
-                    </span>
-                </span>
             </div>
+
+            <details class="mb-3 rounded-xl border border-base-300 bg-base-100 px-3 py-2 text-xs sm:text-sm text-base-content/80">
+                <summary class="cursor-pointer select-none font-semibold text-base-content">How this is calculated</summary>
+                <div class="mt-2">
+                    <p class="mt-1"><span class="font-semibold">Best Marks:</span> best playoff mark per school/event, ranked against statewide playoff best marks.</p>
+                    <p class="mt-1"><span class="font-semibold">Avg Marks (individual events only):</span> average of a school's top 2 athletes in that event/year; marks may come from different playoff meets in the same season; requires 2 athletes.</p>
+                    <p class="mt-1"><span class="font-semibold">Year / All-Time:</span> Year uses one season. All-Time combines all seasons in scope. In All-Time Best, each athlete/relay counts once (best mark). In All-Time Avg, each school counts once (best top-2 average).</p>
+                </div>
+            </details>
 
             <!-- Year Toggle -->
             <div class="flex flex-wrap items-center gap-2 mb-3">
@@ -159,7 +154,7 @@
             <div class="mb-2">
                 <label for="percentiles-compare-mode-toggle" class="inline-flex items-center gap-2 text-xs sm:text-sm text-base-content/80">
                     <input type="checkbox" id="percentiles-compare-mode-toggle" class="checkbox checkbox-sm rounded-none" />
-                    <span id="percentiles-compare-mode-label">check to compare years</span>
+                    <span id="percentiles-compare-mode-label">enable multi-year compare (select multiple years)</span>
                 </label>
             </div>
 
@@ -419,7 +414,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 : `${scopeLabel} percentile`;
             const tooltipSecondary = `${value}% percentile`;
             return `
-                <div class="relative group ${compact ? 'min-w-[6.5rem]' : 'min-w-[8rem]'} cursor-pointer">
+                <div class="relative group ${compact ? 'min-w-[5.5rem]' : 'min-w-[7rem]'} cursor-pointer">
                     <div class="relative h-3 bg-base-200 rounded-md overflow-hidden border border-base-300/60">
                         <span class="absolute top-0 bottom-0 w-px bg-base-content/20" style="left:25%;"></span>
                         <span class="absolute top-0 bottom-0 w-px bg-base-content/20" style="left:50%;"></span>
@@ -455,6 +450,11 @@ document.addEventListener('DOMContentLoaded', async function () {
                 percContainer.style.minHeight = '';
             }
             const selected = selectedPercentileYears.slice();
+            if (percContainer) {
+                const isCompareMode = selected.length > 1;
+                percContainer.classList.toggle('overflow-x-auto', isCompareMode);
+                percContainer.classList.toggle('overflow-x-hidden', !isCompareMode);
+            }
             const eventMap = new Map();
 
             selected.forEach((yearKey) => {
@@ -502,6 +502,41 @@ document.addEventListener('DOMContentLoaded', async function () {
                 rows.forEach((p) => {
                     const isAvgMetric = percMetric === 'avg' && !p.is_relay;
                     const topAthletes = Array.isArray(p.top_athletes) ? p.top_athletes : [];
+                    const topDuos = Array.isArray(p.top_duos) ? p.top_duos : [];
+                    const holders = Array.isArray(p.holders) ? p.holders : [];
+                    const holderMap = new Map();
+                    holders.forEach((h) => {
+                        if (!h) {
+                            return;
+                        }
+                        const rawName = (h.name || '').trim();
+                        const key = h.athlete_id ? `id:${h.athlete_id}` : `name:${rawName.toLowerCase()}`;
+                        if (!holderMap.has(key)) {
+                            holderMap.set(key, {
+                                entry: h,
+                                years: new Set(),
+                            });
+                        }
+                        if (h.year !== null && h.year !== undefined) {
+                            holderMap.get(key).years.add(h.year);
+                        }
+                    });
+                    const dedupedHolders = Array.from(holderMap.values())
+                        .map((item) => {
+                            const years = Array.from(item.years.values()).sort((a, b) => b - a);
+                            return {
+                                ...item.entry,
+                                years,
+                            };
+                        })
+                        .sort((a, b) => {
+                            const aYear = a.years && a.years.length ? a.years[0] : (a.year || 0);
+                            const bYear = b.years && b.years.length ? b.years[0] : (b.year || 0);
+                            if (bYear !== aYear) {
+                                return bYear - aYear;
+                            }
+                            return String(a.name || '').localeCompare(String(b.name || ''));
+                        });
                     const athleteCount = Number(p.avg_athlete_count || topAthletes.length || 0);
                     const hasAvgDuo = Boolean(p.school_avg_top2 && athleteCount >= 2);
                     const noDuo = isAvgMetric && !hasAvgDuo;
@@ -511,10 +546,12 @@ document.addEventListener('DOMContentLoaded', async function () {
                     const percentileScopeLabel = yearKey === 'all'
                         ? 'All-Time Playoff'
                         : `${yearKey} Playoff`;
-                    const relayBadge = p.is_relay ? ' <span class="badge badge-xs badge-outline">Relay</span>' : '';
                     const renderAthleteLink = (a) => a && a.athlete_id
                         ? `<a href="/athlete-dashboard/${a.athlete_id}" class="text-primary font-semibold underline decoration-solid underline-offset-2 hover:text-primary/80">${esc(a.name)}</a>`
                         : esc((a && a.name) || '-');
+                    const renderHolderEntry = (h) => h && h.athlete_id
+                        ? `<a href="/athlete-dashboard/${h.athlete_id}" class="text-primary font-semibold underline decoration-solid underline-offset-2 hover:text-primary/80">${esc(h.name || '-')}</a>`
+                        : esc((h && h.name) || '-');
 
                     let markCell;
                     let athleteCell;
@@ -527,20 +564,41 @@ document.addEventListener('DOMContentLoaded', async function () {
                         } else {
                             markCell = '-';
                         }
-                        if (hasAvgDuo && topAthletes.length) {
-                            athleteCell = topAthletes.map(renderAthleteLink).join(', ');
+                        if (hasAvgDuo && topDuos.length > 1) {
+                            athleteCell = topDuos.map((duo) => {
+                                const duoAthletes = Array.isArray(duo.athletes) ? duo.athletes : [];
+                                return duoAthletes.length
+                                    ? duoAthletes.map(renderAthleteLink).join(' + ')
+                                    : '-';
+                            }).join('<br>');
+                            seasonCell = topDuos
+                                .map((duo) => (duo && duo.year !== null && duo.year !== undefined) ? String(duo.year) : '-')
+                                .join('<br>');
+                        } else if (hasAvgDuo && topAthletes.length) {
+                            athleteCell = topAthletes.map(renderAthleteLink).join(' + ');
+                            seasonCell = hasAvgDuo ? (p.avg_year || (topAthletes[0] && topAthletes[0].year) || '-') : '-';
                         } else {
                             athleteCell = '<span class="text-xs text-base-content/60">No duo available.</span>';
+                            seasonCell = '-';
                         }
-                        seasonCell = hasAvgDuo ? (p.avg_year || (topAthletes[0] && topAthletes[0].year) || '-') : '-';
                     } else {
                         markCell = esc(p.school_best || '-');
-                        athleteCell = p.is_relay
-                            ? 'Relay Team'
-                            : (p.holder_id
-                                ? `<a href="/athlete-dashboard/${p.holder_id}" class="text-primary font-semibold underline decoration-solid underline-offset-2 hover:text-primary/80">${esc(p.holder)}</a>`
-                                : esc(p.holder || '-'));
-                        seasonCell = p.year || '-';
+                        if (holders.length > 1) {
+                            athleteCell = dedupedHolders.map(renderHolderEntry).join('<br>');
+                            seasonCell = dedupedHolders
+                                .map((h) => {
+                                    const years = Array.isArray(h.years) ? h.years : [];
+                                    return years.length ? years.join(', ') : ((h.year !== null && h.year !== undefined) ? String(h.year) : '-');
+                                })
+                                .join('<br>');
+                        } else {
+                            athleteCell = p.is_relay
+                                ? 'Relay Team'
+                                : (p.holder_id
+                                    ? `<a href="/athlete-dashboard/${p.holder_id}" class="text-primary font-semibold underline decoration-solid underline-offset-2 hover:text-primary/80">${esc(p.holder)}</a>`
+                                    : esc(p.holder || '-'));
+                            seasonCell = p.year || '-';
+                        }
                     }
 
                     const percentileHtml = noDuo
@@ -550,13 +608,14 @@ document.addEventListener('DOMContentLoaded', async function () {
                         : renderPercentileBar(Number(percentileValue || 0), rankValue, totalValue, {
                             scopeLabel: percentileScopeLabel,
                             cohortLabel: isAvgMetric ? 'schools' : (p.is_relay ? 'teams' : 'athletes'),
+                            compact: true,
                         }));
 
                     html += `
                             <tr class="hover:bg-primary/5">
-                                <td class="font-semibold text-left py-2.5">${esc(p.event)}${relayBadge}</td>
+                                <td class="font-semibold text-left py-2.5 whitespace-normal break-words">${esc(p.event)}</td>
                                 <td class="${markCellClass} text-left py-2.5">${markCell}</td>
-                                <td class="text-left py-2.5">${athleteCell}</td>
+                                <td class="text-left py-2.5 whitespace-normal break-words">${athleteCell}</td>
                                 <td class="text-left py-2.5">${showSeasonCol ? seasonCell : '<span class="invisible">-</span>'}</td>
                                 <td class="text-left py-2.5">
                                     ${percentileHtml}
@@ -572,12 +631,11 @@ document.addEventListener('DOMContentLoaded', async function () {
 
             let compareBanner = '';
             if (selected.length > 1) {
-                const compareYears = selected.map((yearKey) => `<span class="font-semibold text-base-content">${esc(yearLabel(yearKey))}</span>`).join(' vs ');
                 const metricLabel = percMetric === 'avg' ? 'Avg of top 2 athletes' : 'Best mark';
                 compareBanner = `
-                    <div class="mb-3 rounded-xl border border-base-300 bg-base-100 px-3 py-2 text-xs sm:text-sm text-base-content/80">
-                        Comparing ${compareYears}. ${metricLabel} per event is highlighted.
-                    </div>
+                    <p class="mb-3 text-xs sm:text-sm text-orange-600">
+                        ${metricLabel} per event is highlighted.
+                    </p>
                 `;
             }
 
@@ -624,7 +682,6 @@ document.addEventListener('DOMContentLoaded', async function () {
             const cellIsIncomplete = (cell) => useAvg && cell && !cell.is_relay && (cell.avg_athlete_count || 0) < 2;
 
             events.forEach((eventRow) => {
-                const relayBadge = eventRow.is_relay ? ' <span class="badge badge-xs badge-outline">Relay</span>' : '';
                 let yearCells = '';
 
                 const eventType = eventRow.event_type || 'Track';
@@ -681,7 +738,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
                 html += `
                     <tr class="hover:bg-primary/5" style="border: 0;">
-                        <td class="font-semibold min-w-[16rem] pr-8" style="border: 0;">${esc(eventRow.event)}${relayBadge}</td>
+                        <td class="font-semibold min-w-[16rem] pr-8" style="border: 0;">${esc(eventRow.event)}</td>
                         ${yearCells}
                     </tr>
                 `;
@@ -785,9 +842,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         const updatePercentileCompareUI = () => {
             if (percCompareModeToggle) {
                 percCompareModeToggle.checked = percentileCompareMode;
-            }
-            if (percCompareModeLabel) {
-                percCompareModeLabel.textContent = 'check to compare years';
             }
         };
 
@@ -1018,18 +1072,24 @@ document.addEventListener('DOMContentLoaded', async function () {
 
             let html = `
                 <table class="table table-compact sm:table-normal w-full text-sm">
+                    <colgroup>
+                        <col style="width: 20%;" />
+                        <col style="width: 20%;" />
+                        <col style="width: 30%;" />
+                        <col style="width: 10%;" />
+                        <col style="width: 20%;" />
+                    </colgroup>
                     <thead>
                         <tr class="text-primary text-xs sm:text-sm uppercase">
-                            <th>Event</th>
-                            <th>Mark</th>
-                            <th>Place</th>
-                            <th>Meet</th>
-                            <th>Percentile</th>
+                            <th class="text-left">Event</th>
+                            <th class="text-left">Mark</th>
+                            <th class="text-left">Meet</th>
+                            <th class="text-left">Place</th>
+                            <th class="text-left">Percentile</th>
                         </tr>
                     </thead>
                     <tbody>
             `;
-
             rows.forEach((row) => {
                 const placeText = row.place ? ordinal(row.place) : '-';
                 const meetLabel = `${esc(row.meet_type || 'Meet')} ${row.year || ''}`;
@@ -1044,14 +1104,14 @@ document.addEventListener('DOMContentLoaded', async function () {
 
                 html += `
                     <tr class="hover:bg-primary/5">
-                        <td class="font-semibold">${esc(relayEventLabel(row.event || '-'))}</td>
-                        <td class="font-mono">${esc(row.result || '-')}</td>
-                        <td>${placeText}</td>
-                        <td>
+                        <td class="font-semibold text-left py-2.5">${esc(row.event || '-')}</td>
+                        <td class="font-mono text-left py-2.5">${esc(row.result || '-')}</td>
+                        <td class="text-left py-2.5">
                             <div>${meetLabel}</div>
                             <div class="text-xs text-base-content/60">${hostLabel}</div>
                         </td>
-                        <td>${percentileHtml}</td>
+                        <td class="text-left py-2.5">${placeText}</td>
+                        <td class="text-left py-2.5">${percentileHtml}</td>
                     </tr>
                 `;
             });

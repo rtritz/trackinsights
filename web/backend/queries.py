@@ -1,6 +1,7 @@
 import re
 import sys
 import logging
+import math
 # Set up module-level logger
 logger = logging.getLogger("trackinsights.queries")
 if not logger.hasHandlers():
@@ -2860,21 +2861,24 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
         event_type = next(iter(year_groups.values()))[0]["event_type"]
         lower = _is_lower_better(event_type)
 
-        best_athlete = None
-        best_year = None
+        best_mark = None
+        best_athletes = []
         for y, athletes in year_groups.items():
             for a in athletes:
-                if (
-                    best_athlete is None
-                    or (lower and a["mark_raw"] < best_athlete["mark_raw"])
-                    or (not lower and a["mark_raw"] > best_athlete["mark_raw"])
+                if best_mark is None or (
+                    (lower and a["mark_raw"] < best_mark)
+                    or (not lower and a["mark_raw"] > best_mark)
                 ):
-                    best_athlete = a
-                    best_year = y
+                    best_mark = a["mark_raw"]
+                    best_athletes = [a]
+                elif best_mark is not None and math.isclose(a["mark_raw"], best_mark, rel_tol=0.0, abs_tol=1e-9):
+                    best_athletes.append(a)
 
-        best_duo = None
+        # Keep tie ordering deterministic.
+        best_athletes.sort(key=lambda item: (-(item.get("year") or 0), item.get("name") or ""))
+
+        best_duos = []
         best_duo_avg = None
-        best_duo_year = None
         for y, athletes in year_groups.items():
             if len(athletes) < 2:
                 continue
@@ -2886,19 +2890,32 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
                 or (not lower and duo_avg > best_duo_avg)
             ):
                 best_duo_avg = duo_avg
-                best_duo = duo
-                best_duo_year = y
+                best_duos = [{"year": y, "avg_raw": duo_avg, "athletes": duo}]
+            elif best_duo_avg is not None and math.isclose(duo_avg, best_duo_avg, rel_tol=0.0, abs_tol=1e-9):
+                best_duos.append({"year": y, "avg_raw": duo_avg, "athletes": duo})
+
+        best_duos.sort(
+            key=lambda item: (
+                -(item.get("year") or 0),
+                " | ".join(a.get("name") or "" for a in item.get("athletes", [])),
+            )
+        )
+        best_duo = best_duos[0]["athletes"] if best_duos else []
+        best_duo_year = best_duos[0]["year"] if best_duos else None
+        best_year = best_athletes[0]["year"] if best_athletes else None
 
         indiv_metrics[(event, gender)] = {
             "is_relay": False,
             "event_type": event_type,
-            "best_raw": best_athlete["mark_raw"] if best_athlete else None,
-            "best_holder": best_athlete["name"] if best_athlete else None,
-            "best_holder_id": best_athlete["athlete_id"] if best_athlete else None,
+            "best_raw": best_mark,
+            "best_holder": best_athletes[0]["name"] if best_athletes else None,
+            "best_holder_id": best_athletes[0]["athlete_id"] if best_athletes else None,
+            "best_holders": best_athletes,
             "best_year": best_year,
             "avg_top2_raw": best_duo_avg,
             "avg_year": best_duo_year,
-            "avg_top_athletes": best_duo or [],
+            "avg_top_athletes": best_duo,
+            "avg_top_duos": best_duos,
         }
 
     # ── School relay bests (playoff meets only) ──
@@ -2927,6 +2944,12 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
         key = (row.event, row.gender)
         lower_is_better = _is_lower_better(row.event_type)
         existing = relay_metrics.get(key)
+        entry = {
+            "name": row.athlete_names or "Relay Team",
+            "athlete_id": None,
+            "year": row.year,
+            "mark_raw": row.result2,
+        }
         if existing is None or (
             (lower_is_better and row.result2 < existing["best_raw"])
             or (not lower_is_better and row.result2 > existing["best_raw"])
@@ -2935,13 +2958,24 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
                 "is_relay": True,
                 "event_type": row.event_type,
                 "best_raw": row.result2,
-                "best_holder": row.athlete_names or "Relay Team",
+                "best_holder": entry["name"],
                 "best_holder_id": None,
+                "best_holders": [entry],
                 "best_year": row.year,
                 "avg_top2_raw": None,
                 "avg_year": None,
                 "avg_top_athletes": [],
+                "avg_top_duos": [],
             }
+        elif math.isclose(row.result2, existing["best_raw"], rel_tol=0.0, abs_tol=1e-9):
+            existing["best_holders"].append(entry)
+
+    for item in relay_metrics.values():
+        holders = item.get("best_holders", [])
+        holders.sort(key=lambda entry: (-(entry.get("year") or 0), entry.get("name") or ""))
+        if holders:
+            item["best_holder"] = holders[0]["name"]
+            item["best_year"] = holders[0]["year"]
 
     all_metrics = {}
     all_metrics.update(indiv_metrics)
@@ -3099,6 +3133,39 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
             for a in info.get("avg_top_athletes", [])
         ]
 
+        best_holders = [
+            {
+                "name": h.get("name"),
+                "athlete_id": h.get("athlete_id"),
+                "year": h.get("year"),
+                "mark_raw": h.get("mark_raw"),
+                "mark": _format_result_display(h.get("mark_raw"), event_type)
+                if h.get("mark_raw") is not None else None,
+            }
+            for h in info.get("best_holders", [])
+        ]
+
+        top_duos = [
+            {
+                "year": duo.get("year"),
+                "avg_raw": duo.get("avg_raw"),
+                "avg_mark": _format_result_display(duo.get("avg_raw"), event_type)
+                if duo.get("avg_raw") is not None else None,
+                "athletes": [
+                    {
+                        "name": a.get("name"),
+                        "athlete_id": a.get("athlete_id"),
+                        "year": a.get("year"),
+                        "mark_raw": a.get("mark_raw"),
+                        "mark": _format_result_display(a.get("mark_raw"), event_type)
+                        if a.get("mark_raw") is not None else None,
+                    }
+                    for a in duo.get("athletes", [])
+                ],
+            }
+            for duo in info.get("avg_top_duos", [])
+        ]
+
         results.append(
             {
                 "event": event_name,
@@ -3111,8 +3178,10 @@ def _compute_school_percentiles(school_id: int, year: Optional[int] = None):
                 "school_avg_top2_raw": avg_raw,
                 "avg_athlete_count": len(avg_top_athletes),
                 "top_athletes": avg_top_athletes,
+                "top_duos": top_duos,
                 "holder": info.get("best_holder"),
                 "holder_id": info.get("best_holder_id"),
+                "holders": best_holders,
                 "year": info.get("best_year"),
                 "avg_year": info.get("avg_year"),
                 "best_state_percentile": best_pct,
