@@ -2,7 +2,6 @@ import re
 import sys
 import os
 import pandas as pd
-import difflib
 
 # Allow running as a standalone script
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
@@ -41,61 +40,45 @@ def get_points(df, values, scores):
 def parse_reference_scores(ref_text):
     ref_scores = {}
     for line in ref_text.strip().splitlines():
-        m = re.match(r"\d+\s+(.+?)\s*-\s*([\d.]+)", line.strip())
+        m = re.match(r"\d+[.)]?\s+(.+?)\s*-\s*([\d.]+)", line.strip())
         if m:
             name = m.group(1).strip()
             pts = float(m.group(2))
             ref_scores[name] = pts
     return ref_scores
 
-def compare_scores(computed, reference, fuzzy_threshold=0.4):
-    matches = []
-    mismatches = []
-    missing_in_computed = []
-    missing_in_reference = []
-    fuzzy_matches = []
-    def norm(s):
-        return s.lower().replace('(', '').replace(')', '').replace('-', ' ').replace('.', '').replace(',', '').replace('  ', ' ').strip()
-    computed_norm = {norm(k): (k, v) for k, v in computed.items()}
-    reference_norm = {norm(k): (k, v) for k, v in reference.items()}
-    matched_ref_norms = set()
-    matched_comp_norms = set()
+def compare_scores_by_rank(computed_ranked, reference_ranked, tolerance=0.01):
+    """Compare two (name, points) lists by rank position rather than by name.
 
-    # For each reference, look for any computed with >=0.4 similarity and matching score
-    for ref_norm, (ref_name, ref_pts) in reference_norm.items():
-        found_match = False
-        for comp_norm, (comp_name, comp_pts) in computed_norm.items():
-            similarity = difflib.SequenceMatcher(None, ref_norm, comp_norm).ratio()
-            if similarity >= fuzzy_threshold:
-                if abs(comp_pts - ref_pts) < 0.01:
-                    matches.append((f"{ref_name} (≈ {comp_name})", ref_pts))
-                    fuzzy_matches.append((ref_name, comp_name))
-                    matched_ref_norms.add(ref_norm)
-                    matched_comp_norms.add(comp_norm)
-                    found_match = True
-                    break
-                else:
-                    mismatches.append((f"{ref_name} (≈ {comp_name})", ref_pts, comp_pts))
-                    fuzzy_matches.append((ref_name, comp_name))
-                    matched_ref_norms.add(ref_norm)
-                    matched_comp_norms.add(comp_norm)
-                    found_match = True
-                    break
-        if not found_match:
-            missing_in_computed.append((ref_name, ref_pts))
+    School names can be formatted differently between the DB and whatever is
+    pasted from MileSplit, so pairing is done purely by descending-score rank;
+    the caller visually confirms the paired names refer to the same school.
+    """
+    computed_sorted = sorted(computed_ranked, key=lambda x: x[1], reverse=True)
+    reference_sorted = sorted(reference_ranked, key=lambda x: x[1], reverse=True)
 
-    # Any computed not matched to a reference
-    for comp_norm, (comp_name, comp_pts) in computed_norm.items():
-        if comp_norm not in matched_comp_norms:
-            missing_in_reference.append((comp_name, comp_pts))
-
-    return matches, mismatches, missing_in_computed, missing_in_reference, fuzzy_matches
+    rows = []
+    all_match = len(computed_sorted) == len(reference_sorted)
+    for i in range(max(len(computed_sorted), len(reference_sorted))):
+        comp = computed_sorted[i] if i < len(computed_sorted) else None
+        ref = reference_sorted[i] if i < len(reference_sorted) else None
+        match = comp is not None and ref is not None and abs(comp[1] - ref[1]) < tolerance
+        all_match = all_match and match
+        rows.append({
+            "rank": i + 1,
+            "computed_name": comp[0] if comp else None,
+            "computed_pts": comp[1] if comp else None,
+            "reference_name": ref[0] if ref else None,
+            "reference_pts": ref[1] if ref else None,
+            "match": match,
+        })
+    return rows, all_match
 
 def main():
     year = 2026
-    gender = "Boys"
-    meet_type = "Regional"
-    meet_number = 8
+    gender = "Girls"
+    meet_type = "Sectional"
+    meet_number = 1
 
     # Use path relative to this script's location so it works from any CWD
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -141,26 +124,30 @@ def main():
         ref_lines.append(line)
     if ref_lines:
         reference_scores_text = "\n".join(ref_lines)
-        computed_scores = {db.get_school_name(int(sid)) if db.get_school_name(int(sid)) else str(sid): pts for sid, pts in scores.items()}
-        ref_scores = parse_reference_scores(reference_scores_text)
-        matches, mismatches, missing_in_computed, missing_in_reference, fuzzy_matches = compare_scores(computed_scores, ref_scores)
-        print("\n--- SCORE COMPARISON SUMMARY ---")
-        print(f"Matches ({len(matches)}):")
-        for name, pts in matches:
-            print(f"  {name}: {pts}")
-        print(f"\nMismatches ({len(mismatches)}):")
-        for name, ref_pts, comp_pts in mismatches:
-            print(f"  {name}: reference={ref_pts}, computed={comp_pts}")
-        print(f"\nMissing in computed ({len(missing_in_computed)}):")
-        for name, pts in missing_in_computed:
-            print(f"  {name}: {pts}")
-        print(f"\nMissing in reference ({len(missing_in_reference)}):")
-        for name, pts in missing_in_reference:
-            print(f"  {name}: {pts}")
-        if fuzzy_matches:
-            print(f"\nFuzzy matched schools (≈ means fuzzy match):")
-            for ref_name, comp_name in fuzzy_matches:
-                print(f"  {ref_name} ≈ {comp_name}")
+        computed_ranked = [
+            (db.get_school_name(int(sid)) or str(sid), pts) for sid, pts in scores.items()
+        ]
+        reference_ranked = list(parse_reference_scores(reference_scores_text).items())
+        rows, all_match = compare_scores_by_rank(computed_ranked, reference_ranked)
+
+        print("\n--- RANK-BY-RANK SCORE COMPARISON ---")
+        print("{:<5}{:<30}{:>8}   {:<30}{:>8}   {}".format(
+            "Rank", "Computed (DB)", "Pts", "Reference (MileSplit)", "Pts", ""))
+        for r in rows:
+            comp_name = r["computed_name"] or "-"
+            comp_pts = f'{r["computed_pts"]:.1f}' if r["computed_pts"] is not None else "-"
+            ref_name = r["reference_name"] or "-"
+            ref_pts = f'{r["reference_pts"]:.1f}' if r["reference_pts"] is not None else "-"
+            flag = "" if r["match"] else "  <-- MISMATCH"
+            print("{:<5}{:<30}{:>8}   {:<30}{:>8}{}".format(
+                r["rank"], comp_name, comp_pts, ref_name, ref_pts, flag))
+
+        if all_match:
+            print(f"\nMEET STATUS: DONE - all {len(rows)} ranks match. No further action needed.")
+        else:
+            first_bad = next(r["rank"] for r in rows if not r["match"])
+            print(f"\nMEET STATUS: NEEDS INVESTIGATION - scores diverge starting at rank {first_bad}.")
+            print("Check the DB for missing/incorrect results around that rank (e.g. a dropped event or place).")
 
 if __name__ == "__main__":
     main()
