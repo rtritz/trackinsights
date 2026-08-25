@@ -38,12 +38,32 @@ def get_points(df, values, scores):
             i += tie_size
 
 def parse_reference_scores(ref_text):
+    """Parse pasted "<rank> <school name...> <points>" lines.
+
+    MileSplit's copy/paste format isn't consistent (sometimes a "-" separates
+    name from points, sometimes not; team abbreviation codes may be tacked on
+    to the name). Rather than anchor on a specific separator, treat the first
+    token as the rank and the last token as the points value, and take
+    everything in between as the name -- exact name text doesn't matter since
+    comparison is done by rank, not by name.
+    """
     ref_scores = {}
-    for line in ref_text.strip().splitlines():
-        m = re.match(r"\d+[.)]?\s+(.+?)\s*-\s*([\d.]+)", line.strip())
-        if m:
-            name = m.group(1).strip()
-            pts = float(m.group(2))
+    for raw_line in ref_text.strip().splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        tokens = line.split()
+        if len(tokens) < 3 or not re.match(r"^\d+[.)]?$", tokens[0]):
+            continue
+        try:
+            pts = float(tokens[-1])
+        except ValueError:
+            continue
+        name_tokens = tokens[1:-1]
+        if name_tokens and name_tokens[-1] == "-":
+            name_tokens = name_tokens[:-1]
+        name = " ".join(name_tokens).strip()
+        if name:
             ref_scores[name] = pts
     return ref_scores
 
@@ -78,7 +98,7 @@ def main():
     year = 2026
     gender = "Girls"
     meet_type = "Sectional"
-    meet_number = 1
+    meet_number = 4
 
     # Use path relative to this script's location so it works from any CWD
     script_dir = os.path.dirname(os.path.abspath(__file__))
