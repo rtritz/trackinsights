@@ -122,17 +122,17 @@
       {
         "place": 1,
         "team": "Penn",
-        "score": 64.0
+        "score": 62.0
       },
       {
         "place": 2,
         "team": "Fairfield",
-        "score": 48.0
+        "score": 47.0
       },
       {
         "place": 2,
         "team": "Warsaw Community",
-        "score": 48.0
+        "score": 47.0
       },
       {
         "place": 4,
@@ -147,7 +147,7 @@
       {
         "place": 6,
         "team": "East Noble",
-        "score": 33.0
+        "score": 38.0
       },
       {
         "place": 7,
@@ -191,18 +191,13 @@
       },
       {
         "place": 15,
-        "team": "Fremont",
-        "score": 17.0
-      },
-      {
-        "place": 16,
         "team": "Bremen",
         "score": 16.0
       },
       {
-        "place": 17,
-        "team": "Angola",
-        "score": 14.0
+        "place": 15,
+        "team": "Fremont",
+        "score": 16.0
       },
       {
         "place": 17,
@@ -210,34 +205,44 @@
         "score": 14.0
       },
       {
-        "place": 19,
+        "place": 18,
+        "team": "Angola",
+        "score": 13.0
+      },
+      {
+        "place": 18,
         "team": "Culver Academies",
         "score": 13.0
       },
       {
-        "place": 20,
+        "place": 18,
+        "team": "West Noble",
+        "score": 13.0
+      },
+      {
+        "place": 21,
         "team": "NorthWood",
         "score": 12.0
       },
       {
-        "place": 21,
+        "place": 22,
         "team": "Churubusco",
-        "score": 11.0
+        "score": 10.0
       },
       {
-        "place": 21,
+        "place": 22,
         "team": "Lakeland",
-        "score": 11.0
+        "score": 10.0
       },
       {
-        "place": 23,
+        "place": 24,
         "team": "South Bend Riley",
         "score": 9.0
       },
       {
-        "place": 24,
+        "place": 25,
         "team": "Lakeland Christian Academy",
-        "score": 8.0
+        "score": 6.0
       },
       {
         "place": 25,
@@ -245,43 +250,28 @@
         "score": 6.0
       },
       {
-        "place": 26,
-        "team": "Eastside",
-        "score": 5.0
-      },
-      {
-        "place": 26,
+        "place": 27,
         "team": "Mishawaka Marian",
         "score": 5.0
       },
       {
-        "place": 26,
-        "team": "West Noble",
-        "score": 5.0
+        "place": 28,
+        "team": "Eastside",
+        "score": 4.0
       },
       {
-        "place": 29,
+        "place": 28,
         "team": "Elkhart Christian Academy",
         "score": 4.0
       },
       {
-        "place": 29,
+        "place": 28,
         "team": "Mishawaka",
         "score": 4.0
       },
       {
         "place": 31,
-        "team": "Central Noble",
-        "score": 3.0
-      },
-      {
-        "place": 31,
         "team": "DeKalb",
-        "score": 3.0
-      },
-      {
-        "place": 31,
-        "team": "North Miami",
         "score": 3.0
       },
       {
@@ -295,8 +285,18 @@
         "score": 3.0
       },
       {
-        "place": 36,
+        "place": 34,
+        "team": "Central Noble",
+        "score": 2.0
+      },
+      {
+        "place": 34,
         "team": "Glenn",
+        "score": 2.0
+      },
+      {
+        "place": 34,
+        "team": "North Miami",
         "score": 2.0
       }
     ]
@@ -332,13 +332,13 @@
       },
       {
         "place": 6,
-        "team": "Fort Wayne Bishop Dwenger",
-        "score": 44.0
+        "team": "Delta",
+        "score": 45.0
       },
       {
         "place": 7,
-        "team": "Delta",
-        "score": 42.0
+        "team": "Fort Wayne Bishop Dwenger",
+        "score": 43.0
       },
       {
         "place": 8,
@@ -412,17 +412,17 @@
       },
       {
         "place": 22,
-        "team": "Northfield",
-        "score": 3.0
-      },
-      {
-        "place": 22,
         "team": "Woodlan",
         "score": 3.0
       },
       {
-        "place": 24,
+        "place": 23,
         "team": "Muncie Burris",
+        "score": 2.0
+      },
+      {
+        "place": 23,
+        "team": "Northfield",
         "score": 2.0
       },
       {
@@ -433,11 +433,6 @@
       {
         "place": 25,
         "team": "Fort Wayne Wayne",
-        "score": 1.0
-      },
-      {
-        "place": 25,
-        "team": "Frankton",
         "score": 1.0
       },
       {
@@ -1018,17 +1013,17 @@
       {
         "place": 1,
         "team": "Floyd Central",
-        "score": 88.0
+        "score": 92.0
       },
       {
         "place": 2,
         "team": "Castle",
-        "score": 68.0
+        "score": 67.0
       },
       {
         "place": 3,
         "team": "Jasper",
-        "score": 61.0
+        "score": 63.0
       },
       {
         "place": 4,
@@ -1056,9 +1051,9 @@
         "score": 30.0
       },
       {
-        "place": 8,
+        "place": 9,
         "team": "New Albany",
-        "score": 30.0
+        "score": 29.0
       },
       {
         "place": 10,
@@ -1068,7 +1063,7 @@
       {
         "place": 11,
         "team": "Mt. Vernon",
-        "score": 21.0
+        "score": 19.0
       },
       {
         "place": 12,
@@ -1101,22 +1096,22 @@
         "score": 9.0
       },
       {
-        "place": 17,
-        "team": "North Harrison",
-        "score": 9.0
-      },
-      {
-        "place": 19,
+        "place": 18,
         "team": "Evansville Reitz Memorial",
         "score": 8.0
       },
       {
-        "place": 19,
+        "place": 18,
+        "team": "North Harrison",
+        "score": 8.0
+      },
+      {
+        "place": 18,
         "team": "North Posey",
         "score": 8.0
       },
       {
-        "place": 19,
+        "place": 18,
         "team": "Vincennes Rivet",
         "score": 8.0
       },
@@ -1153,10 +1148,10 @@
       {
         "place": 28,
         "team": "Barr-Reeve",
-        "score": 4.0
+        "score": 3.0
       },
       {
-        "place": 29,
+        "place": 28,
         "team": "Crawford County",
         "score": 3.0
       },
