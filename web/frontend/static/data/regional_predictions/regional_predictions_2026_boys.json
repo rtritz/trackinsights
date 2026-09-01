@@ -157,17 +157,17 @@
       {
         "place": 1,
         "team": "Warsaw Community",
-        "score": 71.0
+        "score": 70.0
       },
       {
         "place": 2,
         "team": "Northridge",
-        "score": 54.0
+        "score": 52.0
       },
       {
         "place": 3,
         "team": "Penn",
-        "score": 53.0
+        "score": 49.0
       },
       {
         "place": 4,
@@ -181,23 +181,33 @@
       },
       {
         "place": 6,
+        "team": "Churubusco",
+        "score": 38.0
+      },
+      {
+        "place": 6,
         "team": "Westview",
         "score": 38.0
       },
       {
-        "place": 7,
+        "place": 8,
         "team": "Angola",
-        "score": 25.0
+        "score": 28.0
       },
       {
-        "place": 7,
+        "place": 9,
         "team": "Manchester",
         "score": 25.0
       },
       {
-        "place": 9,
+        "place": 10,
         "team": "Concord",
-        "score": 23.0
+        "score": 21.0
+      },
+      {
+        "place": 10,
+        "team": "Garrett",
+        "score": 21.0
       },
       {
         "place": 10,
@@ -205,44 +215,34 @@
         "score": 21.0
       },
       {
-        "place": 11,
-        "team": "Garrett",
-        "score": 19.0
-      },
-      {
-        "place": 11,
+        "place": 13,
         "team": "Mishawaka",
         "score": 19.0
       },
       {
-        "place": 13,
-        "team": "Churubusco",
-        "score": 18.0
-      },
-      {
-        "place": 13,
-        "team": "LaVille",
-        "score": 18.0
-      },
-      {
-        "place": 13,
-        "team": "NorthWood",
-        "score": 18.0
-      },
-      {
-        "place": 16,
-        "team": "Wawasee",
-        "score": 17.0
-      },
-      {
-        "place": 17,
+        "place": 14,
         "team": "Goshen",
         "score": 14.0
       },
       {
-        "place": 17,
-        "team": "West Noble",
+        "place": 14,
+        "team": "NorthWood",
         "score": 14.0
+      },
+      {
+        "place": 16,
+        "team": "LaVille",
+        "score": 13.0
+      },
+      {
+        "place": 16,
+        "team": "Wawasee",
+        "score": 13.0
+      },
+      {
+        "place": 18,
+        "team": "West Noble",
+        "score": 12.0
       },
       {
         "place": 19,
@@ -275,32 +275,32 @@
         "score": 7.0
       },
       {
-        "place": 25,
+        "place": 24,
+        "team": "East Noble",
+        "score": 7.0
+      },
+      {
+        "place": 26,
         "team": "Eastside",
         "score": 6.0
       },
       {
-        "place": 25,
-        "team": "Fairfield",
-        "score": 6.0
-      },
-      {
-        "place": 25,
-        "team": "Jimtown",
-        "score": 6.0
-      },
-      {
-        "place": 25,
+        "place": 26,
         "team": "South Bend Adams",
         "score": 6.0
       },
       {
-        "place": 29,
+        "place": 28,
         "team": "Rochester Community",
         "score": 5.0
       },
       {
-        "place": 30,
+        "place": 29,
+        "team": "Jimtown",
+        "score": 4.0
+      },
+      {
+        "place": 29,
         "team": "Triton",
         "score": 4.0
       },
@@ -310,14 +310,9 @@
         "score": 3.0
       },
       {
-        "place": 32,
-        "team": "East Noble",
-        "score": 2.0
-      },
-      {
-        "place": 33,
-        "team": "Glenn",
-        "score": 1.0
+        "place": 31,
+        "team": "Fairfield",
+        "score": 3.0
       }
     ]
   },
@@ -498,23 +493,23 @@
     "rows": [
       {
         "place": 1,
-        "team": "Westfield",
-        "score": 69.0
+        "team": "Fishers",
+        "score": 82.0
       },
       {
         "place": 2,
-        "team": "Hamilton Southeastern",
-        "score": 65.0
+        "team": "Carmel",
+        "score": 74.0
       },
       {
         "place": 3,
-        "team": "Fishers",
-        "score": 64.0
+        "team": "Westfield",
+        "score": 70.0
       },
       {
         "place": 4,
-        "team": "Harrison (West Lafayette)",
-        "score": 63.0
+        "team": "Hamilton Southeastern",
+        "score": 67.0
       },
       {
         "place": 5,
@@ -523,73 +518,68 @@
       },
       {
         "place": 6,
-        "team": "Carmel",
-        "score": 50.0
+        "team": "Harrison (West Lafayette)",
+        "score": 51.0
       },
       {
         "place": 7,
-        "team": "Kokomo",
-        "score": 42.0
-      },
-      {
-        "place": 8,
         "team": "Lebanon",
         "score": 35.0
       },
       {
-        "place": 9,
+        "place": 8,
+        "team": "Kokomo",
+        "score": 28.0
+      },
+      {
+        "place": 8,
         "team": "West Lafayette",
-        "score": 30.0
+        "score": 28.0
       },
       {
         "place": 10,
-        "team": "Logansport",
-        "score": 18.0
+        "team": "Hamilton Heights",
+        "score": 19.0
       },
       {
-        "place": 10,
-        "team": "McCutcheon",
-        "score": 18.0
-      },
-      {
-        "place": 12,
-        "team": "Carroll (Flora)",
-        "score": 15.0
-      },
-      {
-        "place": 12,
+        "place": 11,
         "team": "Guerin Catholic",
         "score": 15.0
       },
       {
-        "place": 14,
-        "team": "Frankfort",
-        "score": 12.0
+        "place": 11,
+        "team": "McCutcheon",
+        "score": 15.0
+      },
+      {
+        "place": 13,
+        "team": "Logansport",
+        "score": 14.0
       },
       {
         "place": 14,
-        "team": "Seeger",
+        "team": "Lapel",
+        "score": 13.0
+      },
+      {
+        "place": 15,
+        "team": "Frankfort",
         "score": 12.0
       },
       {
         "place": 16,
         "team": "Northwestern",
-        "score": 9.0
+        "score": 8.0
       },
       {
-        "place": 17,
-        "team": "Twin Lakes",
+        "place": 16,
+        "team": "Seeger",
         "score": 8.0
       },
       {
         "place": 18,
-        "team": "Lapel",
-        "score": 7.0
-      },
-      {
-        "place": 19,
-        "team": "Faith Christian",
-        "score": 5.0
+        "team": "Carroll (Flora)",
+        "score": 6.0
       },
       {
         "place": 19,
@@ -602,32 +592,22 @@
         "score": 5.0
       },
       {
+        "place": 21,
+        "team": "Twin Lakes",
+        "score": 3.0
+      },
+      {
         "place": 22,
-        "team": "Frontier",
-        "score": 4.0
+        "team": "Faith Christian",
+        "score": 2.0
       },
       {
-        "place": 23,
-        "team": "Hamilton Heights",
-        "score": 3.0
-      },
-      {
-        "place": 23,
-        "team": "Lafayette Jefferson",
-        "score": 3.0
-      },
-      {
-        "place": 23,
-        "team": "Pioneer",
-        "score": 3.0
-      },
-      {
-        "place": 26,
+        "place": 22,
         "team": "Western",
         "score": 2.0
       },
       {
-        "place": 27,
+        "place": 24,
         "team": "Clinton Central",
         "score": 1.0
       }

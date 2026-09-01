@@ -10,4 +10,5 @@ env/
 .vscode/
 .DS_Store
 .claude
+web/backend/scripts/logs/
 
