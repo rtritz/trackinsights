@@ -128,7 +128,17 @@ class Database:
 		self.cursor.execute(query, parameters)
 		self.conn.commit()
 		
+	@staticmethod
+	def _normalize_apostrophes(text):
+		if text is None:
+			return text
+		for fancy in ("‘", "’", "ʼ", "`", "´"):
+			text = text.replace(fancy, "'")
+		return text
+
 	def insert_athlete(self, school_id, first, last, gender):
+		first = self._normalize_apostrophes(first)
+		last = self._normalize_apostrophes(last)
 		query = "INSERT INTO athlete (school_id, first, last, gender) VALUES (?, ?, ?, ?)"
 		parameters = (school_id, first, last, gender)
 		self.cursor.execute(query, parameters)

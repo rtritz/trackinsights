@@ -11,6 +11,14 @@ class Database:
 		self.cursor = self.conn.cursor()
 		self.conn.execute("PRAGMA busy_timeout = 30000")
 
+	@staticmethod
+	def _normalize_apostrophes(text):
+		if text is None:
+			return text
+		for fancy in ("‘", "’", "ʼ", "`", "´"):
+			text = text.replace(fancy, "'")
+		return text
+
 	def _execute_write(self, query, parameters=(), retries=5, delay=0.4):
 		for attempt in range(retries + 1):
 			try:
@@ -194,6 +202,8 @@ class Database:
 			self.conn.commit()
 		
 	def insert_athlete(self, school_id, first, last, gender, grad_year, commit=True):
+		first = self._normalize_apostrophes(first)
+		last = self._normalize_apostrophes(last)
 		query = "INSERT INTO athlete (school_id, first, last, gender, grad_year) VALUES (?, ?, ?, ?, ?)"
 		parameters = (school_id, first, last, gender, grad_year)
 		self._execute_write(query, parameters)
