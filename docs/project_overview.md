@@ -1,45 +1,11 @@
 
 # Project Structure
 
-```
-track_app/
-│
-├── app.py                  # Main entry point that starts the Flask server. Imports and initializes the app from backend/__init__.py.
-├── config.py               # Stores configuration settings such as database path, debug mode, etc.
-│
-├── backend/                # Contains all Flask logic — routes, models, and database queries. Used by the back-end developer.
-│   ├── __init__.py         # Initializes the Flask app, registers blueprints, and connects to the database.
-│   ├── models.py           # Defines SQLAlchemy models (tables such as Athlete, School, etc.).
-│   ├── queries.py          # Reusable database functions (e.g., get_athletes(), add_school()).
-│   ├── routes/             # Organizes all Flask route files for modularity.
-│   │   ├── __init__.py
-│   │   ├── main_routes.py  # Routes that render web pages (e.g., /home, /search).
-│   │   └── api_routes.py   # Routes that serve JSON responses for APIs or AJAX calls.
-│
-├── frontend/               # Contains all user-facing assets — HTML, Tailwind CSS, JS, and images. Used by the front-end developer.
-│   ├── templates/          # Jinja2 HTML templates rendered by Flask.
-│   │   ├── base.html       # Contains template that other pages extend, for example header, footer, navigation, scripts, CSS)
-│   │   ├── home.html       # Home page
-│   │   ├── athlete-search.html # Athlete dashboard
-│   │   └── ...
-│   ├── static/             # Static files served to the browser.
-│   │   ├── css/
-│   │   │   └── styles.css  # Tailwind build output file.
-│   │   ├── js/
-│   │   │   └── main.js     # Custom JavaScript for interactivity.
-│   │   └── images/         # Project images and icons.
-│   └── tailwind.config.js  # Tailwind configuration for custom colors, fonts, and themes.
-│
-├── data/                   # Storage of DB
-│   └── Track.db            # SQLite database file.
-│
-├── tests/                  # Optional folder for test scripts to verify routes, APIs, and models.
-│   └── test_routes.py
-│
-├── requirements.txt        # Lists Python dependencies for easy installation.
-├── README.md               # Project documentation and setup instructions.
-└── .gitignore              # Excludes unnecessary files (e.g., __pycache__, .env, Track.db).
-```
+See the root `CLAUDE.md` for the authoritative, up-to-date project structure
+(the `common/` shared library, `web/` Flask app layout, and `standalone/`
+data-pipeline programs) -- kept here only once to avoid this document
+drifting out of sync with it again.
+
 # Project Roles and Workflow Overview
 
 ## Frontend Developer

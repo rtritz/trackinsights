@@ -1,3 +1,4 @@
+import os
 import re
 import sys
 import logging
@@ -30,9 +31,11 @@ from .models import (
     SchoolEnrollment,
 )
 from . import db
-from .util.conversion_util import Conversion
-from .util.regional_hosts import get_configured_regional_hosts
-from .util.standards_util import meets_state_standard, get_state_standard_display
+from common.conversion import Conversion
+from common.regional_hosts import get_configured_regional_hosts
+from common.standards import meets_state_standard, get_state_standard_display
+from common.const import CONST
+from .analytics.percentiles import get_percentiles as _script_get_percentiles
 
 
 CONVERSION = Conversion()
@@ -43,34 +46,9 @@ SPRINT_DNQ_EVENTS = {
     "110 Hurdles",
 }
 
-SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
-if SCRIPTS_DIR.is_dir():
-    scripts_path = str(SCRIPTS_DIR)
-    if scripts_path not in sys.path:
-        sys.path.insert(0, scripts_path)
-
-try:  # pragma: no-cover
-    from percentiles import get_percentiles as _script_get_percentiles  # type: ignore
-    from util.const_util import CONST  # type: ignore
-except Exception as exc:  # pragma: no-cover
-    _script_get_percentiles = None
-    _SCRIPT_IMPORT_ERROR = exc
-else:
-    _SCRIPT_IMPORT_ERROR = None
-
 DEFAULT_PERCENTILES = (25, 50, 75)
 PERCENTILE_CHOICES = (10, 25, 50, 75, 90, 95)
 GRADE_LEVELS = ("FR", "SO", "JR", "SR")
-
-
-def _require_percentile_script():
-    if _script_get_percentiles is None:
-        message = (
-            "The percentiles script could not be imported. "
-            "See the original exception for details: "
-            f"{_SCRIPT_IMPORT_ERROR!r}"
-        )
-        raise RuntimeError(message)
 
 
 def _unique_events():
@@ -106,7 +84,6 @@ def _available_meet_years(limit: int = 30):
 
 
 def get_percentile_options():
-    _require_percentile_script()
     return {
         "events": _unique_events(),
         "genders": list(getattr(CONST.GENDER, "ALL", [])),
@@ -146,8 +123,6 @@ def get_percentiles_report(
     meet_types=None,
     grade_levels=None,
 ):
-    _require_percentile_script()
-
     kwargs = {
         "events": _tuple_or_none(_coerce_sequence(events or [], str)),
         "genders": _tuple_or_none(_coerce_sequence(genders or [], str)),
@@ -446,12 +421,7 @@ def get_athlete_dashboard_data(athlete_id: int):
     playoff_history = _build_playoff_history(athlete_id)
     personal_bests = get_athlete_personal_bests(athlete_id, athlete_obj=athlete)
 
-    # Look up school logo from School_Logos.db
-    school_logo_url = None
-    if athlete.school:
-        logo_path = _get_school_logo_path(athlete.school.school_name)
-        if logo_path:
-            school_logo_url = "/static/" + logo_path.removeprefix("frontend/static/")
+    school_logo_url = _school_logo_url(athlete.school) if athlete.school else None
 
     return {
         "athlete": {
@@ -2195,6 +2165,15 @@ def get_hypothetical_result_rankings(
         return None
 
     event_type = event.event_type
+
+    # A pure-alpha token (e.g. "DNF", "NT") isn't a real performance to rank
+    # against -- Conversion maps these to a sentinel value (9999s / 0in)
+    # rather than raising, so reject them here explicitly instead of
+    # nonsensically ranking the user's hypothetical entry against "9999
+    # seconds" or "0 inches".
+    if isinstance(performance_input, str) and performance_input.strip().isalpha():
+        return None
+
     try:
         normalized_value = _normalize_performance_input(performance_input, event_type)
     except (ValueError, TypeError):
@@ -2374,27 +2353,45 @@ def get_hypothetical_result_rankings(
 
 # Points awarded by place for cumulative scoring
 _PLACE_POINTS = {1: 10, 2: 8, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1}
+# State Finals score the top 9 places (3rd=7, not 6th) -- see
+# web/backend/scripts/calculate_team_scores.py's STATE_SCORING, verified
+# against MileSplit's official state team totals.
+_STATE_PLACE_POINTS = {1: 10, 2: 8, 3: 7, 4: 6, 5: 5, 6: 4, 7: 3, 8: 2, 9: 1}
 
 MIN_RECORDS_YEAR = 2023
 
-_SCHOOLS_DB_PATH = str(Path(__file__).resolve().parent.parent / "data" / "School_Logos.db")
+
+_SCHOOL_LOGO_DIR = os.path.join(CONST.WEB_DIR, "frontend", "static", CONST.SCHOOL_LOGO_STATIC_SUBDIR)
 
 
-def _get_school_logo_path(school_name: str) -> Optional[str]:
-    """Look up the local logo path for a school from School_Logos.db."""
-    import sqlite3
-    try:
-        conn = sqlite3.connect(_SCHOOLS_DB_PATH)
-        row = conn.execute(
-            "SELECT logo_path FROM school_logo WHERE school_name = ? AND has_logo = 1",
-            (school_name,),
-        ).fetchone()
-        conn.close()
-        if row and row[0]:
-            return row[0]
-    except Exception:
-        pass
-    return None
+@lru_cache(maxsize=1)
+def _schools_with_logos() -> frozenset:
+    """school_ids that have a logo file on disk, cached for the process
+    lifetime -- this directory only changes when standalone/notebooks/Load
+    Schools in DB.ipynb is re-run, which happens far less often than a
+    request comes in.
+    """
+    if not os.path.isdir(_SCHOOL_LOGO_DIR):
+        return frozenset()
+    ext_suffix = f".{CONST.SCHOOL_LOGO_EXT}"
+    return frozenset(
+        int(stem)
+        for stem, ext in (os.path.splitext(name) for name in os.listdir(_SCHOOL_LOGO_DIR))
+        if ext == ext_suffix and stem.isdigit()
+    )
+
+
+def _school_logo_url(school) -> Optional[str]:
+    """Build the served URL for a school's logo, or None if it has none.
+
+    Every logo is converted to a single canonical format/size (common/logo.py),
+    so a file's existence at frontend/static/<CONST.SCHOOL_LOGO_STATIC_SUBDIR>/
+    <school_id>.<CONST.SCHOOL_LOGO_EXT> IS the "has a logo" signal -- no DB
+    column needed.
+    """
+    if not school or school.school_id not in _schools_with_logos():
+        return None
+    return f"/static/{CONST.SCHOOL_LOGO_STATIC_SUBDIR}/{school.school_id}.{CONST.SCHOOL_LOGO_EXT}"
 
 
 def get_school_dashboard_data(school_id: int):
@@ -2416,13 +2413,7 @@ def get_school_dashboard_data(school_id: int):
         latest_enrollment = sorted_enrollments[0].enrollment
         enrollment_year = sorted_enrollments[0].year
 
-    # Look up logo from the separate School_Logos.db
-    logo_path = _get_school_logo_path(school.school_name)
-    # logo_path is stored as "frontend/static/images/…"; Flask serves from
-    # frontend/static so we strip that prefix for the URL.
-    logo_url = None
-    if logo_path:
-        logo_url = "/static/" + logo_path.removeprefix("frontend/static/")
+    logo_url = _school_logo_url(school)
 
     school_info = {
         "id": school.school_id,
@@ -2600,10 +2591,13 @@ def _compute_cumulative_points(school_id: int):
     """
 
     # First, get ALL schools' points for ranking purposes
-    # Include meet_id to differentiate between different sectionals/regionals
+    # Include meet_id and event so ties WITHIN an event can be detected and
+    # split fractionally -- two different events both having a "3rd place"
+    # at the same meet are not a tie with each other.
     all_individual_rows = (
         db.session.query(
             Athlete.school_id,
+            AthleteResult.event,
             Meet.meet_id,
             Meet.year,
             Meet.gender,
@@ -2616,7 +2610,7 @@ def _compute_cumulative_points(school_id: int):
             AthleteResult.result_type == "Final",
             AthleteResult.place.isnot(None),
             AthleteResult.place > 0,
-            AthleteResult.place <= 8,
+            AthleteResult.place <= 9,
             Meet.year >= MIN_RECORDS_YEAR,
             Meet.meet_type.in_(("Sectional", "Regional", "State")),
         )
@@ -2626,6 +2620,7 @@ def _compute_cumulative_points(school_id: int):
     all_relay_rows = (
         db.session.query(
             RelayResult.school_id,
+            RelayResult.event,
             Meet.meet_id,
             Meet.year,
             Meet.gender,
@@ -2636,27 +2631,53 @@ def _compute_cumulative_points(school_id: int):
         .filter(
             RelayResult.place.isnot(None),
             RelayResult.place > 0,
-            RelayResult.place <= 8,
+            RelayResult.place <= 9,
             Meet.year >= MIN_RECORDS_YEAR,
             Meet.meet_type.in_(("Sectional", "Regional", "State")),
         )
         .all()
     )
 
-    # Build {meet_id: {school_id: {"points": int, "places": [int]}}}
-    # Also track meet metadata: {meet_id: (year, gender, meet_type)}
-    meet_school_stats = {}
+    # Group into {(meet_id, event): [(school_id, place), ...]} for tie
+    # detection, and separately track each school's raw per-meet place list
+    # (for avg_place/entries display -- unaffected by point tie-splitting).
+    event_groups = {}
     meet_metadata = {}
+    school_places_by_meet = {}
     for rows in (all_individual_rows, all_relay_rows):
-        for sid, meet_id, year, gender, meet_type, place in rows:
-            pts = _PLACE_POINTS.get(place, 0)
-            if meet_id not in meet_school_stats:
-                meet_school_stats[meet_id] = {}
-                meet_metadata[meet_id] = (year, gender, meet_type)
-            if sid not in meet_school_stats[meet_id]:
-                meet_school_stats[meet_id][sid] = {"points": 0, "places": []}
-            meet_school_stats[meet_id][sid]["points"] += pts
-            meet_school_stats[meet_id][sid]["places"].append(place)
+        for sid, event, meet_id, year, gender, meet_type, place in rows:
+            meet_metadata.setdefault(meet_id, (year, gender, meet_type))
+            event_groups.setdefault((meet_id, event), []).append((sid, place))
+            school_places_by_meet.setdefault(meet_id, {}).setdefault(sid, []).append(place)
+
+    # Build {meet_id: {school_id: {"points": float, "places": [int]}}},
+    # awarding points per event using each event's actual recorded place
+    # (not each row's sequential position), splitting a tie's combined
+    # scoring-slot value evenly across the tied schools -- mirrors
+    # web/backend/scripts/calculate_team_scores.py's get_points().
+    meet_school_stats = {}
+
+    def _stats_entry(meet_id, sid):
+        return meet_school_stats.setdefault(meet_id, {}).setdefault(sid, {"points": 0, "places": []})
+
+    for (meet_id, event), school_places in event_groups.items():
+        _, _, meet_type = meet_metadata[meet_id]
+        points_table = _STATE_PLACE_POINTS if meet_type == "State" else _PLACE_POINTS
+
+        by_place = {}
+        for sid, place in school_places:
+            by_place.setdefault(place, []).append(sid)
+
+        for actual_place, tied_schools in by_place.items():
+            tie_size = len(tied_schools)
+            scoring_slots = [p for p in range(actual_place, actual_place + tie_size) if p in points_table]
+            pts_value = (sum(points_table[p] for p in scoring_slots) / tie_size) if scoring_slots else 0
+            for sid in tied_schools:
+                _stats_entry(meet_id, sid)["points"] += pts_value
+
+    for meet_id, by_school in school_places_by_meet.items():
+        for sid, places in by_school.items():
+            _stats_entry(meet_id, sid)["places"] = places
 
     # Compute rankings for each meet
     # {meet_id: {school_id: {"rank": int, "total_teams": int}}}
@@ -2686,9 +2707,17 @@ def _compute_cumulative_points(school_id: int):
     for sid, mid in all_competing_indiv + all_competing_relay:
         meet_total_schools.setdefault(mid, set()).add(sid)
 
+    # Alphabetical-by-school-name secondary sort for equal-points ties --
+    # standardizes on the tiebreak convention already used by the
+    # regional/state/projected-team-scores prediction scripts.
+    school_names = dict(db.session.query(School.school_id, School.school_name).all())
+
     meet_rankings = {}
     for meet_id, schools_data in meet_school_stats.items():
-        sorted_schools = sorted(schools_data.items(), key=lambda x: -x[1]["points"])
+        sorted_schools = sorted(
+            schools_data.items(),
+            key=lambda x: (-x[1]["points"], school_names.get(x[0], "")),
+        )
         total = len(meet_total_schools.get(meet_id, set()) | set(schools_data.keys()))
         rankings = {}
         for rank, (sid, _) in enumerate(sorted_schools, start=1):

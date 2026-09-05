@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trackinsights-common"
+version = "0.1.0"
+description = "Shared library for the Track Insights web app and standalone data-processing programs."
+requires-python = ">=3.10"
+dependencies = [
+    "pandas",
+]
+
+[project.optional-dependencies]
+web = [
+    "Flask",
+    "Flask-SQLAlchemy",
+    "Flask-Migrate",
+]
+standalone = [
+    "requests",
+    "beautifulsoup4",
+    "fuzzywuzzy",
+    "python-Levenshtein",
+    "matplotlib",
+    "seaborn",
+    "jupyter",
+    "ipykernel",
+    "Pillow",
+    "svglib",
+    "reportlab",
+    "rlPyCairo",
+]
+dev = [
+    "pytest",
+]
+
+[tool.setuptools]
+packages = ["common"]
