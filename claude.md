@@ -8,51 +8,78 @@ Track Insights is an Indiana high school track and field data analysis web appli
 - **Database**: SQLite (`web/data/Track.db`)
 - **Frontend**: Jinja2 templates, Tailwind CSS, DaisyUI components
 - **Testing**: pytest
-- **Data Processing**: pandas (Jupyter notebooks in `jupyter/`)
+- **Data Processing**: pandas, notebooks and standalone scripts in `standalone/`
 
 ## Project Structure
 ```
 trackinsights/
-├── web/                          # Main web application
+├── pyproject.toml                # Defines the `common` package + optional dependency groups (web/standalone/dev)
+├── common/                       # THE shared library -- used by both web/ and standalone/. One canonical
+│   │                              copy of Database, Conversion, CONST, etc. No per-area duplicates of these.
+│   ├── db.py                     # Database class (sqlite3 + pandas wrapper)
+│   ├── conversion.py             # Conversion class (time/distance <-> string parsing)
+│   ├── const.py                  # CONST (event/gender/meet-type constants, DB_PATH)
+│   ├── regional_hosts.py         # Manual regional host mappings
+│   └── standards.py              # State-qualifying standard marks by year
+│
+├── web/                          # Flask app. Run with `cd web && python app.py` (repo-root venv)
 │   ├── app.py                    # Entry point - creates Flask app
 │   ├── config.py                 # Configuration (DB path, secrets)
 │   ├── backend/
 │   │   ├── __init__.py           # Flask app factory (create_app)
 │   │   ├── models.py             # SQLAlchemy models
-│   │   ├── queries.py            # Database query functions (3000+ lines)
+│   │   ├── queries.py            # Database query functions (imports from `common`)
 │   │   ├── routes/
 │   │   │   ├── main_routes.py    # Page rendering routes
 │   │   │   └── api_routes.py     # JSON API endpoints (/api/*)
-│   │   ├── scripts/              # Standalone scripts (percentiles, etc.)
-│   │   └── util/                 # Utilities (conversion_util, db_util)
+│   │   ├── analytics/            # Engines imported live by queries.py/routes at request time
+│   │   │   ├── percentiles.py
+│   │   │   ├── regional_predictions.py
+│   │   │   ├── state_predictions.py
+│   │   │   ├── projected_team_scores.py
+│   │   │   └── examples/         # Runnable demo scripts (not pytest, not part of the request path)
+│   │   ├── jobs/                 # Batch/precompute scripts -- run periodically, not per-request
+│   │   │   └── precompute_*.py   # Regenerate the static JSON under frontend/static/data/
+│   │   └── videos.py
 │   ├── frontend/
 │   │   ├── templates/            # Jinja2 HTML templates
 │   │   │   ├── base.html         # Base template (nav, footer, scripts)
 │   │   │   ├── home.html         # Homepage
 │   │   │   ├── athlete-*.html    # Athlete-related pages
-│   │   │   ├── school-*.html     # School-related pages
+│   │   │   ├── school-dashboard.html
 │   │   │   └── insights/         # Insights pages (queries & reports)
 │   │   ├── static/
 │   │   │   ├── css/output.css    # Tailwind compiled CSS
 │   │   │   ├── js/main.js        # Client-side JavaScript
 │   │   │   └── images/           # Logos, backgrounds, icons
 │   │   └── tailwind.config.js
-│   └── data/Track.db             # SQLite database
-├── jupyter/                      # Jupyter notebooks for data analysis
+│   └── data/                     # Track.db (tracked in git -- deployment pulls it directly)
+│
+├── standalone/                   # Programs that are NOT part of the web app -- data pipeline / maintenance tools
+│   ├── notebooks/                # Jupyter notebooks (scraping, merging, one-off analysis)
+│   │   └── Load Schools in DB.ipynb  # Yearly: load schools/enrollment from an IHSAA CSV, then
+│   │                                  # scrape logos (myIHSAA) and geocode addresses (US Census)
+│   │                                  # for any school missing one, each in its own cell
+│   ├── scripts/                  # Plain .py standalone programs (calculate_team_scores.py, etc.)
+│   └── reports/                  # Generated report notebooks + their output PDFs/TSVs
+│
 └── docs/                         # Project documentation
 ```
+
+## `common/` -- the one shared library
+`common/` is a real installable package (`pip install -e ".[web,standalone,dev]"` once per environment/venv). The Flask app, notebooks, and standalone scripts all import from it the same way, regardless of their own location or working directory -- e.g. `from common.db import Database`, `from common.const import CONST`. **Do not create a new per-area copy of Database/Conversion/CONST/etc.** -- if a standalone script or a web route needs a new shared helper, add it to `common/` so both sides use the same implementation.
 
 ## Database Models (web/backend/models.py)
 Key entities:
 - **Athlete**: `athlete_id`, `first`, `last`, `school_id`, `gender`, `graduation_year` (mapped as `grad_year`)
-- **School**: `school_id`, `school_name`, `team_name`, `city`, `zip`, etc.
+- **School**: `school_id`, `school_name`, `team_name`, `city`, `zip`, `logo_path` (relative path under `frontend/static/`, `None` if no logo), etc.
 - **AthleteResult**: Composite PK (`athlete_id`, `meet_id`, `event`, `result_type`), `result`, `result2` (float), `place`, `grade`
 - **Meet**: `meet_id`, `meet_type` (Sectional/Regional/State), `gender`, `year`, `host`, `meet_num`
 - **Event**: `event` (PK), `event_type`
 - **RelayResult**: School relay results
 - **SchoolEnrollment**: School enrollment data by year
 
-## Important Constants (web/backend/scripts/util/const_util.py)
+## Important Constants (common/const.py)
 ```python
 CONST.GENDER.ALL = ["Boys", "Girls"]
 CONST.MEET_TYPE.ALL = ["Sectional", "Regional", "State"]
@@ -62,6 +89,7 @@ CONST.EVENT.ALL_FIELD = ["High Jump", "Long Jump", "Shot Put", "Discus", "Pole V
 CONST.EVENT.ALL_RELAY = ["4 x 100 Relay", "4 x 400 Relay", "4 x 800 Relay"]
 CONST.EVENT.ALL_GIRLS_HURDLES = ["100 Hurdles", "300 Hurdles"]
 CONST.EVENT.ALL_BOYS_HURDLES = ["110 Hurdles", "300 Hurdles"]
+CONST.DB_PATH  # absolute, cwd-independent path to web/data/Track.db
 ```
 
 ## Route Patterns
@@ -96,6 +124,7 @@ CONST.EVENT.ALL_BOYS_HURDLES = ["110 Hurdles", "300 Hurdles"]
 - Query functions go in `queries.py`, return dicts or model instances
 - Use `@lru_cache` for expensive computations that don't change often
 - Import db from backend: `from . import db` or `from backend import db`
+- Shared, non-web-specific logic (DB access, unit conversion, constants) belongs in `common/`, imported as `from common.<module> import <name>` -- never re-implemented locally
 
 ### API Response Format
 ```python
@@ -131,27 +160,31 @@ return jsonify({'error': 'message'}), 400
 
 ## Utility Functions
 
-### Time/Distance Conversion (web/backend/util/conversion_util.py)
+### Time/Distance Conversion (common/conversion.py)
 ```python
-from backend.util.conversion_util import Conversion
+from common.conversion import Conversion
 CONVERSION = Conversion()
 seconds = CONVERSION.time_to_seconds("1:52.34")  # 112.34
 inches = CONVERSION.distance_to_inches("5'11\"")  # 71.0
 ```
+Handles hand-timed marks with a trailing "h" (`"23.5h"`) and non-numeric sentinel tokens (`"NT"`, `"DNF"`, `"DNS"`, `"DQ"`, ...), mapping them to `9999` seconds / `0` inches rather than raising -- this matches the sentinel convention already written into `result2` by the scraping pipeline.
 
-### Database Helper (web/backend/util/db_util.py)
+### Database Helper (common/db.py)
 ```python
-from backend.util.db_util import Database
-db = Database("data/Track.db")
+from common.db import Database
+from common.const import CONST
+db = Database(CONST.DB_PATH)
 event_type = db.get_event_type("100 Meters")  # "Track"
 ```
 
 ## Running the Application
+One virtual environment at the repo root covers both the web app and standalone/ work:
 ```bash
-cd web
 python -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-pip install -r requirements.txt
+.venv\Scripts\activate      # or source .venv/bin/activate on macOS/Linux
+pip install -e ".[web,standalone,dev]"
+
+cd web
 python app.py
 # Visit http://localhost:5000
 ```
@@ -162,6 +195,7 @@ python app.py
 3. **Grade levels**: FR, SO, JR, SR (Freshman, Sophomore, Junior, Senior)
 4. **School enrollment**: Used for "like schools" comparisons (within 25% enrollment size)
 5. **Meet types progression**: Sectional → Regional → State
+6. **Team scoring**: Sectional/Regional score the top 8 places (10-8-6-5-4-3-2-1); State scores the top 9 (10-8-7-6-5-4-3-2-1). Ties split the combined value of the scoring slots they occupy evenly across the tied schools/athletes -- see `web/backend/queries.py::_compute_cumulative_points` and `standalone/scripts/calculate_team_scores.py::get_points` for the canonical implementation of this logic.
 
 ## Common Query Patterns
 ```python
@@ -180,5 +214,5 @@ results = search_bar(query)  # Returns list of dicts with type, id, name
 
 ## File Naming Conventions
 - Templates: kebab-case (`athlete-dashboard.html`, `athlete-result-detail.html`)
-- Python modules: snake_case (`api_routes.py`, `conversion_util.py`)
+- Python modules: snake_case (`api_routes.py`, `conversion.py`)
 - CSS/JS: kebab-case for files, camelCase for JS functions

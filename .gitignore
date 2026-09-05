@@ -10,5 +10,14 @@ env/
 .vscode/
 .DS_Store
 .claude
-web/backend/scripts/logs/
+web/backend/jobs/logs/
+standalone/scripts/logs/
+*.egg-info/
+build/
+
+# Track.db itself IS tracked (deployment pulls it directly from GitHub) --
+# only these ad hoc local backup/archive snapshots are excluded, since git's
+# own history of Track.db already provides point-in-time recovery.
+web/data/Track_backup_*.db
+web/data/Track_archive.db
 

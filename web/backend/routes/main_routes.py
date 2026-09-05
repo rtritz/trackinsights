@@ -5,12 +5,10 @@ from . import main_bp
 from ..queries import get_athletes
 from ..models import Athlete, School
 from ..videos import INTERVIEW_VIDEOS
-from ..util.regional_hosts import get_configured_regional_hosts
+from common.regional_hosts import get_configured_regional_hosts
 from sqlalchemy.orm import joinedload
 
-# regional_predictions lives under backend/scripts; queries.py already adds
-# that directory to sys.path, so this import resolves at app boot.
-from regional_predictions import get_regional_predictions  # type: ignore  # noqa: E402
+from ..analytics.regional_predictions import get_regional_predictions
 
 # Master switch for the 2025 accuracy-check report. When False, the card on the
 # /insights page is hidden and the URL returns a 404. Flip to False before

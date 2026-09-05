@@ -1,22 +1,41 @@
-# Track Insights (template)
+# Track Insights
 
-This repository contains a template project structure for a Flask app with a simple frontend and a SQLite database.
+An Indiana high school track & field data analysis app: athlete/school dashboards, result comparisons, percentile rankings, and meet-projection tools, built on a SQLite database of meet results.
 
-Run locally
+## Repository layout
 
-1. Create and activate a virtual environment
+- **`common/`** -- the shared library (database access, unit conversion, constants) used by both the web app and the standalone programs. See `CLAUDE.md` for details.
+- **`web/`** -- the Flask web application.
+- **`standalone/`** -- data-pipeline and maintenance programs that are *not* part of the web app: scraping notebooks, one-off scripts, generated reports.
+- **`docs/`** -- project documentation.
 
-   python -m venv venv; .\venv\Scripts\Activate.ps1
+## Setup
 
-2. Install dependencies
+One virtual environment at the repo root covers everything (the web app, notebooks, and standalone scripts):
 
-   pip install -r requirements.txt
+```bash
+python -m venv .venv
+.venv\Scripts\activate      # or source .venv/bin/activate on macOS/Linux
+pip install -e ".[web,standalone,dev]"
+```
 
-3. Run
+## Running the web app
 
-   python app.py
+```bash
+cd web
+python app.py
+# Visit http://localhost:5000
+```
 
-Notes
+`web/data/Track.db` is tracked in git (the deployed site pulls it directly from GitHub), so it's already present and populated -- no separate DB setup step is needed.
 
-- The `data/Track.db` file is included as an empty DB file.
-- Frontend templates live under `frontend/templates` and static assets under `frontend/static`.
+## Working with `standalone/`
+
+- `standalone/notebooks/` -- open with Jupyter/VS Code once the venv above is set up and selected as the kernel.
+- `standalone/scripts/` -- run directly, e.g. `python standalone/scripts/calculate_team_scores.py`.
+
+Both import shared code the same way the web app does: `from common.db import Database`, `from common.const import CONST`, etc.
+
+## More detail
+
+See `CLAUDE.md` for the full project structure, database schema, coding conventions, and route reference.

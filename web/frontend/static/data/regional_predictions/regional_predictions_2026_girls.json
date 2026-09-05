@@ -6,12 +6,12 @@
       {
         "place": 1,
         "team": "Merrillville",
-        "score": 112.0
+        "score": 114.5
       },
       {
         "place": 2,
         "team": "Valparaiso",
-        "score": 93.0
+        "score": 95.0
       },
       {
         "place": 3,
@@ -21,17 +21,17 @@
       {
         "place": 4,
         "team": "Crown Point",
-        "score": 60.0
+        "score": 59.5
       },
       {
         "place": 5,
         "team": "Chesterton",
-        "score": 52.0
+        "score": 51.0
       },
       {
         "place": 6,
         "team": "Kankakee Valley",
-        "score": 32.0
+        "score": 31.0
       },
       {
         "place": 7,
@@ -50,13 +50,13 @@
       },
       {
         "place": 10,
-        "team": "DeMotte Christian",
+        "team": "Illiana Christian",
         "score": 19.0
       },
       {
-        "place": 10,
-        "team": "Illiana Christian",
-        "score": 19.0
+        "place": 11,
+        "team": "DeMotte Christian",
+        "score": 17.0
       },
       {
         "place": 12,
@@ -69,13 +69,13 @@
         "score": 10.0
       },
       {
-        "place": 14,
-        "team": "Morgan Township",
-        "score": 9.0
+        "place": 13,
+        "team": "Washington Township",
+        "score": 10.0
       },
       {
-        "place": 14,
-        "team": "Washington Township",
+        "place": 15,
+        "team": "Morgan Township",
         "score": 9.0
       },
       {
@@ -106,7 +106,7 @@
       {
         "place": 21,
         "team": "North Newton",
-        "score": 3.0
+        "score": 2.0
       },
       {
         "place": 22,
@@ -122,7 +122,7 @@
       {
         "place": 1,
         "team": "Penn",
-        "score": 62.0
+        "score": 64.75
       },
       {
         "place": 2,
@@ -137,17 +137,17 @@
       {
         "place": 4,
         "team": "Goshen",
-        "score": 43.0
+        "score": 43.5
       },
       {
         "place": 5,
-        "team": "Elkhart",
-        "score": 39.0
+        "team": "East Noble",
+        "score": 38.0
       },
       {
         "place": 6,
-        "team": "East Noble",
-        "score": 38.0
+        "team": "Elkhart",
+        "score": 36.0
       },
       {
         "place": 7,
@@ -157,7 +157,7 @@
       {
         "place": 8,
         "team": "South Bend Adams",
-        "score": 27.0
+        "score": 27.5
       },
       {
         "place": 9,
@@ -185,54 +185,54 @@
         "score": 18.0
       },
       {
-        "place": 13,
+        "place": 14,
         "team": "South Bend Saint Joseph",
-        "score": 18.0
-      },
-      {
-        "place": 15,
-        "team": "Bremen",
-        "score": 16.0
+        "score": 17.5
       },
       {
         "place": 15,
         "team": "Fremont",
+        "score": 16.25
+      },
+      {
+        "place": 16,
+        "team": "Bremen",
         "score": 16.0
       },
       {
         "place": 17,
+        "team": "West Noble",
+        "score": 14.5
+      },
+      {
+        "place": 18,
         "team": "Tippecanoe Valley",
         "score": 14.0
       },
       {
-        "place": 18,
+        "place": 19,
         "team": "Angola",
-        "score": 13.0
+        "score": 12.0
       },
       {
-        "place": 18,
-        "team": "Culver Academies",
-        "score": 13.0
-      },
-      {
-        "place": 18,
-        "team": "West Noble",
-        "score": 13.0
-      },
-      {
-        "place": 21,
+        "place": 19,
         "team": "NorthWood",
         "score": 12.0
       },
       {
-        "place": 22,
+        "place": 21,
         "team": "Churubusco",
-        "score": 10.0
+        "score": 11.0
       },
       {
         "place": 22,
+        "team": "Culver Academies",
+        "score": 10.5
+      },
+      {
+        "place": 23,
         "team": "Lakeland",
-        "score": 10.0
+        "score": 9.75
       },
       {
         "place": 24,
@@ -286,17 +286,17 @@
       },
       {
         "place": 34,
+        "team": "North Miami",
+        "score": 2.75
+      },
+      {
+        "place": 35,
         "team": "Central Noble",
         "score": 2.0
       },
       {
-        "place": 34,
+        "place": 35,
         "team": "Glenn",
-        "score": 2.0
-      },
-      {
-        "place": 34,
-        "team": "North Miami",
         "score": 2.0
       }
     ]
@@ -308,7 +308,7 @@
       {
         "place": 1,
         "team": "Carroll (Fort Wayne)",
-        "score": 82.0
+        "score": 78.17
       },
       {
         "place": 2,
@@ -318,7 +318,7 @@
       {
         "place": 3,
         "team": "Fort Wayne Concordia Lutheran",
-        "score": 70.0
+        "score": 69.67
       },
       {
         "place": 4,
@@ -328,17 +328,17 @@
       {
         "place": 5,
         "team": "Homestead",
-        "score": 55.0
+        "score": 54.92
       },
       {
         "place": 6,
         "team": "Delta",
-        "score": 45.0
+        "score": 42.67
       },
       {
         "place": 7,
         "team": "Fort Wayne Bishop Dwenger",
-        "score": 43.0
+        "score": 42.5
       },
       {
         "place": 8,
@@ -356,34 +356,34 @@
         "score": 19.0
       },
       {
-        "place": 11,
+        "place": 10,
         "team": "Leo",
-        "score": 18.0
+        "score": 19.0
       },
       {
         "place": 12,
+        "team": "Norwell",
+        "score": 13.67
+      },
+      {
+        "place": 13,
         "team": "Fort Wayne Snider",
         "score": 12.0
       },
       {
-        "place": 13,
-        "team": "Bluffton",
-        "score": 11.0
-      },
-      {
-        "place": 13,
-        "team": "Norwell",
-        "score": 11.0
-      },
-      {
-        "place": 15,
+        "place": 14,
         "team": "Fort Wayne South Side",
         "score": 10.0
       },
       {
         "place": 15,
         "team": "Jay County",
-        "score": 10.0
+        "score": 9.5
+      },
+      {
+        "place": 16,
+        "team": "Bluffton",
+        "score": 9.0
       },
       {
         "place": 17,
@@ -392,58 +392,63 @@
       },
       {
         "place": 18,
-        "team": "Huntington North",
-        "score": 6.0
+        "team": "Oak Hill",
+        "score": 6.25
       },
       {
-        "place": 18,
-        "team": "Oak Hill",
+        "place": 19,
+        "team": "Huntington North",
         "score": 6.0
       },
       {
         "place": 20,
         "team": "Marion",
-        "score": 4.0
+        "score": 5.67
       },
       {
-        "place": 20,
+        "place": 21,
+        "team": "Woodlan",
+        "score": 5.0
+      },
+      {
+        "place": 22,
         "team": "Southern Wells",
         "score": 4.0
       },
       {
-        "place": 22,
-        "team": "Woodlan",
-        "score": 3.0
-      },
-      {
-        "place": 23,
-        "team": "Muncie Burris",
-        "score": 2.0
-      },
-      {
         "place": 23,
         "team": "Northfield",
-        "score": 2.0
+        "score": 2.5
       },
       {
-        "place": 25,
-        "team": "Bellmont",
-        "score": 1.0
-      },
-      {
-        "place": 25,
-        "team": "Fort Wayne Wayne",
-        "score": 1.0
+        "place": 24,
+        "team": "Muncie Burris",
+        "score": 2.25
       },
       {
         "place": 25,
         "team": "Madison-Grant",
+        "score": 2.0
+      },
+      {
+        "place": 26,
+        "team": "Bellmont",
         "score": 1.0
       },
       {
-        "place": 25,
+        "place": 26,
+        "team": "Fort Wayne Wayne",
+        "score": 1.0
+      },
+      {
+        "place": 26,
         "team": "Randolph Southern",
         "score": 1.0
+      },
+      {
+        "place": 29,
+        "team": "Winchester Community",
+        "score": 0.25
       }
     ]
   },
@@ -454,17 +459,17 @@
       {
         "place": 1,
         "team": "Carmel",
-        "score": 104.0
+        "score": 103.0
       },
       {
         "place": 2,
         "team": "Hamilton Southeastern",
-        "score": 76.0
+        "score": 77.0
       },
       {
         "place": 3,
         "team": "Westfield",
-        "score": 65.0
+        "score": 67.0
       },
       {
         "place": 4,
@@ -479,17 +484,17 @@
       {
         "place": 6,
         "team": "Fishers",
-        "score": 49.0
+        "score": 48.33
       },
       {
         "place": 7,
         "team": "Hamilton Heights",
-        "score": 47.0
+        "score": 45.0
       },
       {
         "place": 8,
         "team": "Guerin Catholic",
-        "score": 30.0
+        "score": 29.5
       },
       {
         "place": 9,
@@ -504,16 +509,16 @@
       {
         "place": 11,
         "team": "Northwestern",
-        "score": 18.0
-      },
-      {
-        "place": 12,
-        "team": "Lewis Cass",
-        "score": 14.0
+        "score": 18.33
       },
       {
         "place": 12,
         "team": "West Lafayette",
+        "score": 14.5
+      },
+      {
+        "place": 13,
+        "team": "Lewis Cass",
         "score": 14.0
       },
       {
@@ -543,18 +548,18 @@
       },
       {
         "place": 18,
-        "team": "Lafayette Central Catholic",
-        "score": 4.0
-      },
-      {
-        "place": 18,
         "team": "North Montgomery",
         "score": 4.0
       },
       {
-        "place": 21,
+        "place": 20,
+        "team": "Lafayette Central Catholic",
+        "score": 3.5
+      },
+      {
+        "place": 20,
         "team": "Tri-County",
-        "score": 3.0
+        "score": 3.5
       },
       {
         "place": 22,
@@ -565,6 +570,11 @@
         "place": 22,
         "team": "McCutcheon",
         "score": 1.0
+      },
+      {
+        "place": 24,
+        "team": "Frontier",
+        "score": 0.33
       }
     ]
   },
@@ -575,17 +585,17 @@
       {
         "place": 1,
         "team": "Brownsburg",
-        "score": 103.0
+        "score": 102.0
       },
       {
         "place": 2,
         "team": "Whiteland Community",
-        "score": 79.0
+        "score": 79.5
       },
       {
         "place": 3,
         "team": "Zionsville",
-        "score": 52.0
+        "score": 53.0
       },
       {
         "place": 4,
@@ -594,13 +604,13 @@
       },
       {
         "place": 5,
-        "team": "Avon",
+        "team": "Pike",
         "score": 44.0
       },
       {
-        "place": 5,
-        "team": "Pike",
-        "score": 44.0
+        "place": 6,
+        "team": "Avon",
+        "score": 42.33
       },
       {
         "place": 7,
@@ -615,12 +625,12 @@
       {
         "place": 9,
         "team": "Franklin Community",
-        "score": 27.0
+        "score": 27.83
       },
       {
         "place": 10,
         "team": "Terre Haute North Vigo",
-        "score": 19.0
+        "score": 19.5
       },
       {
         "place": 11,
@@ -630,17 +640,12 @@
       {
         "place": 12,
         "team": "Monrovia",
-        "score": 14.0
+        "score": 15.33
       },
       {
         "place": 13,
         "team": "Northview",
-        "score": 13.0
-      },
-      {
-        "place": 14,
-        "team": "Indianapolis Crispus Attucks",
-        "score": 11.0
+        "score": 13.5
       },
       {
         "place": 14,
@@ -648,12 +653,17 @@
         "score": 11.0
       },
       {
-        "place": 16,
+        "place": 15,
         "team": "Greenwood Community",
         "score": 10.0
       },
       {
-        "place": 16,
+        "place": 15,
+        "team": "Indianapolis Crispus Attucks",
+        "score": 10.0
+      },
+      {
+        "place": 15,
         "team": "Mooresville",
         "score": 10.0
       },
@@ -683,9 +693,9 @@
         "score": 8.0
       },
       {
-        "place": 19,
+        "place": 23,
         "team": "Waldron",
-        "score": 8.0
+        "score": 7.5
       },
       {
         "place": 24,
@@ -705,7 +715,7 @@
       {
         "place": 27,
         "team": "Indianapolis Cardinal Ritter",
-        "score": 2.0
+        "score": 1.5
       },
       {
         "place": 28,
@@ -726,7 +736,7 @@
       {
         "place": 2,
         "team": "Indianapolis Bishop Chatard",
-        "score": 69.0
+        "score": 67.5
       },
       {
         "place": 3,
@@ -741,42 +751,42 @@
       {
         "place": 5,
         "team": "Pendleton Heights",
-        "score": 46.0
+        "score": 46.5
       },
       {
         "place": 6,
         "team": "East Central",
-        "score": 37.0
+        "score": 35.5
       },
       {
         "place": 7,
         "team": "New Palestine",
-        "score": 28.0
+        "score": 28.5
       },
       {
-        "place": 7,
+        "place": 8,
         "team": "Warren Central",
         "score": 28.0
       },
       {
         "place": 9,
         "team": "Batesville",
-        "score": 27.0
-      },
-      {
-        "place": 10,
-        "team": "Greenfield-Central",
-        "score": 24.0
+        "score": 26.0
       },
       {
         "place": 10,
         "team": "Lawrence North",
-        "score": 24.0
+        "score": 25.0
       },
       {
-        "place": 12,
+        "place": 11,
+        "team": "Greenfield-Central",
+        "score": 23.5
+      },
+      {
+        "place": 11,
         "team": "Indianapolis Cathedral",
-        "score": 23.0
+        "score": 23.5
       },
       {
         "place": 13,
@@ -804,19 +814,14 @@
         "score": 11.0
       },
       {
-        "place": 18,
+        "place": 17,
+        "team": "Roncalli",
+        "score": 11.0
+      },
+      {
+        "place": 19,
         "team": "Oldenburg Academy",
         "score": 10.0
-      },
-      {
-        "place": 18,
-        "team": "Roncalli",
-        "score": 10.0
-      },
-      {
-        "place": 20,
-        "team": "Park Tudor",
-        "score": 8.0
       },
       {
         "place": 20,
@@ -824,9 +829,14 @@
         "score": 8.0
       },
       {
+        "place": 21,
+        "team": "Park Tudor",
+        "score": 7.5
+      },
+      {
         "place": 22,
         "team": "New Castle",
-        "score": 4.0
+        "score": 6.0
       },
       {
         "place": 23,
@@ -840,13 +850,13 @@
       },
       {
         "place": 25,
-        "team": "Connersville",
+        "team": "Morristown",
         "score": 1.0
       },
       {
-        "place": 25,
-        "team": "Morristown",
-        "score": 1.0
+        "place": 26,
+        "team": "Connersville",
+        "score": 0.5
       }
     ]
   },
@@ -857,17 +867,17 @@
       {
         "place": 1,
         "team": "Bloomington South",
-        "score": 147.0
+        "score": 145.5
       },
       {
         "place": 2,
         "team": "Columbus North",
-        "score": 95.0
+        "score": 93.75
       },
       {
         "place": 3,
         "team": "Bloomington North",
-        "score": 56.0
+        "score": 54.75
       },
       {
         "place": 4,
@@ -877,12 +887,7 @@
       {
         "place": 5,
         "team": "Madison Consolidated",
-        "score": 51.0
-      },
-      {
-        "place": 6,
-        "team": "Charlestown",
-        "score": 27.0
+        "score": 51.5
       },
       {
         "place": 6,
@@ -890,24 +895,29 @@
         "score": 27.0
       },
       {
+        "place": 7,
+        "team": "Charlestown",
+        "score": 26.0
+      },
+      {
         "place": 8,
         "team": "Orleans",
-        "score": 16.0
+        "score": 17.0
       },
       {
         "place": 9,
+        "team": "Jennings County",
+        "score": 15.25
+      },
+      {
+        "place": 10,
         "team": "Jeffersonville",
         "score": 15.0
       },
       {
-        "place": 10,
-        "team": "Lawrenceburg",
-        "score": 14.0
-      },
-      {
         "place": 11,
-        "team": "Jennings County",
-        "score": 13.0
+        "team": "Lawrenceburg",
+        "score": 14.5
       },
       {
         "place": 12,
@@ -946,27 +956,27 @@
       },
       {
         "place": 19,
-        "team": "Clay City",
-        "score": 6.0
+        "team": "Scottsburg",
+        "score": 6.25
       },
       {
         "place": 20,
+        "team": "Clay City",
+        "score": 5.5
+      },
+      {
+        "place": 21,
         "team": "Bedford North Lawrence",
         "score": 5.0
       },
       {
-        "place": 20,
+        "place": 21,
         "team": "Henryville",
         "score": 5.0
       },
       {
-        "place": 20,
+        "place": 21,
         "team": "North Decatur",
-        "score": 5.0
-      },
-      {
-        "place": 20,
-        "team": "Scottsburg",
         "score": 5.0
       },
       {
@@ -1013,22 +1023,22 @@
       {
         "place": 1,
         "team": "Floyd Central",
-        "score": 92.0
+        "score": 91.5
       },
       {
         "place": 2,
         "team": "Castle",
-        "score": 67.0
+        "score": 66.0
       },
       {
         "place": 3,
         "team": "Jasper",
-        "score": 63.0
+        "score": 65.7
       },
       {
         "place": 4,
         "team": "Gibson Southern",
-        "score": 43.0
+        "score": 44.4
       },
       {
         "place": 5,
@@ -1053,7 +1063,7 @@
       {
         "place": 9,
         "team": "New Albany",
-        "score": 29.0
+        "score": 28.5
       },
       {
         "place": 10,
@@ -1092,33 +1102,33 @@
       },
       {
         "place": 17,
-        "team": "Evansville F.J. Reitz",
-        "score": 9.0
-      },
-      {
-        "place": 18,
         "team": "Evansville Reitz Memorial",
         "score": 8.0
       },
       {
-        "place": 18,
+        "place": 17,
         "team": "North Harrison",
         "score": 8.0
       },
       {
-        "place": 18,
+        "place": 17,
         "team": "North Posey",
         "score": 8.0
       },
       {
-        "place": 18,
+        "place": 17,
         "team": "Vincennes Rivet",
         "score": 8.0
       },
       {
-        "place": 22,
+        "place": 21,
         "team": "Washington",
-        "score": 7.0
+        "score": 7.5
+      },
+      {
+        "place": 22,
+        "team": "Evansville F.J. Reitz",
+        "score": 6.7
       },
       {
         "place": 23,
@@ -1151,14 +1161,19 @@
         "score": 3.0
       },
       {
-        "place": 28,
-        "team": "Crawford County",
-        "score": 3.0
+        "place": 29,
+        "team": "Eastern (Pekin)",
+        "score": 2.0
       },
       {
         "place": 30,
-        "team": "Eastern (Pekin)",
-        "score": 2.0
+        "team": "South Knox",
+        "score": 1.5
+      },
+      {
+        "place": 31,
+        "team": "Crawford County",
+        "score": 1.2
       }
     ]
   }
