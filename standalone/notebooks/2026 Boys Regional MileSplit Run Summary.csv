@@ -1,9 +1,0 @@
-label,source,anchor_text,meet_url,raw_url,raw_option_found,parser_format,parsed_rows,athlete_rows_inserted,relay_rows_inserted,status,note
-2026 Boys Regional 1,,,,,0,,0,0,0,meet_exists_skipped,Meet already exists in meet table (meet_id=3296)
-2026 Boys Regional 2,,,,,0,,0,0,0,meet_exists_skipped,Meet already exists in meet table (meet_id=3297)
-2026 Boys Regional 3,,,,,0,,0,0,0,meet_exists_skipped,Meet already exists in meet table (meet_id=3298)
-2026 Boys Regional 4,,,,,0,,0,0,0,meet_exists_skipped,Meet already exists in meet table (meet_id=3299)
-2026 Boys Regional 5,,,,,0,,0,0,0,meet_exists_skipped,Meet already exists in meet table (meet_id=3300)
-2026 Boys Regional 6,,,,,0,,0,0,0,meet_exists_skipped,Meet already exists in meet table (meet_id=3301)
-2026 Boys Regional 7,,,,,0,,0,0,0,meet_exists_skipped,Meet already exists in meet table (meet_id=3302)
-2026 Boys Regional 8,,,,,0,,0,0,0,meet_exists_skipped,Meet already exists in meet table (meet_id=3303)
