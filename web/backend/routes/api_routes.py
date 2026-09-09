@@ -2,6 +2,7 @@ import json
 import os
 from flask import jsonify, request, current_app
 from . import api_bp
+from common.const import CONST
 from ..queries import (
     get_athletes,
     get_athlete_by_id,
@@ -16,6 +17,17 @@ from ..queries import (
     get_hypothetical_ranking_options,
     get_hypothetical_result_rankings,
     get_school_dashboard_data,
+    get_school_dashboard_v2_core,
+    get_school_dashboard_v2_program_rank,
+    get_school_dashboard_v2_scorecard,
+    get_school_dashboard_v2_event_detail,
+    get_school_dashboard_v2_leaderboard,
+    get_school_dashboard_v2_qualifiers,
+    get_school_dashboard_v3_scorecard,
+    get_school_dashboard_v3_athlete_scorecard,
+    get_school_dashboard_v3_program_rank,
+    get_school_dashboard_v3_season_h2h,
+    get_school_dashboard_v3_returning,
     _compute_school_percentiles,
     get_regional_qualifiers_status,
     get_regional_qualifiers,
@@ -236,6 +248,133 @@ def api_get_school_percentiles(school_id):
     return jsonify(results)
 
 
+@api_bp.route('/v2/schools/<int:school_id>/dashboard/core')
+def api_get_school_dashboard_v2_core(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        data = get_school_dashboard_v2_core(school_id, gender=gender, season=season)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    if not data:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(data)
+
+
+@api_bp.route('/v2/schools/<int:school_id>/dashboard/scorecard')
+def api_get_school_dashboard_v2_scorecard(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        core = get_school_dashboard_v2_core(school_id, gender=gender, season=season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        data = get_school_dashboard_v2_scorecard(
+            school_id,
+            core['filters']['selected_gender'],
+            core['filters']['selected_season'],
+        )
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v2/schools/<int:school_id>/dashboard/ranking')
+def api_get_school_dashboard_v2_ranking(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        core = get_school_dashboard_v2_core(school_id, gender=gender, season=season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        selected_season = core['filters']['selected_season']
+        if selected_season == 'all-time':
+            return jsonify({'error': 'ranking requires a specific postseason season'}), 400
+        data = get_school_dashboard_v2_program_rank(
+            school_id,
+            core['filters']['selected_gender'],
+            int(selected_season),
+        )
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v2/schools/<int:school_id>/dashboard/leaderboard')
+def api_get_school_dashboard_v2_leaderboard(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    top_n = request.args.get('top_n', default=25, type=int)
+    enrollment_arg = (request.args.get('enrollment_max', '') or '').strip().lower()
+    enrollment_max = None
+    if enrollment_arg and enrollment_arg != 'all':
+        try:
+            enrollment_max = int(enrollment_arg)
+        except ValueError:
+            return jsonify({'error': 'enrollment_max must be all or an integer'}), 400
+
+    try:
+        core = get_school_dashboard_v2_core(school_id, gender=gender, season=season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        selected_season = core['filters']['selected_season']
+        if selected_season == 'all-time':
+            return jsonify({'error': 'leaderboard requires a specific postseason season'}), 400
+        data = get_school_dashboard_v2_leaderboard(
+            school_id,
+            core['filters']['selected_gender'],
+            int(selected_season),
+            top_n=top_n,
+            enrollment_max=enrollment_max,
+        )
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v2/schools/<int:school_id>/dashboard/events/<path:event_name>')
+def api_get_school_dashboard_v2_event_detail(school_id, event_name):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        core = get_school_dashboard_v2_core(school_id, gender=gender, season=season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        selected_season = core['filters']['selected_season']
+        if selected_season == 'all-time':
+            return jsonify({'error': 'event detail requires a specific postseason season'}), 400
+        data = get_school_dashboard_v2_event_detail(
+            school_id,
+            core['filters']['selected_gender'],
+            int(selected_season),
+            event_name,
+        )
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v2/schools/<int:school_id>/dashboard/qualifiers')
+def api_get_school_dashboard_v2_qualifiers(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        core = get_school_dashboard_v2_core(school_id, gender=gender, season=season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        selected_season = core['filters']['selected_season']
+        if selected_season == 'all-time':
+            return jsonify({'error': 'qualifiers require a specific postseason season'}), 400
+        data = get_school_dashboard_v2_qualifiers(
+            school_id,
+            core['filters']['selected_gender'],
+            int(selected_season),
+        )
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
 @api_bp.route('/regional-qualifiers/status')
 def api_regional_qualifiers_status():
     """Return regional readiness status for a gender and year."""
@@ -428,3 +567,114 @@ def api_regional_top_list():
         'events': events_out,
     })
 
+
+# ---------------------------------------------------------------------------
+# School dashboard v3. Additive: v1 and v2 endpoints above are untouched.
+# Endpoints that v3 does not change simply delegate to the v2 query functions.
+# ---------------------------------------------------------------------------
+
+def _v3_scope(school_id, gender, season):
+    core = get_school_dashboard_v2_core(school_id, gender=gender, season=season)
+    if not core:
+        return None, None, None
+    return core, core['filters']['selected_gender'], core['filters']['selected_season']
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/core')
+def api_get_school_dashboard_v3_core(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        data = get_school_dashboard_v2_core(school_id, gender=gender, season=season)
+        if not data:
+            return jsonify({'error': 'not found'}), 404
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/scorecard')
+def api_get_school_dashboard_v3_scorecard(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        core, sel_gender, sel_season = _v3_scope(school_id, gender, season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        data = get_school_dashboard_v3_scorecard(school_id, sel_gender, sel_season)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/athletes')
+def api_get_school_dashboard_v3_athletes(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        core, sel_gender, sel_season = _v3_scope(school_id, gender, season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        data = get_school_dashboard_v3_athlete_scorecard(school_id, sel_gender, sel_season)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/ranking')
+def api_get_school_dashboard_v3_ranking(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        core, sel_gender, sel_season = _v3_scope(school_id, gender, season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        if sel_season == 'all-time':
+            return jsonify({'error': 'ranking requires a specific postseason season'}), 400
+        data = get_school_dashboard_v3_program_rank(school_id, sel_gender, int(sel_season))
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/season-h2h')
+def api_get_school_dashboard_v3_season_h2h(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        core, sel_gender, sel_season = _v3_scope(school_id, gender, season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        data = get_school_dashboard_v3_season_h2h(school_id, sel_gender, sel_season)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/returning')
+def api_get_school_dashboard_v3_returning(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        core, sel_gender, sel_season = _v3_scope(school_id, gender, season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        data = get_school_dashboard_v3_returning(school_id, sel_gender, sel_season)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/leaderboard')
+def api_get_school_dashboard_v3_leaderboard(school_id):
+    return api_get_school_dashboard_v2_leaderboard(school_id)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/events/<path:event_name>')
+def api_get_school_dashboard_v3_event_detail(school_id, event_name):
+    return api_get_school_dashboard_v2_event_detail(school_id, event_name)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/qualifiers')
+def api_get_school_dashboard_v3_qualifiers(school_id):
+    return api_get_school_dashboard_v2_qualifiers(school_id)

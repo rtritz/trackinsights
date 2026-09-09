@@ -1,0 +1,330 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if school_name %}{{ school_name }} - {% endif %}Focus School Postseason Dashboard - Track Insights{% endblock %}
+{% block meta_description %}{% if school_name %}Compact postseason program profile for {{ school_name }}{% if school_city %} in {{ school_city }}{% endif %}, including postseason stage results, statewide program rank, and event strength.{% else %}Compact postseason school dashboard for Indiana high school track and field programs.{% endif %}{% endblock %}
+{% block og_title %}{% if school_name %}{{ school_name }} - Focus School Postseason Dashboard{% else %}Focus School Postseason Dashboard{% endif %} - Track Insights{% endblock %}
+
+{% block content %}
+<style>
+    #school-dashboard-v2 {
+        --sd2-bg: #0b0f14;
+        --sd2-surface: #131920;
+        --sd2-surface-2: #1a2129;
+        --sd2-border: #2a3440;
+        --sd2-text: #f5f7fa;
+        --sd2-muted: #a5b0bc;
+        --sd2-accent: #6ea8fe;
+        --sd2-accent-soft: rgba(110, 168, 254, 0.16);
+        --sd2-success: #7ad7a2;
+        --sd2-danger: #f0c674;
+        background: var(--sd2-bg);
+        color: var(--sd2-text);
+        min-height: 100vh;
+        padding: 5.5rem 0 4rem;
+    }
+
+    #school-dashboard-v2 * { box-sizing: border-box; }
+    #school-dashboard-v2 .sd2-shell { max-width: 1200px; margin: 0 auto; padding: 0 1rem; }
+    #school-dashboard-v2 .sd2-panel,
+    #school-dashboard-v2 .sd2-stage-card,
+    #school-dashboard-v2 .sd2-toolbar { background: var(--sd2-surface); border: 1px solid var(--sd2-border); border-radius: 10px; }
+    #school-dashboard-v2 .sd2-toolbar { position: sticky; top: 4.75rem; z-index: 20; padding: 1rem; margin-bottom: 1rem; }
+    #school-dashboard-v2 .sd2-toolbar-grid { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; }
+    #school-dashboard-v2 .sd2-header-main { display: flex; gap: 1rem; align-items: center; min-width: 0; }
+    #school-dashboard-v2 .sd2-logo-wrap { width: 72px; height: 72px; border: 1px solid var(--sd2-border); border-radius: 8px; background: #f8fafc; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    #school-dashboard-v2 .sd2-logo-wrap img { width: 100%; height: 100%; object-fit: contain; padding: 0.35rem; }
+    #school-dashboard-v2 .sd2-heading { font-size: clamp(1.7rem, 4vw, 2.5rem); line-height: 1.05; margin: 0; color: var(--sd2-text); font-family: "Oswald", sans-serif; font-style: italic; }
+    #school-dashboard-v2 .sd2-meta { color: var(--sd2-muted); font-size: 0.92rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-top: 0.35rem; }
+    #school-dashboard-v2 .sd2-meta span { white-space: nowrap; }
+    #school-dashboard-v2 .sd2-meta-separator { color: #7b8794; font-weight: 600; user-select: none; }
+    /* View controls: gender is a 2-way segmented toggle, season a pill row.
+       The whole choice space is 2 genders x <=5 seasons, so every option is
+       rendered inline -- nothing worth hiding behind a dropdown. */
+    #school-dashboard-v2 .sd2-filter-row { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; flex-shrink: 0; }
+
+    #school-dashboard-v2 .sd2-segmented { display: inline-flex; gap: 2px; padding: 2px; background: var(--sd2-surface-2); border: 1px solid var(--sd2-border); border-radius: 8px; }
+    #school-dashboard-v2 .sd2-segmented button {
+        appearance: none; border: 0; background: transparent; color: var(--sd2-muted);
+        font: inherit; font-size: 0.82rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+        padding: 0.36rem 1.05rem; border-radius: 6px; cursor: pointer; transition: background 120ms ease, color 120ms ease;
+    }
+    #school-dashboard-v2 .sd2-segmented button:hover[aria-checked="false"] { color: var(--sd2-text); background: rgba(255, 255, 255, 0.05); }
+    #school-dashboard-v2 .sd2-segmented button[aria-checked="true"] { background: var(--sd2-accent); color: #0b0f14; }
+
+    #school-dashboard-v2 .sd2-seasons { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 0.2rem; }
+    #school-dashboard-v2 .sd2-season-pill {
+        appearance: none; border: 1px solid transparent; background: transparent; color: var(--sd2-muted);
+        font: inherit; font-size: 0.86rem; font-variant-numeric: tabular-nums;
+        padding: 0.28rem 0.62rem; border-radius: 999px; cursor: pointer; transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+    }
+    #school-dashboard-v2 .sd2-season-pill:hover[aria-checked="false"]:not(:disabled) { color: var(--sd2-text); border-color: var(--sd2-border); }
+    #school-dashboard-v2 .sd2-season-pill[aria-checked="true"] { background: var(--sd2-accent-soft); border-color: var(--sd2-accent); color: var(--sd2-text); font-weight: 600; }
+    /* A season this program has no postseason results for: shown, not hidden --
+       the gap is information about the program. */
+    #school-dashboard-v2 .sd2-season-pill:disabled { color: #4a5560; cursor: not-allowed; text-decoration: line-through; text-decoration-thickness: 1px; }
+    #school-dashboard-v2 .sd2-season-divider { width: 1px; height: 1.15rem; background: var(--sd2-border); margin: 0 0.4rem; flex-shrink: 0; }
+
+    #school-dashboard-v2 .sd2-filter-row button:focus-visible { outline: 2px solid var(--sd2-accent); outline-offset: 2px; }
+
+    @media (max-width: 720px) {
+        #school-dashboard-v2 .sd2-filter-row { align-items: flex-start; width: 100%; }
+        #school-dashboard-v2 .sd2-seasons { justify-content: flex-start; }
+    }
+    #school-dashboard-v2 .sd2-button,
+    #school-dashboard-v2 .sd2-row-button,
+    #school-dashboard-v2 .sd2-modal-close {
+        border: 1px solid var(--sd2-border);
+        background: var(--sd2-surface-2);
+        color: var(--sd2-text);
+        border-radius: 8px;
+        min-height: 2.5rem;
+        padding: 0.55rem 0.9rem;
+    }
+    #school-dashboard-v2 .sd2-button:hover,
+    #school-dashboard-v2 .sd2-row-button:hover,
+    #school-dashboard-v2 .sd2-modal-close:hover { border-color: var(--sd2-accent); }
+    #school-dashboard-v2 .sd2-button.is-active { background: var(--sd2-accent-soft); color: var(--sd2-text); box-shadow: inset 0 0 0 1px var(--sd2-accent); }
+    #school-dashboard-v2 select,
+    #school-dashboard-v2 input[type="number"] {
+        background: var(--sd2-surface-2);
+        color: var(--sd2-text);
+        border: 1px solid var(--sd2-border);
+        border-radius: 8px;
+        padding: 0.6rem 0.8rem;
+        min-height: 2.5rem;
+    }
+    #school-dashboard-v2 .sd2-subtle,
+    #school-dashboard-v2 .sd2-loading-copy { color: var(--sd2-muted); font-size: 0.86rem; }
+    #school-dashboard-v2 .sd2-section { margin-top: 1rem; }
+    #school-dashboard-v2 .sd2-section-title { font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--sd2-muted); margin-bottom: 0.65rem; }
+    #school-dashboard-v2 .sd2-note { padding: 0.9rem 1rem; }
+    #school-dashboard-v2 .sd2-stage-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.85rem; }
+    #school-dashboard-v2 .sd2-stage-card { padding: 1rem; }
+    #school-dashboard-v2 .sd2-stage-label { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--sd2-muted); }
+    #school-dashboard-v2 .sd2-stage-rank { font-size: 1.3rem; margin-top: 0.4rem; font-weight: 700; }
+    #school-dashboard-v2 .sd2-stage-points { font-size: 0.95rem; margin-top: 0.15rem; color: var(--sd2-muted); }
+    #school-dashboard-v2 .sd2-stage-meta { display: flex; gap: 0.75rem; margin-top: 0.8rem; color: var(--sd2-muted); font-size: 0.82rem; }
+    #school-dashboard-v2 .sd2-rank-wrap { padding: 1rem; }
+    #school-dashboard-v2 .sd2-rank-top { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; }
+    #school-dashboard-v2 .sd2-rank-value { font-size: 2rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+    #school-dashboard-v2 .sd2-rank-bar { position: relative; margin-top: 1rem; height: 14px; border: 1px solid var(--sd2-border); background: var(--sd2-surface-2); border-radius: 999px; overflow: hidden; }
+    #school-dashboard-v2 .sd2-rank-bar > span { display: block; height: 100%; background: linear-gradient(90deg, #cfd8e3, var(--sd2-accent)); min-width: 0; }
+    /* Reference marker: where the median program sits on the same 0-100 scale.
+       Without it a bare "54.4" gives the reader nothing to judge against. */
+    #school-dashboard-v2 .sd2-rank-median { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--sd2-text); opacity: 0.55; transform: translateX(-1px); }
+    #school-dashboard-v2 .sd2-rank-legend { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.45rem; color: var(--sd2-muted); font-size: 0.78rem; }
+    #school-dashboard-v2 .sd2-rank-legend-tick { display: inline-block; width: 2px; height: 0.72rem; background: var(--sd2-text); opacity: 0.55; }
+    /* Position bar: fill = programs you finished ahead of, so "more filled = better"
+       matches the universal bar convention. The marker therefore lands on your
+       percentile and the median falls at the 50% centerline with no axis trickery. */
+    #school-dashboard-v2 .sd2-position { margin-top: 1rem; }
+    #school-dashboard-v2 .sd2-position-labels { display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 0.35rem; }
+    #school-dashboard-v2 .sd2-position-behind { color: var(--sd2-success); font-weight: 600; }
+    #school-dashboard-v2 .sd2-position-ahead { color: var(--sd2-muted); }
+    #school-dashboard-v2 .sd2-position-bar { position: relative; height: 18px; border: 1px solid var(--sd2-border); background: var(--sd2-surface-2); border-radius: 999px; overflow: hidden; }
+    #school-dashboard-v2 .sd2-position-fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, rgba(122, 215, 162, 0.35), rgba(122, 215, 162, 0.7)); }
+    #school-dashboard-v2 .sd2-position-median { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--sd2-text); opacity: 0.45; transform: translateX(-1px); }
+    #school-dashboard-v2 .sd2-position-marker { position: absolute; top: -2px; bottom: -2px; width: 3px; background: var(--sd2-text); border-radius: 2px; transform: translateX(-1.5px); box-shadow: 0 0 0 2px var(--sd2-surface); }
+    #school-dashboard-v2 .sd2-position-scale { display: flex; justify-content: space-between; color: var(--sd2-muted); font-size: 0.74rem; margin-top: 0.3rem; }
+    #school-dashboard-v2 .sd2-position-note { color: var(--sd2-muted); font-size: 0.76rem; margin-top: 0.35rem; }
+
+    /* Quartile strip, drawn on the SCORE axis inside the explainer. Its uneven
+       segment widths are the point: they show why a 50/100 score is not the middle. */
+    #school-dashboard-v2 .sd2-quartile-strip { position: relative; height: 26px; margin: 0.6rem 0 0.3rem; border: 1px solid var(--sd2-border); border-radius: 6px; overflow: hidden; display: flex; }
+    #school-dashboard-v2 .sd2-quartile-seg { height: 100%; border-right: 1px solid var(--sd2-border); display: flex; align-items: center; justify-content: center; font-size: 0.68rem; color: var(--sd2-muted); min-width: 0; }
+    #school-dashboard-v2 .sd2-quartile-seg:last-child { border-right: 0; }
+    #school-dashboard-v2 .sd2-quartile-seg:nth-child(odd) { background: var(--sd2-surface-2); }
+    #school-dashboard-v2 .sd2-quartile-you { position: absolute; top: -2px; bottom: -2px; width: 3px; background: var(--sd2-accent); border-radius: 2px; transform: translateX(-1.5px); }
+    #school-dashboard-v2 .sd2-quartile-axis { display: flex; justify-content: space-between; color: var(--sd2-muted); font-size: 0.72rem; font-variant-numeric: tabular-nums; }
+
+    #school-dashboard-v2 .sd2-rank-delta { font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+    #school-dashboard-v2 .sd2-rank-delta.is-above { color: var(--sd2-success); }
+    #school-dashboard-v2 .sd2-rank-delta.is-below { color: var(--sd2-danger); }
+    #school-dashboard-v2 .sd2-rank-sub { color: var(--sd2-muted); font-size: 0.86rem; margin-top: 0.3rem; }
+    #school-dashboard-v2 .sd2-details { margin-top: 0.8rem; border-top: 1px solid var(--sd2-border); padding-top: 0.75rem; }
+    #school-dashboard-v2 details summary { cursor: pointer; color: var(--sd2-muted); }
+    #school-dashboard-v2 .sd2-breakdown-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-top: 0.75rem; }
+    #school-dashboard-v2 .sd2-breakdown-item { padding: 0.8rem; border: 1px solid var(--sd2-border); border-radius: 8px; background: var(--sd2-surface-2); }
+    #school-dashboard-v2 .sd2-breakdown-label { color: var(--sd2-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; }
+    #school-dashboard-v2 .sd2-breakdown-value { font-size: 1.15rem; font-variant-numeric: tabular-nums; margin-top: 0.3rem; }
+    #school-dashboard-v2 .sd2-section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.7rem; }
+    #school-dashboard-v2 .sd2-inline-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+    #school-dashboard-v2 .sd2-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; font-variant-numeric: tabular-nums; }
+    #school-dashboard-v2 .sd2-table th,
+    #school-dashboard-v2 .sd2-table td { text-align: left; padding: 0.7rem 0.75rem; border-bottom: 1px solid var(--sd2-border); vertical-align: top; }
+    #school-dashboard-v2 .sd2-table th { color: var(--sd2-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+    #school-dashboard-v2 .sd2-scorecard-wrap { padding: 0; overflow: hidden; }
+    #school-dashboard-v2 .sd2-row-button { width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--sd2-border); border-radius: 0; padding: 0; text-align: left; }
+    #school-dashboard-v2 .sd2-row-button:focus-visible { outline: 2px solid var(--sd2-accent); outline-offset: -2px; }
+    #school-dashboard-v2 .sd2-score-row { display: grid; grid-template-columns: 1.15fr 0.95fr 1fr 0.9fr 0.7fr; gap: 0.5rem; padding: 0.8rem 0.9rem; align-items: center; }
+    #school-dashboard-v2 .sd2-score-row > div { min-width: 0; }
+    #school-dashboard-v2 .sd2-link { color: var(--sd2-text); text-decoration: underline; text-decoration-color: rgba(110, 168, 254, 0.5); text-underline-offset: 0.15rem; }
+    #school-dashboard-v2 .sd2-status-success { color: var(--sd2-success); font-weight: 600; }
+    #school-dashboard-v2 .sd2-status-accent { color: var(--sd2-accent); font-weight: 600; }
+    #school-dashboard-v2 .sd2-status-muted { color: var(--sd2-muted); }
+    #school-dashboard-v2 .sd2-qualifier-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.85rem; }
+    #school-dashboard-v2 .sd2-qualifier-panel { padding: 1rem; }
+    #school-dashboard-v2 .sd2-modal[hidden] { display: none; }
+    #school-dashboard-v2 .sd2-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        background: rgba(2, 6, 12, 0.74);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+    #school-dashboard-v2 .sd2-modal-card {
+        width: min(1080px, 100%);
+        max-height: calc(100vh - 2rem);
+        overflow: auto;
+        background: var(--sd2-bg);
+        border: 1px solid var(--sd2-border);
+        border-radius: 12px;
+        padding: 1rem;
+    }
+    #school-dashboard-v2 .sd2-modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+    #school-dashboard-v2 .sd2-chart-wrap { padding: 1rem; }
+    #school-dashboard-v2 .sd2-chart-wrap svg { width: 100%; height: auto; display: block; }
+    #school-dashboard-v2 .sd2-chart-list { margin-top: 0.85rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+    #school-dashboard-v2 .sd2-chart-list a,
+    #school-dashboard-v2 .sd2-chart-list span { display: block; padding: 0.6rem; border: 1px solid var(--sd2-border); border-radius: 8px; background: var(--sd2-surface-2); color: var(--sd2-text); }
+    #school-dashboard-v2 .sd2-highlight-row { background: rgba(110, 168, 254, 0.12); }
+    #school-dashboard-v2 .sd2-pinned-note { color: var(--sd2-muted); font-size: 0.82rem; margin-top: 0.6rem; }
+    #school-dashboard-v2 .sd2-hidden { display: none !important; }
+    #school-dashboard-v2 .sd2-mobile-note { display: none; }
+
+    @media (max-width: 900px) {
+        #school-dashboard-v2 .sd2-stage-grid,
+        #school-dashboard-v2 .sd2-qualifier-grid,
+        #school-dashboard-v2 .sd2-breakdown-grid,
+        #school-dashboard-v2 .sd2-chart-list { grid-template-columns: 1fr; }
+        #school-dashboard-v2 .sd2-score-row { grid-template-columns: 1fr; padding: 0.85rem; }
+        #school-dashboard-v2 .sd2-table thead { display: none; }
+        #school-dashboard-v2 .sd2-table,
+        #school-dashboard-v2 .sd2-table tbody,
+        #school-dashboard-v2 .sd2-table tr,
+        #school-dashboard-v2 .sd2-table td { display: block; width: 100%; }
+        #school-dashboard-v2 .sd2-table tr { border-bottom: 1px solid var(--sd2-border); padding: 0.55rem 0; }
+        #school-dashboard-v2 .sd2-table td { border-bottom: 0; padding: 0.28rem 0; }
+        #school-dashboard-v2 .sd2-table td::before { content: attr(data-label); display: block; color: var(--sd2-muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.12rem; }
+        #school-dashboard-v2 .sd2-mobile-note { display: block; color: var(--sd2-muted); font-size: 0.82rem; margin-top: 0.6rem; }
+        #school-dashboard-v2 .sd2-toolbar { top: 4rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        #school-dashboard-v2 * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+    }
+</style>
+
+<div id="school-dashboard-v2" data-school-id="{{ school_id }}">
+    <div class="sd2-shell">
+        <div id="sd2-loading" class="sd2-panel sd2-note">
+            <div class="sd2-loading-copy">Loading postseason program profile…</div>
+        </div>
+
+        <div id="sd2-error" class="sd2-panel sd2-note sd2-hidden">
+            <h2 class="sd2-heading" style="font-size:1.5rem;">School not found</h2>
+            <p class="sd2-subtle">We couldn't load this postseason school profile.</p>
+        </div>
+
+        <div id="sd2-app" class="sd2-hidden">
+            <header class="sd2-toolbar">
+                <div class="sd2-toolbar-grid">
+                    <div class="sd2-header-main">
+                        <div id="sd2-logo-wrap" class="sd2-logo-wrap sd2-hidden">
+                            <img id="sd2-logo" alt="School logo" />
+                        </div>
+                        <div>
+                            <h1 id="sd2-school-name" class="sd2-heading">Loading…</h1>
+                            <div id="sd2-school-meta" class="sd2-meta"></div>
+                        </div>
+                    </div>
+                    <div id="sd2-filter-row" class="sd2-filter-row"></div>
+                </div>
+            </header>
+
+            <section class="sd2-section">
+                <div class="sd2-section-title">Playoff Overview</div>
+                <div id="sd2-stage-grid" class="sd2-stage-grid"></div>
+                <div id="sd2-all-time-intro" class="sd2-panel sd2-note sd2-hidden"></div>
+            </section>
+
+            <section id="sd2-program-rank-section" class="sd2-section">
+                <div class="sd2-section-head">
+                    <div>
+                        <div class="sd2-section-title">Ranking</div>
+                    </div>
+                    <div class="sd2-inline-actions">
+                        <button type="button" id="sd2-leaderboard-open" class="sd2-button">Open leaderboard</button>
+                    </div>
+                </div>
+                <div id="sd2-program-rank" class="sd2-panel sd2-rank-wrap"></div>
+            </section>
+
+            <section id="sd2-qualifiers-section" class="sd2-section">
+                <div class="sd2-section-title">Regional &amp; State Qualifiers</div>
+                <div id="sd2-qualifiers" class="sd2-qualifier-grid"></div>
+            </section>
+
+            <section class="sd2-section">
+                <div class="sd2-section-head">
+                    <div class="sd2-section-title">Event Strength</div>
+                    <div class="sd2-inline-actions">
+                        <button type="button" id="sd2-load-scorecard" class="sd2-button">Load scorecard</button>
+                    </div>
+                </div>
+                <div id="sd2-scorecard-status" class="sd2-subtle"></div>
+                <div id="sd2-scorecard" class="sd2-panel sd2-scorecard-wrap"></div>
+            </section>
+
+        </div>
+    </div>
+
+    <div id="sd2-leaderboard-modal" class="sd2-modal" hidden aria-hidden="true">
+        <div class="sd2-modal-card" role="dialog" aria-modal="true" aria-labelledby="sd2-leaderboard-title">
+            <div class="sd2-modal-header">
+                <div>
+                    <h2 id="sd2-leaderboard-title" class="sd2-heading" style="font-size:1.55rem;">Statewide Leaderboard</h2>
+                    <div id="sd2-leaderboard-subtitle" class="sd2-subtle"></div>
+                </div>
+                <button type="button" class="sd2-modal-close" data-close-modal="sd2-leaderboard-modal">Close</button>
+            </div>
+            <div class="sd2-inline-actions" style="margin-bottom:0.9rem;">
+                <select id="sd2-leaderboard-enrollment" aria-label="Enrollment maximum">
+                    <option value="all">All schools</option>
+                    <option value="500">Under 500</option>
+                    <option value="1000">Under 1,000</option>
+                    <option value="1500">Under 1,500</option>
+                    <option value="custom">Custom maximum</option>
+                </select>
+                <input id="sd2-leaderboard-custom" type="number" min="1" placeholder="Custom max" class="sd2-hidden" />
+                <select id="sd2-leaderboard-topn" aria-label="Top N">
+                    <option value="10">Top 10</option>
+                    <option value="25" selected>Top 25</option>
+                    <option value="50">Top 50</option>
+                    <option value="100">Top 100</option>
+                </select>
+                <button type="button" id="sd2-leaderboard-apply" class="sd2-button">Apply</button>
+            </div>
+            <div id="sd2-leaderboard-content" class="sd2-panel"></div>
+        </div>
+    </div>
+
+    <div id="sd2-event-modal" class="sd2-modal" hidden aria-hidden="true">
+        <div class="sd2-modal-card" role="dialog" aria-modal="true" aria-labelledby="sd2-event-title">
+            <div class="sd2-modal-header">
+                <div>
+                    <h2 id="sd2-event-title" class="sd2-heading" style="font-size:1.55rem;">Event detail</h2>
+                    <div id="sd2-event-subtitle" class="sd2-subtle"></div>
+                </div>
+                <button type="button" class="sd2-modal-close" data-close-modal="sd2-event-modal">Close</button>
+            </div>
+            <div id="sd2-event-content"></div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/school-dashboard-v2.js') }}"></script>
+{% endblock %}

@@ -1,8 +1,10 @@
 import os
 import re
 import sys
+import bisect
 import logging
 import math
+import statistics
 # Set up module-level logger
 logger = logging.getLogger("trackinsights.queries")
 if not logger.hasHandlers():
@@ -14,7 +16,7 @@ if not logger.hasHandlers():
 import html as html_lib
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
@@ -3280,6 +3282,22 @@ def _format_result_display(raw_value, event_type):
         return f"{seconds:.2f}"
 
 
+def _format_gap_display(raw_value, event_type):
+    """Format a *difference* between two marks.
+
+    A field gap under a foot comes back from _format_result_display as 0'4",
+    which reads badly for a delta -- inches alone are what a coach thinks in at
+    that range.
+    """
+    if raw_value is None:
+        return None
+    if event_type == CONST.EVENT_TYPE.FIELD and raw_value < 12:
+        if raw_value == int(raw_value):
+            return f'{int(raw_value)}"'
+        return f'{raw_value:.2f}"'.replace('.00"', '"')
+    return _format_result_display(raw_value, event_type)
+
+
 def _compute_school_records(school_id: int):
     """Unofficial school records: best mark per event+gender from 2023 onwards."""
 
@@ -3456,6 +3474,1596 @@ def _compute_avg_places(school_id: int):
         result[gender] = gender_result
 
     return result
+
+
+def _school_dashboard_v2_event_groups(gender: str) -> List[Tuple[str, List[str]]]:
+    hurdles = (
+        list(getattr(CONST.EVENT, "ALL_GIRLS_HURDLES", []))
+        if gender == CONST.GENDER.GIRLS
+        else list(getattr(CONST.EVENT, "ALL_BOYS_HURDLES", []))
+    )
+    return [
+        ("Sprints", [CONST.EVENT.E100, CONST.EVENT.E200, CONST.EVENT.E400]),
+        ("Middle & Distance", [CONST.EVENT.E800, CONST.EVENT.E1600, CONST.EVENT.E3200]),
+        ("Hurdles", hurdles),
+        ("Jumps", [CONST.EVENT.EHJ, CONST.EVENT.ELJ, CONST.EVENT.EPV]),
+        ("Throws", [CONST.EVENT.ESP, CONST.EVENT.EDT]),
+        ("Relays", list(getattr(CONST.EVENT, "ALL_RELAY", []))),
+    ]
+
+
+def _school_dashboard_v2_events_for_gender(gender: str) -> List[str]:
+    events = []
+    for _, group_events in _school_dashboard_v2_event_groups(gender):
+        events.extend(group_events)
+    return events
+
+
+def _school_dashboard_v2_available_years(school_id: int, gender: str) -> List[int]:
+    individual_years = (
+        db.session.query(Meet.year)
+        .join(AthleteResult, AthleteResult.meet_id == Meet.meet_id)
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .filter(
+            Athlete.school_id == school_id,
+            Athlete.gender == gender,
+            Meet.meet_type.in_(CONST.MEET_TYPE.ALL),
+            Meet.year.isnot(None),
+            Meet.year >= MIN_RECORDS_YEAR,
+        )
+        .distinct()
+        .all()
+    )
+    relay_years = (
+        db.session.query(Meet.year)
+        .join(RelayResult, RelayResult.meet_id == Meet.meet_id)
+        .filter(
+            RelayResult.school_id == school_id,
+            Meet.gender == gender,
+            Meet.meet_type.in_(CONST.MEET_TYPE.ALL),
+            Meet.year.isnot(None),
+            Meet.year >= MIN_RECORDS_YEAR,
+        )
+        .distinct()
+        .all()
+    )
+    return sorted(
+        {
+            int(row.year)
+            for row in list(individual_years) + list(relay_years)
+            if getattr(row, "year", None) is not None
+        },
+        reverse=True,
+    )
+
+
+def _school_dashboard_v2_covered_years(gender: str) -> List[int]:
+    """Every postseason year the database covers for this gender, ascending.
+
+    This is the full axis the season picker draws. A school's own available
+    years are a subset of it, so any year missing from that subset renders as
+    a visible gap ("this program had no postseason team in 2025") instead of
+    silently vanishing from the list the way a dropdown would hide it.
+    """
+    rows = (
+        db.session.query(Meet.year)
+        .filter(
+            Meet.gender == gender,
+            Meet.meet_type.in_(CONST.MEET_TYPE.ALL),
+            Meet.year.isnot(None),
+            Meet.year >= MIN_RECORDS_YEAR,
+        )
+        .distinct()
+        .all()
+    )
+    return sorted({int(row.year) for row in rows if getattr(row, "year", None) is not None})
+
+
+def _default_school_dashboard_v2_season(gender: str, school_years: List[int]) -> Optional[int]:
+    if school_years:
+        latest_school_year = max(school_years)
+    else:
+        latest_school_year = None
+
+    latest_completed = (
+        db.session.query(func.max(Meet.year))
+        .filter(
+            Meet.gender == gender,
+            Meet.meet_type == CONST.MEET_TYPE.STATE,
+            Meet.year.isnot(None),
+            Meet.year >= MIN_RECORDS_YEAR,
+        )
+        .scalar()
+    )
+    if latest_completed is None:
+        return latest_school_year
+    if latest_school_year is None:
+        return latest_completed
+    return min(latest_completed, latest_school_year)
+
+
+def _resolve_school_enrollment_for_year(school: School, year: Optional[int]) -> Dict[str, Any]:
+    enrollments = sorted(
+        [item for item in getattr(school, "enrollments", []) if item.year is not None],
+        key=lambda item: item.year,
+    )
+    if not enrollments:
+        return {
+            "value": None,
+            "source_year": None,
+            "is_exact": False,
+        }
+
+    if year is None:
+        latest = enrollments[-1]
+        return {
+            "value": latest.enrollment,
+            "source_year": latest.year,
+            "is_exact": True,
+        }
+
+    exact = next((item for item in enrollments if item.year == year), None)
+    if exact:
+        return {
+            "value": exact.enrollment,
+            "source_year": exact.year,
+            "is_exact": True,
+        }
+
+    nearest = sorted(
+        enrollments,
+        key=lambda item: (
+            abs(item.year - year),
+            0 if item.year <= year else 1,
+            -item.year,
+        ),
+    )[0]
+    return {
+        "value": nearest.enrollment,
+        "source_year": nearest.year,
+        "is_exact": False,
+    }
+
+
+def _get_school_dashboard_v2_scope(
+    school_id: int,
+    gender: Optional[str] = None,
+    season: Optional[str] = None,
+):
+    school = (
+        School.query.options(joinedload(School.enrollments))
+        .filter_by(school_id=school_id)
+        .one_or_none()
+    )
+    if not school:
+        return None
+
+    clean_gender = (gender or CONST.GENDER.BOYS).strip().title()
+    if clean_gender not in CONST.GENDER.ALL:
+        raise ValueError("gender must be Boys or Girls")
+
+    available_years = _school_dashboard_v2_available_years(school_id, clean_gender)
+    if not available_years and season not in (None, "", "all-time"):
+        raise ValueError("season must be All-Time or a covered postseason year for this school")
+
+    if season in (None, ""):
+        selected_season = _default_school_dashboard_v2_season(clean_gender, available_years)
+    elif str(season).strip().lower() == "all-time":
+        selected_season = "all-time"
+    else:
+        try:
+            selected_season = int(season)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("season must be All-Time or a numeric postseason year") from exc
+        if selected_season not in available_years:
+            raise ValueError("season must be one of the school's covered postseason years or All-Time")
+
+    if selected_season is None:
+        selected_season = "all-time"
+
+    return school, clean_gender, selected_season, available_years
+
+
+def _is_valid_postseason_mark(result_value, event_type: str) -> bool:
+    if result_value is None:
+        return False
+    if event_type == CONST.EVENT_TYPE.FIELD:
+        return result_value > 0
+    return 0 < result_value < 9999
+
+
+def _format_points_value(points: Optional[float]) -> Optional[str]:
+    if points is None:
+        return None
+    rounded = round(points, 1)
+    if rounded.is_integer():
+        return str(int(rounded))
+    return f"{rounded:.1f}"
+
+
+def _competition_rank_rows(rows: List[Dict[str, Any]], lower_is_better: bool, value_key: str = "result_value"):
+    if not rows:
+        return []
+
+    default_value = float("inf") if lower_is_better else float("-inf")
+    sorted_rows = sorted(
+        rows,
+        key=lambda item: item.get(value_key, default_value),
+        reverse=not lower_is_better,
+    )
+
+    ranked = []
+    last_value = object()
+    current_rank = 0
+    for index, row in enumerate(sorted_rows, start=1):
+        value = row.get(value_key)
+        if index == 1 or value != last_value:
+            current_rank = index
+            last_value = value
+        ranked_row = dict(row)
+        ranked_row["rank"] = current_rank
+        ranked.append(ranked_row)
+    return ranked
+
+
+def _normalize_rank_to_score(rank: Optional[int], total_marks: int) -> float:
+    if rank is None or total_marks <= 0:
+        return 0.0
+    if total_marks == 1:
+        return 100.0
+    return round(((total_marks - rank) / (total_marks - 1)) * 100, 1)
+
+
+def _resolve_postseason_individual_rows(
+    *,
+    gender: Optional[str] = None,
+    year: Optional[int] = None,
+    school_id: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    query = (
+        db.session.query(
+            Athlete.school_id.label("school_id"),
+            School.school_name.label("school_name"),
+            Athlete.athlete_id.label("athlete_id"),
+            Athlete.first.label("first"),
+            Athlete.last.label("last"),
+            Athlete.gender.label("gender"),
+            AthleteResult.event.label("event"),
+            AthleteResult.meet_id.label("meet_id"),
+            AthleteResult.result_type.label("result_type"),
+            AthleteResult.result.label("result"),
+            AthleteResult.result2.label("result_value"),
+            AthleteResult.place.label("place"),
+            Meet.meet_type.label("meet_type"),
+            Meet.year.label("year"),
+            Event.event_type.label("event_type"),
+        )
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .join(Event, AthleteResult.event == Event.event)
+        .outerjoin(School, Athlete.school_id == School.school_id)
+        .filter(
+            Meet.meet_type.in_(CONST.MEET_TYPE.ALL),
+            Meet.year.isnot(None),
+            Meet.year >= MIN_RECORDS_YEAR,
+            Event.event_type != CONST.EVENT_TYPE.RELAY,
+            AthleteResult.result2.isnot(None),
+        )
+    )
+    if gender:
+        query = query.filter(Athlete.gender == gender, Meet.gender == gender)
+    if year is not None:
+        query = query.filter(Meet.year == year)
+    if school_id is not None:
+        query = query.filter(Athlete.school_id == school_id)
+
+    per_meet: Dict[Tuple[int, str, int], Dict[str, Any]] = {}
+    for row in query.all():
+        candidate = {
+            "school_id": row.school_id,
+            "school_name": row.school_name,
+            "athlete_id": row.athlete_id,
+            "athlete_name": f"{(row.first or '').strip()} {(row.last or '').strip()}".strip(),
+            "gender": row.gender,
+            "event": row.event,
+            "meet_id": row.meet_id,
+            "meet_type": row.meet_type,
+            "year": row.year,
+            "event_type": row.event_type or CONST.EVENT_TYPE.TRACK,
+            "result_type": row.result_type,
+            "result": row.result,
+            "result_value": row.result_value,
+            "place": row.place,
+        }
+        key = (row.athlete_id, row.event, row.meet_id)
+        lower_is_better = _is_lower_better(candidate["event_type"])
+        per_meet[key] = _choose_result_entry(per_meet.get(key), candidate, lower_is_better)
+    return list(per_meet.values())
+
+
+def _resolve_postseason_relay_rows(
+    *,
+    gender: Optional[str] = None,
+    year: Optional[int] = None,
+    school_id: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    query = (
+        db.session.query(
+            RelayResult.school_id.label("school_id"),
+            School.school_name.label("school_name"),
+            Meet.gender.label("gender"),
+            RelayResult.event.label("event"),
+            RelayResult.meet_id.label("meet_id"),
+            Meet.meet_type.label("meet_type"),
+            Meet.year.label("year"),
+            RelayResult.result.label("result"),
+            RelayResult.result2.label("result_value"),
+            RelayResult.place.label("place"),
+            RelayResult.athlete_names.label("athlete_names"),
+        )
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .outerjoin(School, RelayResult.school_id == School.school_id)
+        .filter(
+            Meet.meet_type.in_(CONST.MEET_TYPE.ALL),
+            Meet.year.isnot(None),
+            Meet.year >= MIN_RECORDS_YEAR,
+            RelayResult.result2.isnot(None),
+        )
+    )
+    if gender:
+        query = query.filter(Meet.gender == gender)
+    if year is not None:
+        query = query.filter(Meet.year == year)
+    if school_id is not None:
+        query = query.filter(RelayResult.school_id == school_id)
+
+    return [
+        {
+            "school_id": row.school_id,
+            "school_name": row.school_name,
+            "gender": row.gender,
+            "event": row.event,
+            "meet_id": row.meet_id,
+            "meet_type": row.meet_type,
+            "year": row.year,
+            "event_type": CONST.EVENT_TYPE.RELAY,
+            "result": row.result,
+            "result_value": row.result_value,
+            "place": row.place,
+            "athlete_names": row.athlete_names,
+            "lineup": _extract_relay_names(row.athlete_names or ""),
+        }
+        for row in query.all()
+    ]
+
+
+def _compute_team_scores_for_meet(meet_id: int) -> Dict[int, Dict[str, Any]]:
+    meet = db.session.get(Meet, meet_id)
+    if not meet:
+        return {}
+
+    points_table = _STATE_PLACE_POINTS if meet.meet_type == CONST.MEET_TYPE.STATE else _PLACE_POINTS
+    scoring_limit = 9 if meet.meet_type == CONST.MEET_TYPE.STATE else 8
+
+    individual_rows = (
+        db.session.query(
+            Athlete.school_id,
+            AthleteResult.event,
+            AthleteResult.place,
+        )
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .filter(
+            AthleteResult.meet_id == meet_id,
+            AthleteResult.result_type == CONST.RESULT_TYPE.FINAL,
+            AthleteResult.place.isnot(None),
+            AthleteResult.place > 0,
+            AthleteResult.place <= scoring_limit,
+        )
+        .all()
+    )
+    relay_rows = (
+        db.session.query(
+            RelayResult.school_id,
+            RelayResult.event,
+            RelayResult.place,
+        )
+        .filter(
+            RelayResult.meet_id == meet_id,
+            RelayResult.place.isnot(None),
+            RelayResult.place > 0,
+            RelayResult.place <= scoring_limit,
+        )
+        .all()
+    )
+    event_groups: Dict[str, List[Tuple[int, int]]] = {}
+    for school_id_value, event_name, place in list(individual_rows) + list(relay_rows):
+        event_groups.setdefault(event_name, []).append((school_id_value, place))
+
+    points_by_school: Dict[int, float] = {}
+    for event_name, placements in event_groups.items():
+        by_place: Dict[int, List[int]] = {}
+        for school_id_value, place in placements:
+            by_place.setdefault(place, []).append(school_id_value)
+
+        for actual_place, tied_schools in by_place.items():
+            scoring_slots = [
+                place_number
+                for place_number in range(actual_place, actual_place + len(tied_schools))
+                if place_number in points_table
+            ]
+            points_value = (
+                sum(points_table[place_number] for place_number in scoring_slots) / len(tied_schools)
+                if scoring_slots
+                else 0
+            )
+            for school_id_value in tied_schools:
+                points_by_school[school_id_value] = points_by_school.get(school_id_value, 0) + points_value
+
+    participants = {
+        row[0]
+        for row in db.session.query(Athlete.school_id)
+        .join(AthleteResult, AthleteResult.athlete_id == Athlete.athlete_id)
+        .filter(AthleteResult.meet_id == meet_id)
+        .distinct()
+        .all()
+    }
+    participants.update(
+        row[0]
+        for row in db.session.query(RelayResult.school_id)
+        .filter(RelayResult.meet_id == meet_id)
+        .distinct()
+        .all()
+    )
+
+    school_names = dict(
+        db.session.query(School.school_id, School.school_name)
+        .filter(School.school_id.in_(participants))
+        .all()
+    ) if participants else {}
+
+    ranked = {}
+    ordered = sorted(
+        participants,
+        key=lambda school_id_value: (
+            -points_by_school.get(school_id_value, 0),
+            school_names.get(school_id_value, ""),
+        ),
+    )
+    for index, school_id_value in enumerate(ordered, start=1):
+        ranked[school_id_value] = {
+            "points": round(points_by_school.get(school_id_value, 0), 1),
+            "rank": index,
+            "total_teams": len(participants),
+        }
+    return ranked
+
+
+def get_school_dashboard_v2_stage_summary(school_id: int, gender: str, year: int):
+    stage_order = {CONST.MEET_TYPE.SECTIONAL: 1, CONST.MEET_TYPE.REGIONAL: 2, CONST.MEET_TYPE.STATE: 3}
+    scoring_cutoffs = {
+        CONST.MEET_TYPE.SECTIONAL: 8,
+        CONST.MEET_TYPE.REGIONAL: 8,
+        CONST.MEET_TYPE.STATE: 9,
+    }
+    summary = {
+        meet_type: {
+            "stage": meet_type,
+            "attended": False,
+            "entries": 0,
+            "scoring_finishes": 0,
+            "points": None,
+            "points_display": "—",
+            "team_rank": None,
+            "team_rank_display": "—",
+            "total_teams": None,
+        }
+        for meet_type in CONST.MEET_TYPE.ALL
+    }
+
+    individual_rows = (
+        db.session.query(
+            AthleteResult.meet_id,
+            AthleteResult.event,
+            AthleteResult.place,
+            AthleteResult.result_type,
+            Athlete.athlete_id,
+            Meet.meet_type,
+        )
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .filter(
+            Athlete.school_id == school_id,
+            Athlete.gender == gender,
+            Meet.gender == gender,
+            Meet.year == year,
+            Meet.meet_type.in_(CONST.MEET_TYPE.ALL),
+        )
+        .all()
+    )
+    relay_rows = (
+        db.session.query(
+            RelayResult.meet_id,
+            RelayResult.event,
+            RelayResult.place,
+            Meet.meet_type,
+        )
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .filter(
+            RelayResult.school_id == school_id,
+            Meet.gender == gender,
+            Meet.year == year,
+            Meet.meet_type.in_(CONST.MEET_TYPE.ALL),
+        )
+        .all()
+    )
+
+    meet_ids_by_stage: Dict[str, set] = {meet_type: set() for meet_type in CONST.MEET_TYPE.ALL}
+    stage_entries: Dict[str, set] = {meet_type: set() for meet_type in CONST.MEET_TYPE.ALL}
+    stage_scores: Dict[str, set] = {meet_type: set() for meet_type in CONST.MEET_TYPE.ALL}
+
+    for row in individual_rows:
+        key = ("individual", row.athlete_id, row.event)
+        stage_entries[row.meet_type].add(key)
+        meet_ids_by_stage[row.meet_type].add(row.meet_id)
+        scoring_cutoff = scoring_cutoffs.get(row.meet_type, 8)
+        if (
+            row.result_type == CONST.RESULT_TYPE.FINAL
+            and row.place is not None
+            and 0 < row.place <= scoring_cutoff
+        ):
+            stage_scores[row.meet_type].add(key)
+
+    for row in relay_rows:
+        key = ("relay", row.event)
+        stage_entries[row.meet_type].add(key)
+        meet_ids_by_stage[row.meet_type].add(row.meet_id)
+        scoring_cutoff = scoring_cutoffs.get(row.meet_type, 8)
+        if row.place is not None and 0 < row.place <= scoring_cutoff:
+            stage_scores[row.meet_type].add(key)
+
+    for meet_type in CONST.MEET_TYPE.ALL:
+        entry = summary[meet_type]
+        entry["attended"] = bool(stage_entries[meet_type])
+        entry["entries"] = len(stage_entries[meet_type])
+        entry["scoring_finishes"] = len(stage_scores[meet_type])
+        if not entry["attended"]:
+            continue
+
+        meet_id = sorted(meet_ids_by_stage[meet_type])[0] if meet_ids_by_stage[meet_type] else None
+        team_scores = _compute_team_scores_for_meet(meet_id) if meet_id else {}
+        team_stats = team_scores.get(school_id)
+        entry["points"] = team_stats.get("points", 0) if team_stats else 0
+        entry["points_display"] = _format_points_value(entry["points"]) or "0"
+        entry["team_rank"] = team_stats.get("rank") if team_stats else None
+        entry["total_teams"] = team_stats.get("total_teams") if team_stats else None
+        entry["team_rank_display"] = (
+            f"{_ordinal(entry['team_rank'])} of {entry['total_teams']}"
+            if entry["team_rank"] and entry["total_teams"]
+            else "—"
+        )
+
+    return {
+        "year": year,
+        "gender": gender,
+        "stages": [summary[meet_type] for meet_type in sorted(summary.keys(), key=lambda item: stage_order[item])],
+    }
+
+
+@lru_cache(maxsize=32)
+def _build_statewide_program_rankings(gender: str, year: int):
+    events = _school_dashboard_v2_events_for_gender(gender)
+    relay_events = set(CONST.EVENT.ALL_RELAY)
+    event_group_map = {}
+    for group_name, group_events in _school_dashboard_v2_event_groups(gender):
+        for event_name in group_events:
+            event_group_map[event_name] = group_name
+
+    resolved_individual_rows = _resolve_postseason_individual_rows(gender=gender, year=year)
+    sectional_entry_rows = (
+        db.session.query(
+            Athlete.school_id,
+            Athlete.athlete_id,
+            Athlete.first,
+            Athlete.last,
+            AthleteResult.event,
+        )
+        .join(AthleteResult, AthleteResult.athlete_id == Athlete.athlete_id)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .filter(
+            Athlete.gender == gender,
+            Meet.gender == gender,
+            Meet.year == year,
+            Meet.meet_type == CONST.MEET_TYPE.SECTIONAL,
+            AthleteResult.event.in_([event_name for event_name in events if event_name not in relay_events]),
+        )
+        .distinct()
+        .all()
+    )
+
+    sectional_entries_by_school_event: Dict[Tuple[int, str], List[Dict[str, Any]]] = {}
+    participating_schools = set()
+    for row in sectional_entry_rows:
+        participating_schools.add(row.school_id)
+        sectional_entries_by_school_event.setdefault((row.school_id, row.event), [])
+        athlete_name = f"{(row.first or '').strip()} {(row.last or '').strip()}".strip()
+        athletes = sectional_entries_by_school_event[(row.school_id, row.event)]
+        if not any(existing["athlete_id"] == row.athlete_id for existing in athletes):
+            athletes.append({"athlete_id": row.athlete_id, "athlete_name": athlete_name})
+
+    athlete_best_by_event: Dict[Tuple[int, str], Dict[str, Any]] = {}
+    for row in resolved_individual_rows:
+        if not _is_valid_postseason_mark(row["result_value"], row["event_type"]):
+            continue
+        key = (row["athlete_id"], row["event"])
+        existing = athlete_best_by_event.get(key)
+        lower_is_better = _is_lower_better(row["event_type"])
+        if existing is None or (
+            lower_is_better and row["result_value"] < existing["result_value"]
+        ) or (
+            not lower_is_better and row["result_value"] > existing["result_value"]
+        ):
+            athlete_best_by_event[key] = dict(row)
+
+    event_rank_lookup: Dict[Tuple[str, int], Dict[str, Any]] = {}
+    event_school_rows = {}
+    for event_name in [event_name for event_name in events if event_name not in relay_events]:
+        lower_is_better = _is_lower_better(_get_event_types_map().get(event_name, CONST.EVENT_TYPE.TRACK))
+        event_rows = [
+            {
+                **row,
+                "result_display": row.get("result") or _format_result_display(row["result_value"], row["event_type"]),
+            }
+            for row in athlete_best_by_event.values()
+            if row["event"] == event_name
+        ]
+        ranked_rows = _competition_rank_rows(event_rows, lower_is_better, value_key="result_value")
+        event_school_rows[event_name] = ranked_rows
+        for ranked_row in ranked_rows:
+            event_rank_lookup[(event_name, ranked_row["athlete_id"])] = ranked_row
+
+    relay_rows = _resolve_postseason_relay_rows(gender=gender, year=year)
+    relay_best_by_school_event: Dict[Tuple[int, str], Dict[str, Any]] = {}
+    relay_sectional_entries = (
+        db.session.query(RelayResult.school_id, RelayResult.event)
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .filter(
+            Meet.gender == gender,
+            Meet.year == year,
+            Meet.meet_type == CONST.MEET_TYPE.SECTIONAL,
+            RelayResult.event.in_(CONST.EVENT.ALL_RELAY),
+        )
+        .distinct()
+        .all()
+    )
+    for school_id_value, event_name in relay_sectional_entries:
+        participating_schools.add(school_id_value)
+
+    for row in relay_rows:
+        participating_schools.add(row["school_id"])
+        if not _is_valid_postseason_mark(row["result_value"], CONST.EVENT_TYPE.TRACK):
+            continue
+        key = (row["school_id"], row["event"])
+        existing = relay_best_by_school_event.get(key)
+        if existing is None or row["result_value"] < existing["result_value"]:
+            relay_best_by_school_event[key] = dict(row)
+
+    relay_rank_lookup: Dict[Tuple[str, int], Dict[str, Any]] = {}
+    relay_event_rows = {}
+    for event_name in CONST.EVENT.ALL_RELAY:
+        event_rows = [
+            {
+                **row,
+                "result_display": row.get("result") or _format_result_display(row["result_value"], CONST.EVENT_TYPE.TRACK),
+            }
+            for row in relay_best_by_school_event.values()
+            if row["event"] == event_name
+        ]
+        ranked_rows = _competition_rank_rows(event_rows, True, value_key="result_value")
+        relay_event_rows[event_name] = ranked_rows
+        for ranked_row in ranked_rows:
+            relay_rank_lookup[(event_name, ranked_row["school_id"])] = ranked_row
+
+    school_names = dict(
+        db.session.query(School.school_id, School.school_name)
+        .filter(School.school_id.in_(participating_schools))
+        .all()
+    ) if participating_schools else {}
+
+    school_results: Dict[int, Dict[str, Any]] = {}
+    for school_id_value in participating_schools:
+        event_results = []
+        group_accumulator: Dict[str, List[float]] = {}
+
+        for event_name in events:
+            group_name = event_group_map[event_name]
+            if event_name in relay_events:
+                relay_ranked = relay_rank_lookup.get((event_name, school_id_value))
+                total_marks = len(relay_event_rows.get(event_name, []))
+                event_score = _normalize_rank_to_score(relay_ranked.get("rank"), total_marks) if relay_ranked else 0.0
+                event_payload = {
+                    "event": event_name,
+                    "group": group_name,
+                    "event_score": event_score,
+                    "total_marks": total_marks,
+                    "slots": [
+                        {
+                            "entry_type": "relay",
+                            "school_id": school_id_value,
+                            "holder_name": school_names.get(school_id_value),
+                            "mark": relay_ranked.get("result_display") if relay_ranked else None,
+                            "statewide_rank": relay_ranked.get("rank") if relay_ranked else None,
+                            "statewide_score": event_score,
+                        }
+                    ],
+                }
+            else:
+                sectional_entries = sectional_entries_by_school_event.get((school_id_value, event_name), [])
+                lower_is_better = _is_lower_better(_get_event_types_map().get(event_name, CONST.EVENT_TYPE.TRACK))
+                sorted_entries = sorted(
+                    sectional_entries,
+                    key=lambda item: (
+                        athlete_best_by_event.get((item["athlete_id"], event_name), {}).get(
+                            "result_value",
+                            float("inf") if lower_is_better else float("-inf"),
+                        ),
+                        item["athlete_name"],
+                        item["athlete_id"],
+                    ),
+                    reverse=not lower_is_better,
+                )[:2]
+                slots = []
+                total_marks = len(event_school_rows.get(event_name, []))
+                for item in sorted_entries:
+                    ranked_row = event_rank_lookup.get((event_name, item["athlete_id"]))
+                    score = _normalize_rank_to_score(ranked_row.get("rank"), total_marks) if ranked_row else 0.0
+                    slots.append(
+                        {
+                            "entry_type": "individual",
+                            "athlete_id": item["athlete_id"],
+                            "holder_name": item["athlete_name"],
+                            "mark": ranked_row.get("result_display") if ranked_row else None,
+                            "statewide_rank": ranked_row.get("rank") if ranked_row else None,
+                            "statewide_score": score,
+                        }
+                    )
+                while len(slots) < 2:
+                    slots.append(
+                        {
+                            "entry_type": "individual",
+                            "athlete_id": None,
+                            "holder_name": None,
+                            "mark": None,
+                            "statewide_rank": None,
+                            "statewide_score": 0.0,
+                        }
+                    )
+                event_score = round(sum(slot["statewide_score"] for slot in slots) / 2, 1)
+                event_payload = {
+                    "event": event_name,
+                    "group": group_name,
+                    "event_score": event_score,
+                    "total_marks": total_marks,
+                    "slots": slots,
+                }
+
+            group_accumulator.setdefault(group_name, []).append(event_payload["event_score"])
+            event_results.append(event_payload)
+
+        composite_score = round(sum(item["event_score"] for item in event_results) / len(events), 1) if events else 0.0
+        group_scores = {
+            group_name: round(sum(values) / len(values), 1)
+            for group_name, values in group_accumulator.items()
+            if values
+        }
+        school_results[school_id_value] = {
+            "school_id": school_id_value,
+            "school_name": school_names.get(school_id_value),
+            "composite_score": composite_score,
+            "event_scores": event_results,
+            "group_scores": group_scores,
+        }
+
+    leaderboard_rows = _competition_rank_rows(
+        list(school_results.values()),
+        lower_is_better=False,
+        value_key="composite_score",
+    )
+    total_schools = len(leaderboard_rows)
+    leaderboard_by_school = {row["school_id"]: row for row in leaderboard_rows}
+    for row in leaderboard_rows:
+        row["total_schools"] = total_schools
+        row["rank_display"] = f"{_ordinal(row['rank'])} of {total_schools}" if total_schools else "—"
+
+    return {
+        "year": year,
+        "gender": gender,
+        "events": events,
+        "group_order": [group_name for group_name, _ in _school_dashboard_v2_event_groups(gender)],
+        "leaderboard": leaderboard_rows,
+        "by_school": leaderboard_by_school,
+    }
+
+
+# Half-width of the like-size peer window: each school is compared against the 30
+# schools nearest below and 30 nearest above it by enrollment, with the shortfall
+# pushed to the other side at the edges of the distribution.
+#
+# 60 rather than something larger because enrollment is the dominant confound in
+# the composite (statewide correlation 0.745) and only a tight window removes it:
+# inside a 60-window the residual enrollment/score correlation falls to ~0.20,
+# while a 200-window still leaves ~0.49 -- and with roughly 400 ranked schools a
+# 200-window is half the field, so ~49% of schools would share a clamped,
+# uncentered peer set instead of a genuinely local one.
+PEER_WINDOW_HALF = 30
+
+
+@lru_cache(maxsize=32)
+def _school_dashboard_v2_peer_standings(gender: str, year: int):
+    """Rank every school against the like-size programs nearest it by enrollment.
+
+    Statewide rank systematically flatters large schools -- several 2,000+ student
+    programs sit near the 75th percentile statewide but the 13th-20th among their
+    own size peers. This is the standing that answers "how are we doing for a
+    school our size", which statewide rank cannot.
+    """
+    state = _build_statewide_program_rankings(gender, year)
+    rows = list(state["by_school"].values())
+    if not rows:
+        return {}
+
+    schools = {
+        school.school_id: school
+        for school in School.query.options(joinedload(School.enrollments))
+        .filter(School.school_id.in_([row["school_id"] for row in rows]))
+        .all()
+    }
+
+    sized = []
+    for row in rows:
+        school = schools.get(row["school_id"])
+        meta = _resolve_school_enrollment_for_year(school, year) if school else None
+        if not meta or meta["value"] is None:
+            continue
+        sized.append((meta["value"], row["school_id"], row["composite_score"]))
+
+    sized.sort(key=lambda item: item[0])
+    count = len(sized)
+    standings = {}
+    for index, (enrollment, school_id, score) in enumerate(sized):
+        low, high = index - PEER_WINDOW_HALF, index + PEER_WINDOW_HALF
+        if low < 0:
+            high += -low
+            low = 0
+        if high > count - 1:
+            low -= high - (count - 1)
+            high = count - 1
+        window = sized[max(0, low):min(count - 1, high) + 1]
+        if not window:
+            continue
+        standings[school_id] = {
+            "rank": sum(1 for peer in window if peer[2] > score) + 1,
+            "total": len(window),
+            "percentile": round(100.0 * sum(1 for peer in window if peer[2] < score) / len(window), 1),
+            "enrollment": enrollment,
+            "enrollment_min": window[0][0],
+            "enrollment_max": window[-1][0],
+        }
+    return standings
+
+
+@lru_cache(maxsize=32)
+def _school_dashboard_v2_rank_baselines(gender: str, year: int):
+    """Median composite and per-group scores across every ranked school.
+
+    A 0-100 strength score means nothing on its own -- "Relays 54.4" is only
+    legible next to what a typical program scores. These medians are what the
+    UI draws as a reference marker on each bar.
+    """
+    state = _build_statewide_program_rankings(gender, year)
+    rows = list(state["by_school"].values())
+    if not rows:
+        return {"composite": 0.0, "groups": {}, "ranked_schools": 0}
+
+    group_values: Dict[str, List[float]] = {}
+    for row in rows:
+        for group_name, score in (row.get("group_scores") or {}).items():
+            group_values.setdefault(group_name, []).append(score)
+
+    composite_sorted = sorted(row["composite_score"] for row in rows)
+    count = len(composite_sorted)
+
+    return {
+        "composite": round(statistics.median(composite_sorted), 1),
+        "groups": {
+            group_name: round(statistics.median(values), 1)
+            for group_name, values in group_values.items()
+        },
+        "ranked_schools": count,
+        # Sorted score arrays, kept in the cached structure so standings can be
+        # resolved with a bisect instead of rescanning every school per request.
+        "composite_sorted": composite_sorted,
+        "group_sorted": {
+            group_name: sorted(values) for group_name, values in group_values.items()
+        },
+        # Quartiles on the SCORE axis. On a rank axis these would always land on
+        # 25/50/75 and carry no information; here their bunching is what shows
+        # the distribution's skew.
+        "quartiles": {
+            "min": round(composite_sorted[0], 1),
+            "q1": round(composite_sorted[count // 4], 1),
+            "median": round(statistics.median(composite_sorted), 1),
+            "q3": round(composite_sorted[(3 * count) // 4], 1),
+            "max": round(composite_sorted[-1], 1),
+        },
+    }
+
+
+def get_school_dashboard_v2_program_rank(school_id: int, gender: str, year: int):
+    state = _build_statewide_program_rankings(gender, year)
+    baselines = _school_dashboard_v2_rank_baselines(gender, year)
+    school_row = state["by_school"].get(school_id)
+    if not school_row:
+        return {
+            "year": year,
+            "gender": gender,
+            "rank": None,
+            "rank_display": "Not ranked",
+            "is_ranked": False,
+            "percentile": None,
+            "standing": None,
+            "total_schools": len(state["leaderboard"]),
+            "composite_score": None,
+            "bar_value": 0.0,
+            "state_median_composite": baselines["composite"],
+            "state_median_group_scores": baselines["groups"],
+            "group_percentiles": {},
+            "entry_slots": None,
+            "posted_mark_percentile": None,
+            "peer_standing": None,
+            "score_distribution": baselines["quartiles"],
+            "group_scores": {},
+            "event_scores": [],
+            "info_text": (
+                "Unofficial postseason comparison. Each event is normalized to a 0-100 scale from statewide postseason marks, "
+                "ties share the same rank, and missing or invalid entries score 0."
+            ),
+        }
+
+    # Standing is counted directly rather than derived from rank, so tied programs
+    # are reported as tied instead of being silently folded into "behind you".
+    total_schools = school_row["total_schools"] or 0
+    composite_sorted = baselines["composite_sorted"]
+    my_score = school_row["composite_score"]
+    behind = bisect.bisect_left(composite_sorted, my_score)
+    at_or_below = bisect.bisect_right(composite_sorted, my_score)
+    tied = max(0, at_or_below - behind - 1)  # excludes this school itself
+    ahead = max(0, len(composite_sorted) - at_or_below)
+    percentile = round(100.0 * behind / len(composite_sorted), 1) if composite_sorted else None
+
+    # The composite is a mean of per-slot percentiles with empty slots counted as
+    # zero, so ~70% of its variance across the state is roster depth rather than
+    # mark quality. Reporting its two ingredients separately lets a rank be read
+    # as "few entries" vs "slow marks" instead of collapsing both into one number.
+    all_slots = [slot for entry in school_row["event_scores"] for slot in entry["slots"]]
+    scoring_slots = [slot for slot in all_slots if slot.get("statewide_rank")]
+    entered_slots = [slot for slot in all_slots if slot.get("holder_name")]
+    entry_slots = {
+        "total": len(all_slots),
+        "filled": len(scoring_slots),
+        "entered": len(entered_slots),
+    }
+    posted_mark_percentile = (
+        round(sum(slot["statewide_score"] for slot in scoring_slots) / len(scoring_slots), 1)
+        if scoring_slots
+        else None
+    )
+
+    def _group_percentile(group_name, score):
+        values = baselines["group_sorted"].get(group_name) or []
+        if not values:
+            return None
+        return round(100.0 * bisect.bisect_left(values, score) / len(values), 1)
+
+    return {
+        "standing": {
+            "behind": behind,
+            "tied": tied,
+            "ahead": ahead,
+            "total": total_schools,
+        },
+        # Percentile per group, so the six tiles become comparable to each other.
+        # Raw group scores are not: each group has its own distribution, so a 57.2
+        # in Jumps can outrank a 59.5 in Hurdles against the field.
+        "group_percentiles": {
+            group_name: _group_percentile(group_name, score)
+            for group_name, score in (school_row["group_scores"] or {}).items()
+        },
+        "entry_slots": entry_slots,
+        "posted_mark_percentile": posted_mark_percentile,
+        "peer_standing": _school_dashboard_v2_peer_standings(gender, year).get(school_id),
+        "score_distribution": baselines["quartiles"],
+        "year": year,
+        "gender": gender,
+        "rank": school_row["rank"],
+        "rank_display": school_row["rank_display"],
+        "is_ranked": True,
+        "percentile": percentile,
+        "total_schools": total_schools,
+        "composite_score": school_row["composite_score"],
+        "bar_value": school_row["composite_score"],
+        "state_median_composite": baselines["composite"],
+        "state_median_group_scores": baselines["groups"],
+        "group_scores": school_row["group_scores"],
+        "event_scores": school_row["event_scores"],
+        "info_text": (
+            "Unofficial postseason comparison only, not IHSAA team scoring. Individual events use up to two sectional-entry slots per school; "
+            "relays use one slot. Valid postseason marks are ranked statewide with ties sharing rank, then converted to 0-100 scores. "
+            "Missing entries, DNF/DNS/DQ-style invalid marks, and empty slots score 0."
+        ),
+    }
+
+
+def get_school_dashboard_v2_leaderboard(
+    school_id: int,
+    gender: str,
+    year: int,
+    *,
+    top_n: int = 25,
+    enrollment_max: Optional[int] = None,
+):
+    if top_n <= 0:
+        raise ValueError("top_n must be a positive integer")
+
+    state = _build_statewide_program_rankings(gender, year)
+    schools = {
+        school.school_id: school
+        for school in School.query.options(joinedload(School.enrollments))
+        .filter(School.school_id.in_([row["school_id"] for row in state["leaderboard"]]))
+        .all()
+    }
+
+    enriched_rows = []
+    for row in state["leaderboard"]:
+        school = schools.get(row["school_id"])
+        enrollment_meta = _resolve_school_enrollment_for_year(school, year) if school else {"value": None, "source_year": None, "is_exact": False}
+        enriched = {
+            "school_id": row["school_id"],
+            "school_name": row["school_name"],
+            "rank": row["rank"],
+            "rank_display": row["rank_display"],
+            "composite_score": row["composite_score"],
+            "enrollment": enrollment_meta["value"],
+            "enrollment_source_year": enrollment_meta["source_year"],
+            "enrollment_is_exact": enrollment_meta["is_exact"],
+        }
+        enriched_rows.append(enriched)
+
+    filtered_rows = [
+        row
+        for row in enriched_rows
+        if enrollment_max is None or (row["enrollment"] is not None and row["enrollment"] <= enrollment_max)
+    ]
+    selected_school_row = next((row for row in filtered_rows if row["school_id"] == school_id), None)
+    visible_rows = filtered_rows[:top_n]
+    selected_school_filtered_out = school_id not in {row["school_id"] for row in filtered_rows}
+    if selected_school_row and school_id not in {row["school_id"] for row in visible_rows}:
+        pinned_row = dict(selected_school_row)
+        pinned_row["is_pinned"] = True
+        visible_rows.append(pinned_row)
+
+    return {
+        "year": year,
+        "gender": gender,
+        "top_n": top_n,
+        "enrollment_max": enrollment_max,
+        "total_schools": len(enriched_rows),
+        "filtered_schools": len(filtered_rows),
+        "rows": visible_rows,
+        "selected_school_row": selected_school_row,
+        "selected_school_filtered_out": selected_school_filtered_out,
+    }
+
+
+def _build_school_best_history(gender: str):
+    individual_rows = _resolve_postseason_individual_rows(gender=gender)
+    history: Dict[Tuple[int, str, int], Dict[str, Any]] = {}
+    for row in individual_rows:
+        if not _is_valid_postseason_mark(row["result_value"], row["event_type"]):
+            continue
+        key = (row["school_id"], row["event"], row["year"])
+        enriched = {
+            **row,
+            "result_display": row.get("result") or _format_result_display(row["result_value"], row["event_type"]),
+        }
+        existing = history.get(key)
+        lower_is_better = _is_lower_better(row["event_type"])
+        if existing is None or (
+            lower_is_better and enriched["result_value"] < existing["result_value"]
+        ) or (
+            not lower_is_better and enriched["result_value"] > existing["result_value"]
+        ):
+            history[key] = enriched
+
+    for row in _resolve_postseason_relay_rows(gender=gender):
+        if not _is_valid_postseason_mark(row["result_value"], CONST.EVENT_TYPE.TRACK):
+            continue
+        key = (row["school_id"], row["event"], row["year"])
+        enriched = {
+            **row,
+            "result_display": row.get("result") or _format_result_display(row["result_value"], CONST.EVENT_TYPE.TRACK),
+        }
+        existing = history.get(key)
+        if existing is None or enriched["result_value"] < existing["result_value"]:
+            history[key] = enriched
+    return history
+
+
+def _prior_season_status_for_best_mark(
+    *,
+    school_id: int,
+    event_name: str,
+    current_year: int,
+    current_row: Optional[Dict[str, Any]],
+    history: Dict[Tuple[int, str, int], Dict[str, Any]],
+):
+    if not current_row:
+        return {
+            "label": "—",
+            "tone": "muted",
+            "tooltip": "No postseason mark this season.",
+        }
+
+    prior_years = sorted(
+        [
+            year
+            for candidate_school_id, candidate_event, year in history.keys()
+            if candidate_school_id == school_id and candidate_event == event_name and year < current_year
+        ],
+        reverse=True,
+    )
+    if not prior_years:
+        if current_year == MIN_RECORDS_YEAR:
+            return {
+                "label": "—",
+                "tone": "muted",
+                "tooltip": f"No earlier covered postseason season before {current_year}.",
+            }
+        return {
+            "label": "New",
+            "tone": "accent",
+            "tooltip": f"First covered postseason mark for this event: {current_year} ({current_row['result_display']}).",
+        }
+
+    prior_year = prior_years[0]
+    prior_row = history[(school_id, event_name, prior_year)]
+    lower_is_better = _is_lower_better(current_row["event_type"])
+    if current_row["result_value"] == prior_row["result_value"]:
+        label = "Same"
+        tone = "muted"
+    elif (lower_is_better and current_row["result_value"] < prior_row["result_value"]) or (
+        not lower_is_better and current_row["result_value"] > prior_row["result_value"]
+    ):
+        label = "Improved"
+        tone = "success"
+    else:
+        label = "—"
+        tone = "muted"
+
+    return {
+        "label": label,
+        "tone": tone,
+        "tooltip": f"Compared with {prior_year}: {current_row['result_display']} vs {prior_row['result_display']}.",
+        "compared_year": prior_year,
+        "prior_mark": prior_row["result_display"],
+    }
+
+
+def get_school_dashboard_v2_scorecard(school_id: int, gender: str, season):
+    events = _school_dashboard_v2_events_for_gender(gender)
+    event_group_map = {}
+    for group_name, group_events in _school_dashboard_v2_event_groups(gender):
+        for event_name in group_events:
+            event_group_map[event_name] = group_name
+
+    history = _build_school_best_history(gender)
+    school = db.session.get(School, school_id)
+    school_name = school.school_name if school else None
+
+    if season == "all-time":
+        scope_year = None
+        season_label = "All-Time"
+    else:
+        scope_year = int(season)
+        season_label = str(scope_year)
+
+    scoped_individual_rows = _resolve_postseason_individual_rows(gender=gender, year=scope_year)
+    scoped_relay_rows = _resolve_postseason_relay_rows(gender=gender, year=scope_year)
+
+    school_best_rows: Dict[Tuple[int, str], Dict[str, Any]] = {}
+    for row in scoped_individual_rows:
+        if not _is_valid_postseason_mark(row["result_value"], row["event_type"]):
+            continue
+        key = (row["school_id"], row["event"])
+        enriched = dict(row)
+        enriched["result_display"] = row.get("result") or _format_result_display(row["result_value"], row["event_type"])
+        existing = school_best_rows.get(key)
+        lower_is_better = _is_lower_better(row["event_type"])
+        if existing is None or (
+            lower_is_better and enriched["result_value"] < existing["result_value"]
+        ) or (
+            not lower_is_better and enriched["result_value"] > existing["result_value"]
+        ):
+            school_best_rows[key] = enriched
+
+    relay_lookup = {}
+    for row in _compute_school_relay_results(school_id):
+        if row.get("gender") != gender:
+            continue
+        if scope_year is not None and row.get("year") != scope_year:
+            continue
+        if not _is_valid_postseason_mark(row.get("result_value"), CONST.EVENT_TYPE.TRACK):
+            continue
+        key = (school_id, row["event"])
+        enriched = {
+            **row,
+            "school_id": school_id,
+            "school_name": school_name,
+            "result_display": row.get("result") or _format_result_display(row["result_value"], CONST.EVENT_TYPE.TRACK),
+            "event_type": CONST.EVENT_TYPE.TRACK,
+        }
+        existing = relay_lookup.get(key)
+        if existing is None or enriched["result_value"] < existing["result_value"]:
+            relay_lookup[key] = enriched
+    relay_best_rows_all_schools: Dict[Tuple[int, str], Dict[str, Any]] = {}
+    for row in scoped_relay_rows:
+        if not _is_valid_postseason_mark(row["result_value"], CONST.EVENT_TYPE.TRACK):
+            continue
+        key = (row["school_id"], row["event"])
+        enriched = dict(row)
+        enriched["result_display"] = row.get("result") or _format_result_display(row["result_value"], CONST.EVENT_TYPE.TRACK)
+        existing = relay_best_rows_all_schools.get(key)
+        if existing is None or enriched["result_value"] < existing["result_value"]:
+            relay_best_rows_all_schools[key] = enriched
+
+    event_rankings = {}
+    for event_name in events:
+        if event_name in CONST.EVENT.ALL_RELAY:
+            event_rows = [row for row in relay_best_rows_all_schools.values() if row["event"] == event_name]
+            ranked_rows = _competition_rank_rows(event_rows, True, "result_value")
+        else:
+            event_rows = [row for row in school_best_rows.values() if row["event"] == event_name]
+            ranked_rows = _competition_rank_rows(event_rows, _is_lower_better(event_rows[0]["event_type"]) if event_rows else True, "result_value")
+        event_rankings[event_name] = ranked_rows
+
+    rows = []
+    for event_name in events:
+        if event_name in CONST.EVENT.ALL_RELAY:
+            best_row = relay_lookup.get((school_id, event_name))
+            ranking_row = next((row for row in event_rankings.get(event_name, []) if row["school_id"] == school_id), None)
+            holder_name = school_name
+            status = None if season == "all-time" else _prior_season_status_for_best_mark(
+                school_id=school_id,
+                event_name=event_name,
+                current_year=scope_year,
+                current_row=best_row,
+                history=history,
+            )
+        else:
+            best_row = school_best_rows.get((school_id, event_name))
+            ranking_row = next((row for row in event_rankings.get(event_name, []) if row["school_id"] == school_id), None)
+            holder_name = best_row.get("athlete_name") if best_row else None
+            status = None if season == "all-time" else _prior_season_status_for_best_mark(
+                school_id=school_id,
+                event_name=event_name,
+                current_year=scope_year,
+                current_row=best_row,
+                history=history,
+            )
+
+        rows.append(
+            {
+                "event": event_name,
+                "group": event_group_map[event_name],
+                "mark_display": best_row.get("result_display") if best_row else "No mark",
+                "holder_name": holder_name,
+                "holder_type": "relay" if event_name in CONST.EVENT.ALL_RELAY else "athlete",
+                "holder_athlete_id": best_row.get("athlete_id") if best_row and event_name not in CONST.EVENT.ALL_RELAY else None,
+                "rank": ranking_row.get("rank") if ranking_row else None,
+                "rank_total": len(event_rankings.get(event_name, [])),
+                "rank_display": (
+                    f"{_ordinal(ranking_row['rank'])} of {len(event_rankings.get(event_name, []))}"
+                    if ranking_row
+                    else "—"
+                ),
+                "status": status,
+                "achieved_year": best_row.get("year") if best_row else None,
+            }
+        )
+
+    return {
+        "gender": gender,
+        "season": season,
+        "season_label": season_label,
+        "rows": rows,
+    }
+
+
+def get_school_dashboard_v2_event_detail(school_id: int, gender: str, year: int, event_name: str):
+    valid_events = _school_dashboard_v2_events_for_gender(gender)
+    if event_name not in valid_events:
+        raise ValueError("event is not valid for the selected gender")
+
+    school = db.session.get(School, school_id)
+    school_name = school.school_name if school else None
+
+    if event_name in CONST.EVENT.ALL_RELAY:
+        all_marks = [
+            {
+                "row_type": "relay",
+                "event": row["event"],
+                "team_name": school_name,
+                "mark": row.get("result") or _format_result_display(row.get("result_value"), CONST.EVENT_TYPE.TRACK),
+                "stage": row.get("meet_type"),
+                "place": row.get("place"),
+                "lineup": row.get("lineup", []),
+                "year": row.get("year"),
+            }
+            for row in _compute_school_relay_results(school_id)
+            if row.get("gender") == gender and row.get("year") == year
+            if row["event"] == event_name
+        ]
+        trend_rows = []
+        for row in _compute_school_relay_results(school_id):
+            if row.get("gender") != gender:
+                continue
+            if row["event"] != event_name or not _is_valid_postseason_mark(row["result_value"], CONST.EVENT_TYPE.TRACK):
+                continue
+            existing = next((item for item in trend_rows if item["year"] == row["year"]), None)
+            enriched = {
+                "year": row["year"],
+                "mark_value": row["result_value"],
+                "mark_display": row.get("result") or _format_result_display(row["result_value"], CONST.EVENT_TYPE.TRACK),
+                "holder_name": school_name,
+                "holder_athlete_id": None,
+                "stage": row.get("meet_type"),
+                "place": row.get("place"),
+                "lineup": row.get("lineup", []),
+                "is_selected_season": row["year"] == year,
+            }
+            if existing is None or enriched["mark_value"] < existing["mark_value"]:
+                if existing is None:
+                    trend_rows.append(enriched)
+                else:
+                    trend_rows[trend_rows.index(existing)] = enriched
+        trend_rows.sort(key=lambda item: item["year"])
+        event_type = CONST.EVENT_TYPE.TRACK
+    else:
+        raw_rows = (
+            db.session.query(
+                AthleteResult.result,
+                AthleteResult.result2,
+                AthleteResult.place,
+                AthleteResult.result_type,
+                AthleteResult.event,
+                Athlete.athlete_id,
+                Athlete.first,
+                Athlete.last,
+                Meet.meet_type,
+                Meet.year,
+                Event.event_type,
+            )
+            .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+            .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+            .join(Event, AthleteResult.event == Event.event)
+            .filter(
+                Athlete.school_id == school_id,
+                Athlete.gender == gender,
+                Meet.gender == gender,
+                Meet.year == year,
+                Meet.meet_type.in_(CONST.MEET_TYPE.ALL),
+                AthleteResult.event == event_name,
+            )
+            .all()
+        )
+        all_marks = [
+            {
+                "row_type": "individual",
+                "event": row.event,
+                "athlete_id": row.athlete_id,
+                "athlete_name": f"{(row.first or '').strip()} {(row.last or '').strip()}".strip(),
+                "mark": row.result or _format_result_display(row.result2, row.event_type),
+                "stage": row.meet_type,
+                "place": row.place,
+                "result_type": row.result_type,
+                "year": row.year,
+            }
+            for row in raw_rows
+        ]
+
+        resolved_rows = _resolve_postseason_individual_rows(school_id=school_id, gender=gender)
+        sectional_entry_ids_by_year: Dict[int, set] = {}
+        sectionals_all_years = (
+            db.session.query(
+                Athlete.athlete_id,
+                Meet.year,
+            )
+            .join(AthleteResult, AthleteResult.athlete_id == Athlete.athlete_id)
+            .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+            .filter(
+                Athlete.school_id == school_id,
+                Athlete.gender == gender,
+                Meet.gender == gender,
+                Meet.meet_type == CONST.MEET_TYPE.SECTIONAL,
+                AthleteResult.event == event_name,
+                Meet.year >= MIN_RECORDS_YEAR,
+            )
+            .distinct()
+            .all()
+        )
+        for athlete_id_value, row_year in sectionals_all_years:
+            sectional_entry_ids_by_year.setdefault(row_year, set()).add(athlete_id_value)
+
+        for row in raw_rows:
+            if row.meet_type == CONST.MEET_TYPE.SECTIONAL:
+                sectional_entry_ids_by_year.setdefault(row.year, set()).add(row.athlete_id)
+
+        trend_by_year: Dict[int, List[Dict[str, Any]]] = {}
+        for row in resolved_rows:
+            if row["event"] != event_name or row["year"] not in sectional_entry_ids_by_year:
+                continue
+            if row["athlete_id"] not in sectional_entry_ids_by_year.get(row["year"], set()):
+                continue
+            if not _is_valid_postseason_mark(row["result_value"], row["event_type"]):
+                continue
+            trend_by_year.setdefault(row["year"], [])
+            trend_by_year[row["year"]].append(
+                {
+                    "year": row["year"],
+                    "mark_value": row["result_value"],
+                    "mark_display": row.get("result") or _format_result_display(row["result_value"], row["event_type"]),
+                    "holder_name": row.get("athlete_name"),
+                    "holder_athlete_id": row.get("athlete_id"),
+                    "stage": row.get("meet_type"),
+                    "place": row.get("place"),
+                    "is_selected_season": row["year"] == year,
+                }
+            )
+
+        trend_rows = []
+        for trend_year, year_rows in sorted(trend_by_year.items()):
+            lower_is_better = _is_lower_better(_get_event_types_map().get(event_name, CONST.EVENT_TYPE.TRACK))
+            ordered = sorted(
+                year_rows,
+                key=lambda item: (item["mark_value"], item["holder_name"]),
+                reverse=not lower_is_better,
+            )[:2]
+            trend_rows.extend(ordered)
+        event_type = _get_event_types_map().get(event_name, CONST.EVENT_TYPE.TRACK)
+
+    return {
+        "event": event_name,
+        "gender": gender,
+        "year": year,
+        "event_type": event_type,
+        "all_marks": all_marks,
+        "trend_points": trend_rows,
+        "chart_inverts_axis": event_type != CONST.EVENT_TYPE.FIELD,
+    }
+
+
+def _format_school_qualifier_row(row: Dict[str, Any], stage_name: str, event_name: Optional[str] = None):
+    source_label = row.get("sectional_host")
+    if row.get("sectional_num") is not None and not source_label:
+        source_label = f"{stage_name} feed {row.get('sectional_num')}"
+    return {
+        "event": row.get("event") or event_name,
+        "mark": row.get("result") or "—",
+        "place": row.get("place"),
+        "qualifier_type": row.get("qualifier_type"),
+        "source_label": source_label,
+        "school_id": row.get("school_id"),
+        "school_name": row.get("school"),
+        "athlete_id": row.get("athlete_id"),
+        "name": row.get("name") or row.get("school"),
+        "lineup": [],
+    }
+
+
+@lru_cache(maxsize=128)
+def get_school_dashboard_v2_qualifiers(school_id: int, gender: str, year: int):
+    if year < MIN_RECORDS_YEAR:
+        return {
+            "year": year,
+            "gender": gender,
+            "available": False,
+            "regional": None,
+            "state": None,
+        }
+
+    regional_stage = {
+        "stage": CONST.MEET_TYPE.REGIONAL,
+        "individual": [],
+        "relay": [],
+        "regional_num": None,
+        "status": "empty",
+        "empty_text": "No regional qualifiers for this school in the selected postseason season.",
+    }
+    for regional_num in sorted(REGIONAL_SECTIONAL_GROUPS.keys()):
+        payload = get_regional_qualifiers(gender=gender, regional_num=regional_num, year=year)
+        stage_rows = []
+        for event_block in payload.get("events", []):
+            for row in event_block.get("qualifiers", []):
+                if row.get("is_placeholder") or row.get("school_id") != school_id:
+                    continue
+                stage_rows.append(_format_school_qualifier_row(row, CONST.MEET_TYPE.SECTIONAL, event_block.get("event")))
+        if stage_rows:
+            regional_stage["regional_num"] = regional_num
+            regional_stage["status"] = payload.get("context", {}).get("status", "ready")
+            for entry in stage_rows:
+                target = regional_stage["relay"] if entry["event"] in CONST.EVENT.ALL_RELAY else regional_stage["individual"]
+                target.append(entry)
+            break
+
+    state_payload = get_state_qualifiers(gender=gender, year=year)
+    state_stage = {
+        "stage": CONST.MEET_TYPE.STATE,
+        "individual": [],
+        "relay": [],
+        "status": state_payload.get("context", {}).get("status", "pending"),
+        "empty_text": "No state qualifiers for this school in the selected postseason season.",
+    }
+    for event_block in state_payload.get("events", []):
+        for row in event_block.get("qualifiers", []):
+            if row.get("is_placeholder") or row.get("school_id") != school_id:
+                continue
+            entry = _format_school_qualifier_row(row, CONST.MEET_TYPE.REGIONAL, event_block.get("event"))
+            target = state_stage["relay"] if entry["event"] in CONST.EVENT.ALL_RELAY else state_stage["individual"]
+            target.append(entry)
+
+    return {
+        "year": year,
+        "gender": gender,
+        "available": True,
+        "regional": regional_stage,
+        "state": state_stage,
+    }
+
+
+def get_school_dashboard_v2_core(school_id: int, gender: Optional[str] = None, season: Optional[str] = None):
+    scope = _get_school_dashboard_v2_scope(school_id, gender=gender, season=season)
+    if not scope:
+        return None
+
+    school, clean_gender, selected_season, available_years = scope
+    selected_year = None if selected_season == "all-time" else int(selected_season)
+    enrollment_meta = _resolve_school_enrollment_for_year(school, selected_year)
+    return {
+        "school": {
+            "id": school.school_id,
+            "name": school.school_name,
+            "city": school.city,
+            "school_type": school.school_type,
+            "logo_url": _school_logo_url(school),
+            "enrollment": enrollment_meta["value"],
+            "enrollment_source_year": enrollment_meta["source_year"],
+            "enrollment_is_exact": enrollment_meta["is_exact"],
+        },
+        "filters": {
+            "selected_gender": clean_gender,
+            "selected_season": selected_season,
+            "default_season": _default_school_dashboard_v2_season(clean_gender, available_years),
+            "genders": list(CONST.GENDER.ALL),
+            "covered_seasons": _school_dashboard_v2_covered_years(clean_gender),
+            "seasons": available_years + (["all-time"] if available_years else ["all-time"]),
+            "season_labels": {**{str(year_value): str(year_value) for year_value in available_years}, "all-time": "All-Time"},
+        },
+        "stage_results": None if selected_year is None else get_school_dashboard_v2_stage_summary(school_id, clean_gender, selected_year),
+        "all_time_intro": (
+            "All-Time mode shows covered postseason program bests only. Stage cards and qualifier lists are hidden because combining advancement stages across seasons is misleading."
+            if selected_year is None
+            else None
+        ),
+    }
 
 
 # -----------------------------------------------------------------------------
@@ -4321,3 +5929,1014 @@ def get_state_qualifiers(gender: str, year: int = CURRENT_QUALIFIER_YEAR):
 
     return response
 
+
+# ---------------------------------------------------------------------------
+# School dashboard v3 -- coach-facing scorecard.
+#
+# v3 is additive: it never modifies the v2 functions above, and reuses their
+# private helpers so both pages stay in agreement. The design goal is that every
+# figure on the page is a real mark, a real rank, or real meet points -- no
+# composite scores, which repeatedly proved to need a footnote to be read right.
+# ---------------------------------------------------------------------------
+
+_H2H_INDIVIDUAL_POINTS = (5, 3, 1)
+_H2H_RELAY_POINTS = (5,)
+
+
+@lru_cache(maxsize=64)
+def _school_dashboard_v3_grades(gender: str, year: int):
+    """Class year (FR/SO/JR/SR) for every athlete with a postseason mark that season.
+
+    ``athlete_result.grade`` is populated on 100% of rows, so this is the reliable
+    way to answer "who is coming back" -- ``athlete.grad_year`` is not needed and
+    would disagree for athletes who repeat or skip a year. An athlete can carry
+    different grades across meets in the same season (data entry), so the most
+    advanced grade seen wins: assuming a senior is graduating is the safer error,
+    since it under-promises what returns rather than over-promising it.
+    """
+    order = {"FR": 0, "SO": 1, "JR": 2, "SR": 3}
+    rows = (
+        db.session.query(AthleteResult.athlete_id, AthleteResult.grade)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .filter(
+            Meet.meet_type.in_(CONST.MEET_TYPE.ALL),
+            Meet.year == year,
+            Meet.gender == gender,
+            Athlete.gender == gender,
+        )
+        .all()
+    )
+    grades: Dict[int, str] = {}
+    for athlete_id, grade in rows:
+        if grade not in order:
+            continue
+        current = grades.get(athlete_id)
+        if current is None or order[grade] > order[current]:
+            grades[athlete_id] = grade
+    return grades
+
+
+def _school_dashboard_v3_season_entries(
+    school_id: int, gender: str, year: int, exclude_athlete_ids=frozenset()
+):
+    """The entries one school could field in one season, by event.
+
+    Up to two individual entries per event and one relay -- the same slot model
+    as the IHSAA sectional entry limit. Each entry is that athlete's best valid
+    postseason mark, so a season is represented by its strongest available team.
+
+    ``exclude_athlete_ids`` drops athletes before the slots are chosen, not after,
+    so removing a graduating senior promotes the next athlete in that event into
+    the open slot. Filtering afterwards would leave the slot empty and overstate
+    what graduation costs.
+    """
+    best_by_athlete: Dict[Tuple[str, int], Dict[str, Any]] = {}
+    for row in _resolve_postseason_individual_rows(gender=gender, year=year, school_id=school_id):
+        if not _is_valid_postseason_mark(row["result_value"], row["event_type"]):
+            continue
+        if row["athlete_id"] in exclude_athlete_ids:
+            continue
+        key = (row["event"], row["athlete_id"])
+        existing = best_by_athlete.get(key)
+        lower_is_better = _is_lower_better(row["event_type"])
+        if existing is None or (
+            row["result_value"] < existing["result_value"] if lower_is_better
+            else row["result_value"] > existing["result_value"]
+        ):
+            best_by_athlete[key] = row
+
+    by_event: Dict[str, List[Dict[str, Any]]] = {}
+    for (event_name, _athlete_id), row in best_by_athlete.items():
+        by_event.setdefault(event_name, []).append(row)
+
+    for event_name, entries in by_event.items():
+        lower_is_better = _is_lower_better(entries[0]["event_type"])
+        entries.sort(key=lambda item: item["result_value"], reverse=not lower_is_better)
+        by_event[event_name] = entries[:2]
+
+    for row in _resolve_postseason_relay_rows(gender=gender, year=year, school_id=school_id):
+        if not _is_valid_postseason_mark(row["result_value"], CONST.EVENT_TYPE.TRACK):
+            continue
+        current = by_event.get(row["event"])
+        if not current or row["result_value"] < current[0]["result_value"]:
+            enriched = dict(row)
+            enriched.setdefault("event_type", CONST.EVENT_TYPE.TRACK)
+            by_event[row["event"]] = [enriched]
+
+    return by_event
+
+
+def _score_h2h_meet(current_entries, prior_entries):
+    """Score two seasons of the same school against each other as a dual meet.
+
+    5-3-1 for individual events, 5-0 for relays. An event a side did not contest
+    simply yields it no points -- the vacancy costs the same in every event,
+    which is exactly how it works at a real meet.
+    """
+    points_current = 0.0
+    points_prior = 0.0
+    events_won = 0
+    events_lost = 0
+    uncontested_points = 0.0
+
+    for event_name in sorted(set(current_entries) | set(prior_entries)):
+        mine = current_entries.get(event_name, [])
+        theirs = prior_entries.get(event_name, [])
+        sample = (mine or theirs)[0]
+        event_type = sample.get("event_type") or CONST.EVENT_TYPE.TRACK
+        lower_is_better = _is_lower_better(event_type)
+
+        field = [(row["result_value"], "current") for row in mine]
+        field += [(row["result_value"], "prior") for row in theirs]
+        field.sort(key=lambda item: item[0], reverse=not lower_is_better)
+
+        table = _H2H_RELAY_POINTS if event_name in CONST.EVENT.ALL_RELAY else _H2H_INDIVIDUAL_POINTS
+        event_current = 0.0
+        event_prior = 0.0
+
+        # Equal marks split the combined value of the places they occupy, the same
+        # convention as _compute_cumulative_points. Without this, a stable sort hands
+        # every tie to whichever season is listed first, which would inflate the
+        # current season against every past one -- a season scored against itself
+        # would "win" instead of tying.
+        index = 0
+        while index < len(field):
+            value = field[index][0]
+            tied = [entry for entry in field[index:] if entry[0] == value]
+            slots = [
+                table[place] for place in range(index, index + len(tied)) if place < len(table)
+            ]
+            if slots:
+                share = sum(slots) / len(tied)
+                for _value, side in tied:
+                    if side == "current":
+                        event_current += share
+                    else:
+                        event_prior += share
+            index += len(tied)
+
+        # Points scored in events the other season did not contest at all -- worth
+        # reporting separately so a win is not misread as "everyone ran faster".
+        if mine and not theirs:
+            uncontested_points += event_current
+
+        points_current += event_current
+        points_prior += event_prior
+        if event_current > event_prior:
+            events_won += 1
+        elif event_prior > event_current:
+            events_lost += 1
+
+    return {
+        "points_for": round(points_current, 1),
+        "points_against": round(points_prior, 1),
+        "events_won": events_won,
+        "events_lost": events_lost,
+        "uncontested_points": round(uncontested_points, 1),
+    }
+
+
+def get_school_dashboard_v3_season_h2h(school_id: int, gender: str, year):
+    """This season scored as a dual meet against each earlier season."""
+    if year in (None, "", "all-time"):
+        return {"available": False, "seasons": []}
+
+    current_year = int(year)
+    available = _school_dashboard_v2_available_years(school_id, gender)
+    prior_years = sorted((item for item in available if item < current_year), reverse=True)
+    if not prior_years:
+        return {
+            "available": False,
+            "seasons": [],
+            "reason": "No earlier season on record for this program.",
+        }
+
+    current_entries = _school_dashboard_v3_season_entries(school_id, gender, current_year)
+    seasons = []
+    for prior_year in prior_years:
+        prior_entries = _school_dashboard_v3_season_entries(school_id, gender, prior_year)
+        scored = _score_h2h_meet(current_entries, prior_entries)
+        if scored["points_for"] > scored["points_against"]:
+            result = "WIN"
+        elif scored["points_for"] < scored["points_against"]:
+            result = "LOSS"
+        else:
+            result = "TIE"
+        seasons.append({"season": prior_year, "result": result, **scored})
+
+    return {"available": True, "year": current_year, "gender": gender, "seasons": seasons}
+
+
+def get_school_dashboard_v3_returning(school_id: int, gender: str, year):
+    """What the program keeps and loses to graduation, and what the core is worth.
+
+    The season head-to-head answers "are we better than last year" looking back.
+    This answers the same question looking forward, which is the one a coach acts
+    on -- and it needs no new scoring concept: the returning athletes are scored
+    against each earlier season with the same dual-meet routine, so "our core
+    would still beat 2025" is directly comparable to the cards above it.
+    """
+    if year in (None, "", "all-time"):
+        return {"available": False, "reason": "Pick a single season to see what returns."}
+
+    current_year = int(year)
+    grades = _school_dashboard_v3_grades(gender, current_year)
+    entries = _school_dashboard_v3_season_entries(school_id, gender, current_year)
+    if not entries:
+        return {"available": False, "reason": "No valid postseason marks in this season."}
+
+    mark_ranks = _school_dashboard_v3_event_mark_ranks(gender, current_year)
+
+    # Every scoring slot this season, flagged by whether its holder graduates.
+    slots = []
+    for event_name, event_entries in entries.items():
+        is_relay = event_name in CONST.EVENT.ALL_RELAY
+        for position, row in enumerate(event_entries):
+            athlete_id = row.get("athlete_id")
+            slots.append(
+                {
+                    "event": event_name,
+                    "athlete_id": athlete_id,
+                    "name": row.get("athlete_name") or row.get("school_name"),
+                    "mark_display": row.get("result"),
+                    "is_relay": is_relay,
+                    "is_event_best": position == 0,
+                    "graduating": (not is_relay) and grades.get(athlete_id) == "SR",
+                }
+            )
+
+    individual_slots = [slot for slot in slots if not slot["is_relay"]]
+    senior_ids = {
+        slot["athlete_id"] for slot in individual_slots if slot["graduating"]
+    }
+    roster_ids = {
+        slot["athlete_id"] for slot in individual_slots if slot["athlete_id"] is not None
+    }
+
+    graduating: Dict[int, Dict[str, Any]] = {}
+    for slot in individual_slots:
+        if not slot["graduating"]:
+            continue
+        record = graduating.setdefault(
+            slot["athlete_id"],
+            {"athlete_id": slot["athlete_id"], "name": slot["name"], "marks": []},
+        )
+        rank = mark_ranks.get((slot["athlete_id"], slot["event"]))
+        record["marks"].append(
+            {
+                "event": slot["event"],
+                "mark_display": slot["mark_display"],
+                "rank": rank[0] if rank else None,
+                "rank_total": rank[1] if rank else 0,
+                "is_event_best": slot["is_event_best"],
+            }
+        )
+
+    graduating_list = sorted(graduating.values(), key=lambda item: item["name"] or "")
+    for record in graduating_list:
+        record["marks"].sort(key=lambda item: item["rank"] or 10 ** 9)
+
+    event_bests = [slot for slot in individual_slots if slot["is_event_best"]]
+
+    retention = {
+        "athletes_returning": len(roster_ids - senior_ids),
+        "athletes_total": len(roster_ids),
+        "marks_returning": sum(1 for slot in individual_slots if not slot["graduating"]),
+        "marks_total": len(individual_slots),
+        "event_bests_returning": sum(1 for slot in event_bests if not slot["graduating"]),
+        "event_bests_total": len(event_bests),
+    }
+
+    # The returning core scored against each earlier season, exactly as the
+    # season-vs-season cards are scored, so the two blocks read on one scale.
+    core_h2h = []
+    if senior_ids:
+        core_entries = _school_dashboard_v3_season_entries(
+            school_id, gender, current_year, exclude_athlete_ids=frozenset(senior_ids)
+        )
+        available = _school_dashboard_v2_available_years(school_id, gender)
+        for prior_year in sorted(
+            (item for item in available if item < current_year), reverse=True
+        ):
+            prior_entries = _school_dashboard_v3_season_entries(school_id, gender, prior_year)
+            scored = _score_h2h_meet(core_entries, prior_entries)
+            if scored["points_for"] > scored["points_against"]:
+                result = "WIN"
+            elif scored["points_for"] < scored["points_against"]:
+                result = "LOSS"
+            else:
+                result = "TIE"
+            core_h2h.append({"season": prior_year, "result": result, **scored})
+
+    # Relay legs are not recorded for every season, so a relay is carried into the
+    # core unchanged. It then ties itself and moves the margin by nothing either
+    # way -- neutral rather than wrong, but worth disclosing.
+    relay_events = sorted(slot["event"] for slot in slots if slot["is_relay"])
+
+    return {
+        "available": True,
+        "year": current_year,
+        "next_year": current_year + 1,
+        "gender": gender,
+        "retention": retention,
+        "graduating": graduating_list,
+        "core_h2h": core_h2h,
+        "relay_events": relay_events,
+        "note": (
+            "Class year comes from the postseason result rows. Relays are carried "
+            "into the returning core unchanged because relay legs are not recorded "
+            "for every season, so they neither help nor hurt the core's score."
+        ),
+    }
+
+
+@lru_cache(maxsize=64)
+def _school_dashboard_v3_group_ranks(gender: str, year: int):
+    """Rank every school within each event group.
+
+    Group *scores* are not comparable across groups -- their medians run from 24.9
+    (Hurdles) to 44.1 (Throws) purely because events differ in how widely they are
+    contested, which is what made "Jumps 21 vs Throws 44" misleading. Group *ranks*
+    are uniform by construction, so "Jumps 90th, Throws 200th" is a fair sentence.
+
+    A missing event still costs the group, as it should: schools with no pole
+    vaulter sit about 6 percentile points worse in Jumps than in their own other
+    groups. That is the vacancy showing through, not a distortion.
+    """
+    state = _build_statewide_program_rankings(gender, year)
+    by_group: Dict[str, List[Tuple[int, float]]] = {}
+    for row in state["by_school"].values():
+        for group_name, score in (row.get("group_scores") or {}).items():
+            by_group.setdefault(group_name, []).append((row["school_id"], score))
+
+    ranks: Dict[Tuple[str, int], Tuple[int, int]] = {}
+    for group_name, items in by_group.items():
+        items.sort(key=lambda item: item[1], reverse=True)
+        total = len(items)
+        previous_score = None
+        previous_rank = 0
+        for index, (school_id, score) in enumerate(items):
+            rank = previous_rank if score == previous_score else index + 1
+            previous_score, previous_rank = score, rank
+            ranks[(group_name, school_id)] = (rank, total)
+    return ranks
+
+
+def _school_dashboard_v3_group_standings(school_id: int, gender: str, year: int):
+    """One entry per group: rank in the selected season and the events it covers.
+
+    Only the selected season is resolved. Walking every season here to draw a trend
+    meant rebuilding the statewide rankings once per season, which dominated page
+    load time.
+
+    The events list is what lets the strip act as a filter over the event table
+    rather than opening a third level of drill-down.
+    """
+    current = _school_dashboard_v3_group_ranks(gender, year)
+    standings = []
+    for group_name, group_events in _school_dashboard_v2_event_groups(gender):
+        here = current.get((group_name, school_id))
+        standings.append(
+            {
+                "group": group_name,
+                "events": list(group_events),
+                "rank": here[0] if here else None,
+                "rank_total": here[1] if here else 0,
+            }
+        )
+    return standings
+
+
+@lru_cache(maxsize=64)
+def _school_dashboard_v3_event_team_ranks(gender: str, year: int):
+    """Rank every school's two-entry unit within each event.
+
+    The scorecard's headline rank is the unit, not the best athlete, because the
+    two answer different questions. One school held the 3rd-fastest 100m in the
+    state in 2026 and ranked 159th of 375 as a unit -- a star with nobody behind
+    them. Ranking only the best mark hides that entirely.
+
+    An unfilled slot scores zero inside event_score, so a vacancy costs full price
+    here just as it does at a meet. Schools that fielded nobody in the event are
+    excluded rather than ranked last, so the denominator matches the best-mark
+    rank the v2 scorecard reports.
+    """
+    state = _build_statewide_program_rankings(gender, year)
+    by_event: Dict[str, List[Tuple[int, float]]] = {}
+    for row in state["by_school"].values():
+        for entry in row["event_scores"]:
+            if not any(slot.get("statewide_rank") for slot in entry["slots"]):
+                continue
+            by_event.setdefault(entry["event"], []).append((row["school_id"], entry["event_score"]))
+
+    ranks: Dict[Tuple[str, int], Tuple[int, int]] = {}
+    for event_name, items in by_event.items():
+        items.sort(key=lambda item: item[1], reverse=True)
+        total = len(items)
+        previous_score = None
+        previous_rank = 0
+        for index, (school_id, score) in enumerate(items):
+            # Competition ranking: equal units share a rank, matching _competition_rank_rows.
+            rank = previous_rank if score == previous_score else index + 1
+            previous_score, previous_rank = score, rank
+            ranks[(event_name, school_id)] = (rank, total)
+    return ranks
+
+
+@lru_cache(maxsize=512)
+def _school_dashboard_v3_scorecard_base(school_id: int, gender: str, season):
+    """Cached read-through to the v2 scorecard.
+
+    get_school_dashboard_v2_scorecard is not itself cached, and v3 auto-loads the
+    scorecard rather than hiding it behind a button, so the uncached cost showed up
+    as page latency. Callers must treat the returned payload as read-only.
+    """
+    return get_school_dashboard_v2_scorecard(school_id, gender, season)
+
+
+def get_school_dashboard_v3_scorecard(school_id: int, gender: str, season):
+    """The v2 scorecard rows, plus entry depth and the unit rank.
+
+    Built by calling the v2 scorecard rather than re-deriving marks, so the two
+    pages can never disagree about a best mark or its rank.
+    """
+    base = _school_dashboard_v3_scorecard_base(school_id, gender, season)
+
+    entries_by_event: Dict[str, List[Dict[str, Any]]] = {}
+    slot_totals: Dict[str, int] = {}
+    if season != "all-time":
+        state = _build_statewide_program_rankings(gender, int(season))
+        school_row = state["by_school"].get(school_id)
+        if school_row:
+            for entry in school_row["event_scores"]:
+                slot_totals[entry["event"]] = len(entry["slots"])
+                entries_by_event[entry["event"]] = [
+                    slot for slot in entry["slots"] if slot.get("statewide_rank")
+                ]
+
+    team_ranks = (
+        {} if season == "all-time" else _school_dashboard_v3_event_team_ranks(gender, int(season))
+    )
+
+    # Build fresh rows rather than mutating the cached base payload in place.
+    rows = []
+    for row in base.get("rows", []):
+        event_name = row["event"]
+        slots = entries_by_event.get(event_name, [])
+        unit = team_ranks.get((event_name, school_id))
+        rows.append(
+            {
+                **row,
+                "team_rank": unit[0] if unit else None,
+                "team_rank_total": unit[1] if unit else (row.get("rank_total") or 0),
+                "entries": {
+                    "filled": len(slots),
+                    "total": slot_totals.get(
+                        event_name, 1 if event_name in CONST.EVENT.ALL_RELAY else 2
+                    ),
+                },
+                "slots": slots,
+            }
+        )
+
+    return {**base, "rows": rows}
+
+
+def get_school_dashboard_v3_program_rank(school_id: int, gender: str, year: int):
+    """Statewide standing for one program.
+
+    Deliberately standalone rather than a wrapper around the v2 function. v2 also
+    computes like-size peer standings and the average percentile of posted marks;
+    v3 shows neither, and peer standings alone cost ~1.3s on a cold cache. Wrapping
+    would have hidden those figures while still paying for them.
+
+    Event groups are excluded too: 54% of schools field nobody in Pole Vault versus
+    5% in the 100m, so a group *score* was never comparable across groups. The group
+    strip ranks schools within each group instead, which is comparable.
+    """
+    state = _build_statewide_program_rankings(gender, year)
+    baselines = _school_dashboard_v2_rank_baselines(gender, year)
+    school_row = state["by_school"].get(school_id)
+
+    info_text = (
+        "Unofficial postseason comparison only, not IHSAA team scoring. Individual events use up to two "
+        "sectional-entry slots per school; relays use one slot. Valid postseason marks are ranked statewide "
+        "with ties sharing rank, then converted to 0-100 scores. Missing entries, DNF/DNS/DQ-style invalid "
+        "marks, and empty slots score 0."
+    )
+
+    if not school_row:
+        return {
+            "year": year,
+            "gender": gender,
+            "rank": None,
+            "rank_display": "Not ranked",
+            "is_ranked": False,
+            "percentile": None,
+            "standing": None,
+            "total_schools": len(state["leaderboard"]),
+            "composite_score": None,
+            "entry_slots": None,
+            "state_median_composite": baselines["composite"],
+            "score_distribution": baselines["quartiles"],
+            "prior_rank": None,
+            "rank_movement": None,
+            "group_standings": _school_dashboard_v3_group_standings(school_id, gender, year),
+            "info_text": info_text,
+        }
+
+    # Counted directly rather than derived from rank, so tied programs are reported
+    # as tied instead of being silently folded into "behind you".
+    composite_sorted = baselines["composite_sorted"]
+    my_score = school_row["composite_score"]
+    behind = bisect.bisect_left(composite_sorted, my_score)
+    at_or_below = bisect.bisect_right(composite_sorted, my_score)
+    tied = max(0, at_or_below - behind - 1)  # excludes this school itself
+    ahead = max(0, len(composite_sorted) - at_or_below)
+    percentile = round(100.0 * behind / len(composite_sorted), 1) if composite_sorted else None
+
+    all_slots = [slot for entry in school_row["event_scores"] for slot in entry["slots"]]
+    scoring_slots = [slot for slot in all_slots if slot.get("statewide_rank")]
+    entered_slots = [slot for slot in all_slots if slot.get("holder_name")]
+
+    prior = None
+    if year - 1 >= MIN_RECORDS_YEAR:
+        prior_row = _build_statewide_program_rankings(gender, year - 1)["by_school"].get(school_id)
+        if prior_row:
+            prior = {
+                "season": year - 1,
+                "rank": prior_row["rank"],
+                "total_schools": prior_row["total_schools"],
+            }
+
+    return {
+        "year": year,
+        "gender": gender,
+        "rank": school_row["rank"],
+        "rank_display": school_row["rank_display"],
+        "is_ranked": True,
+        "percentile": percentile,
+        "standing": {
+            "behind": behind,
+            "tied": tied,
+            "ahead": ahead,
+            "total": school_row["total_schools"] or 0,
+        },
+        "total_schools": school_row["total_schools"] or 0,
+        "composite_score": school_row["composite_score"],
+        "entry_slots": {
+            "total": len(all_slots),
+            "filled": len(scoring_slots),
+            "entered": len(entered_slots),
+        },
+        "state_median_composite": baselines["composite"],
+        "score_distribution": baselines["quartiles"],
+        "prior_rank": prior,
+        "rank_movement": prior["rank"] - school_row["rank"] if prior else None,
+        "group_standings": _school_dashboard_v3_group_standings(school_id, gender, year),
+        "info_text": info_text,
+    }
+
+
+@lru_cache(maxsize=32)
+def _school_dashboard_v3_event_mark_ranks(gender: str, year: int):
+    """Every postseason mark in the state, ranked within its event.
+
+    Athlete rows are ranked against other athletes (roughly 669 marks in the Boys
+    100m), not against school bests (375). That is the honest denominator for a
+    person: a school best is a school's number, an athlete's mark is theirs.
+
+    One best mark per athlete per event, so an athlete who ran the same event at
+    sectional, regional and state appears once at their fastest.
+    """
+    best: Dict[Tuple[int, str], Dict[str, Any]] = {}
+    for row in _resolve_postseason_individual_rows(gender=gender, year=year):
+        if not _is_valid_postseason_mark(row["result_value"], row["event_type"]):
+            continue
+        key = (row["athlete_id"], row["event"])
+        existing = best.get(key)
+        lower_is_better = _is_lower_better(row["event_type"])
+        if existing is None or (
+            row["result_value"] < existing["result_value"] if lower_is_better
+            else row["result_value"] > existing["result_value"]
+        ):
+            best[key] = row
+
+    by_event: Dict[str, List[Dict[str, Any]]] = {}
+    for row in best.values():
+        by_event.setdefault(row["event"], []).append(row)
+
+    ranks: Dict[Tuple[int, str], Tuple[int, int]] = {}
+    for event_name, rows in by_event.items():
+        ranked = _competition_rank_rows(rows, _is_lower_better(rows[0]["event_type"]))
+        total = len(ranked)
+        for row in ranked:
+            ranks[(row["athlete_id"], event_name)] = (row["rank"], total)
+    return ranks
+
+
+@lru_cache(maxsize=32)
+def _school_dashboard_v3_relay_mark_ranks(gender: str, year: int):
+    """Relay bests ranked within their event. One entry per school."""
+    best: Dict[Tuple[int, str], Dict[str, Any]] = {}
+    for row in _resolve_postseason_relay_rows(gender=gender, year=year):
+        if not _is_valid_postseason_mark(row["result_value"], CONST.EVENT_TYPE.TRACK):
+            continue
+        key = (row["school_id"], row["event"])
+        existing = best.get(key)
+        if existing is None or row["result_value"] < existing["result_value"]:
+            best[key] = row
+
+    by_event: Dict[str, List[Dict[str, Any]]] = {}
+    for row in best.values():
+        by_event.setdefault(row["event"], []).append(row)
+
+    ranks: Dict[Tuple[int, str], Tuple[int, int]] = {}
+    for event_name, rows in by_event.items():
+        ranked = _competition_rank_rows(rows, True)
+        total = len(ranked)
+        for row in ranked:
+            ranks[(row["school_id"], event_name)] = (row["rank"], total)
+    return ranks
+
+
+# Sectional -> Regional -> State. Advancement is measured at whichever stage an
+# athlete's season actually ended, so the same column means one thing on every row.
+_V3_STAGE_ORDER = (
+    CONST.MEET_TYPE.SECTIONAL,
+    CONST.MEET_TYPE.REGIONAL,
+    CONST.MEET_TYPE.STATE,
+)
+
+
+def _v3_stage_index(meet_type):
+    try:
+        return _V3_STAGE_ORDER.index(meet_type)
+    except ValueError:
+        return -1
+
+
+def _v3_advancement_from_rows(rows, next_stage_pairs, pair_of, lower_is_better_of):
+    """Shared core for the individual and relay advancement passes.
+
+    ``rows`` are every postseason result for one gender and season. For each entry
+    (an athlete-event, or a school-relay) this finds the furthest stage reached,
+    the place and round there, and -- when that stage is not State -- how far the
+    mark fell short of the weakest mark that actually advanced out of that same
+    meet in that same event.
+
+    The cutoff stays deliberately observational. Top three advance automatically
+    and further athletes fill the next field, but the fill depends on how strong
+    the other feeder meets were: in 2026 Boys, sectional 2 sent seven 110-hurdlers
+    through while most sectional-events sent three. Rather than model that, the
+    cutoff is a mark that was really posted and really advanced, which stays true
+    however the field was filled.
+    """
+    # Weakest advancing mark per (meet, event), for every stage that has a next one.
+    cutoffs: Dict[Tuple[int, str], Dict[str, Any]] = {}
+    for row in rows:
+        stage_index = _v3_stage_index(row["meet_type"])
+        if stage_index < 0 or stage_index >= len(_V3_STAGE_ORDER) - 1:
+            continue
+        if row["result_type"] != CONST.RESULT_TYPE.FINAL:
+            continue
+        next_stage = _V3_STAGE_ORDER[stage_index + 1]
+        if pair_of(row) not in next_stage_pairs[next_stage]:
+            continue
+        if not _is_valid_postseason_mark(row["result_value"], row["event_type"]):
+            continue
+        key = (row["meet_id"], row["event"])
+        current = cutoffs.get(key)
+        lower_is_better = lower_is_better_of(row)
+        if current is None or (
+            row["result_value"] > current["value"] if lower_is_better
+            else row["result_value"] < current["value"]
+        ):
+            cutoffs[key] = {"value": row["result_value"], "display": row["result"]}
+
+    # The furthest stage each entry reached, and its best row at that stage.
+    furthest: Dict[Any, Dict[str, Any]] = {}
+    for row in rows:
+        stage_index = _v3_stage_index(row["meet_type"])
+        if stage_index < 0:
+            continue
+        pair = pair_of(row)
+        current = furthest.get(pair)
+        if current is None:
+            furthest[pair] = row
+            continue
+        current_index = _v3_stage_index(current["meet_type"])
+        if stage_index > current_index:
+            furthest[pair] = row
+        elif stage_index == current_index:
+            # The final is the round that decides advancement, so it wins over a
+            # prelim for the same entry at the same meet.
+            is_final = row["result_type"] == CONST.RESULT_TYPE.FINAL
+            was_final = current["result_type"] == CONST.RESULT_TYPE.FINAL
+            if is_final and not was_final:
+                furthest[pair] = row
+
+    result: Dict[Any, Dict[str, Any]] = {}
+    for pair, row in furthest.items():
+        stage = row["meet_type"]
+        stage_index = _v3_stage_index(stage)
+        is_final = row["result_type"] == CONST.RESULT_TYPE.FINAL
+        place = row.get("place")
+        entry = {
+            "final_stage": stage,
+            "final_place": place if place and place > 0 else None,
+            "final_round": CONST.RESULT_TYPE.FINAL if is_final else CONST.RESULT_TYPE.PRELIM,
+            "final_mark_display": row.get("result"),
+            "cutoff_display": None,
+            "gap_display": None,
+        }
+
+        # State is terminal, and a prelim exit was never racing for the final's
+        # qualifying mark, so neither gets priced against a cutoff.
+        can_advance = stage_index < len(_V3_STAGE_ORDER) - 1
+        if can_advance and is_final and _is_valid_postseason_mark(
+            row["result_value"], row["event_type"]
+        ):
+            cutoff = cutoffs.get((row["meet_id"], row["event"]))
+            if cutoff is not None:
+                lower_is_better = lower_is_better_of(row)
+                gap = (
+                    row["result_value"] - cutoff["value"] if lower_is_better
+                    else cutoff["value"] - row["result_value"]
+                )
+                if gap > 0:
+                    entry["cutoff_display"] = cutoff["display"]
+                    entry["gap_display"] = _format_gap_display(gap, row["event_type"])
+        result[pair] = entry
+
+    return result
+
+
+@lru_cache(maxsize=64)
+def _school_dashboard_v3_advancement(gender: str, year: int):
+    """Per (athlete, event): where the season ended, and how close to going further."""
+    rows = []
+    query = (
+        db.session.query(
+            AthleteResult.athlete_id,
+            AthleteResult.event,
+            AthleteResult.meet_id,
+            AthleteResult.place,
+            AthleteResult.result,
+            AthleteResult.result2,
+            AthleteResult.result_type,
+            Meet.meet_type,
+            Event.event_type,
+        )
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .join(Event, AthleteResult.event == Event.event)
+        .filter(
+            Meet.meet_type.in_(CONST.MEET_TYPE.ALL),
+            Meet.year == year,
+            Meet.gender == gender,
+            AthleteResult.result2.isnot(None),
+        )
+    )
+    for row in query.all():
+        rows.append({
+            "athlete_id": row.athlete_id,
+            "event": row.event,
+            "meet_id": row.meet_id,
+            "meet_type": row.meet_type,
+            "place": row.place,
+            "result": row.result,
+            "result_value": row.result2,
+            "result_type": row.result_type,
+            "event_type": row.event_type or CONST.EVENT_TYPE.TRACK,
+        })
+
+    next_stage_pairs = {}
+    for stage in _V3_STAGE_ORDER[1:]:
+        next_stage_pairs[stage] = {
+            (item["athlete_id"], item["event"])
+            for item in rows if item["meet_type"] == stage
+        }
+
+    return _v3_advancement_from_rows(
+        rows,
+        next_stage_pairs,
+        pair_of=lambda item: (item["athlete_id"], item["event"]),
+        lower_is_better_of=lambda item: _is_lower_better(item["event_type"]),
+    )
+
+
+@lru_cache(maxsize=64)
+def _school_dashboard_v3_relay_advancement(gender: str, year: int):
+    """The same, keyed by school and relay -- relays live in relay_result."""
+    rows = []
+    query = (
+        db.session.query(
+            RelayResult.school_id,
+            RelayResult.event,
+            RelayResult.meet_id,
+            RelayResult.place,
+            RelayResult.result,
+            RelayResult.result2,
+            Meet.meet_type,
+        )
+        .join(Meet, RelayResult.meet_id == Meet.meet_id)
+        .filter(
+            Meet.meet_type.in_(CONST.MEET_TYPE.ALL),
+            Meet.year == year,
+            Meet.gender == gender,
+            RelayResult.result2.isnot(None),
+        )
+    )
+    for row in query.all():
+        rows.append({
+            "school_id": row.school_id,
+            "event": row.event,
+            "meet_id": row.meet_id,
+            "meet_type": row.meet_type,
+            "place": row.place,
+            "result": row.result,
+            "result_value": row.result2,
+            # relay_result has no rounds; every relay row is a final
+            "result_type": CONST.RESULT_TYPE.FINAL,
+            "event_type": CONST.EVENT_TYPE.TRACK,
+        })
+
+    next_stage_pairs = {}
+    for stage in _V3_STAGE_ORDER[1:]:
+        next_stage_pairs[stage] = {
+            (item["school_id"], item["event"])
+            for item in rows if item["meet_type"] == stage
+        }
+
+    return _v3_advancement_from_rows(
+        rows,
+        next_stage_pairs,
+        pair_of=lambda item: (item["school_id"], item["event"]),
+        lower_is_better_of=lambda _item: True,
+    )
+
+
+def get_school_dashboard_v3_athlete_scorecard(school_id: int, gender: str, season):
+    """One row per athlete who competed in the postseason, plus their best mark.
+
+    Rows are per athlete rather than per event because a coach reads this to see
+    their people. Events nobody entered still get a placeholder row: without one a
+    gap simply vanishes from the table, and an unfilled event is the most
+    actionable thing on the page.
+    """
+    if season == "all-time":
+        year = None
+    else:
+        year = int(season)
+
+    events = _school_dashboard_v2_events_for_gender(gender)
+    event_group_map = {}
+    for group_name, group_events in _school_dashboard_v2_event_groups(gender):
+        for event_name in group_events:
+            event_group_map[event_name] = group_name
+
+    mark_ranks = _school_dashboard_v3_event_mark_ranks(gender, year) if year else {}
+    relay_ranks = _school_dashboard_v3_relay_mark_ranks(gender, year) if year else {}
+    grades = _school_dashboard_v3_grades(gender, year) if year else {}
+    advancement = _school_dashboard_v3_advancement(gender, year) if year else {}
+    relay_advancement = _school_dashboard_v3_relay_advancement(gender, year) if year else {}
+
+    # Best mark per athlete per event for this school only.
+    best: Dict[Tuple[int, str], Dict[str, Any]] = {}
+    for row in _resolve_postseason_individual_rows(gender=gender, year=year, school_id=school_id):
+        if not _is_valid_postseason_mark(row["result_value"], row["event_type"]):
+            continue
+        key = (row["athlete_id"], row["event"])
+        existing = best.get(key)
+        lower_is_better = _is_lower_better(row["event_type"])
+        if existing is None or (
+            row["result_value"] < existing["result_value"] if lower_is_better
+            else row["result_value"] > existing["result_value"]
+        ):
+            best[key] = row
+
+    rows_by_event: Dict[str, List[Dict[str, Any]]] = {}
+    for (athlete_id, event_name), row in best.items():
+        rank = mark_ranks.get((athlete_id, event_name))
+        rows_by_event.setdefault(event_name, []).append(
+            {
+                "event": event_name,
+                "group": event_group_map.get(event_name),
+                "entry_type": "individual",
+                "athlete_id": athlete_id,
+                "name": row.get("athlete_name"),
+                "grade": grades.get(athlete_id),
+                "mark_display": row.get("result") or _format_result_display(row["result_value"], row["event_type"]),
+                "result_value": row["result_value"],
+                "rank": rank[0] if rank else None,
+                "rank_total": rank[1] if rank else 0,
+                "year": row.get("year"),
+                # Which meet the best mark came from. Across 2026 Boys, 49% of
+                # multi-stage athletes set their best at the regional rather than
+                # the sectional, so without this the mark and the finish beside it
+                # silently describe two different days.
+                "mark_stage": row.get("meet_type"),
+                **(advancement.get((athlete_id, event_name)) or {
+                    "final_stage": None,
+                    "final_place": None,
+                    "final_round": None,
+                    "final_mark_display": None,
+                    "cutoff_display": None,
+                    "gap_display": None,
+                }),
+            }
+        )
+
+    relay_best: Dict[str, Dict[str, Any]] = {}
+    for row in _resolve_postseason_relay_rows(gender=gender, year=year, school_id=school_id):
+        if not _is_valid_postseason_mark(row["result_value"], CONST.EVENT_TYPE.TRACK):
+            continue
+        existing = relay_best.get(row["event"])
+        if existing is None or row["result_value"] < existing["result_value"]:
+            relay_best[row["event"]] = row
+
+    for event_name, row in relay_best.items():
+        rank = relay_ranks.get((school_id, event_name))
+        legs = [part.strip() for part in (row.get("athlete_names") or "").split(",") if part.strip()]
+        rows_by_event.setdefault(event_name, []).append(
+            {
+                "event": event_name,
+                "group": event_group_map.get(event_name),
+                "entry_type": "relay",
+                "athlete_id": None,
+                "name": ", ".join(legs) if legs else row.get("school_name"),
+                "mark_display": row.get("result") or _format_result_display(row["result_value"], CONST.EVENT_TYPE.TRACK),
+                "result_value": row["result_value"],
+                "rank": rank[0] if rank else None,
+                "rank_total": rank[1] if rank else 0,
+                "year": row.get("year"),
+                "mark_stage": row.get("meet_type"),
+                **(relay_advancement.get((school_id, event_name)) or {
+                    "final_stage": None,
+                    "final_place": None,
+                    "final_round": None,
+                    "final_mark_display": None,
+                    "cutoff_display": None,
+                    "gap_display": None,
+                }),
+            }
+        )
+
+    # All-Time is a records board, not a season card: there is no statewide rank to
+    # sort by, so order by the mark itself and keep the top three per event. Seven
+    # undifferentiated rows in the 100 with an empty Rank column read as broken;
+    # "the three fastest ever, and who ran them" is the thing this mode is for.
+    records_mode = year is None
+    RECORDS_PER_EVENT = 3
+
+    rows = []
+    for event_name in events:
+        entries = rows_by_event.get(event_name)
+        if entries:
+            if records_mode:
+                event_type = (
+                    CONST.EVENT_TYPE.TRACK
+                    if event_name in CONST.EVENT.ALL_RELAY
+                    else db.session.query(Event.event_type)
+                    .filter(Event.event == event_name)
+                    .scalar()
+                    or CONST.EVENT_TYPE.TRACK
+                )
+                lower_is_better = _is_lower_better(event_type)
+                entries.sort(
+                    key=lambda item: item["result_value"], reverse=not lower_is_better
+                )
+                for position, entry in enumerate(entries):
+                    entry["record_position"] = position + 1
+                entries = entries[:RECORDS_PER_EVENT]
+            else:
+                entries.sort(key=lambda item: item["rank"] or 10 ** 9)
+            rows.extend(entries)
+        else:
+            # No entry at all. Kept visible on purpose -- the gap is the point.
+            rows.append(
+                {
+                    "event": event_name,
+                    "group": event_group_map.get(event_name),
+                    "entry_type": "none",
+                    "athlete_id": None,
+                    "name": None,
+                    "mark_display": None,
+                    "result_value": None,
+                    "rank": None,
+                    "rank_total": (
+                        relay_ranks.get((school_id, event_name), (None, 0))[1]
+                        if event_name in CONST.EVENT.ALL_RELAY
+                        else 0
+                    ),
+                }
+            )
+
+    return {
+        "gender": gender,
+        "season": season,
+        "mode": "records" if records_mode else "season",
+        "records_per_event": RECORDS_PER_EVENT if records_mode else None,
+        "rows": rows,
+    }
