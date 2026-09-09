@@ -22,7 +22,7 @@ REGIONAL_HOSTS_BY_YEAR_GENDER: Dict[Tuple[int, str], Dict[int, str]] = {
         4: "Lafayette Jefferson",
         5: "Plainfield",
         6: "Greenfield-Central",
-        7: "Bloomington North",
+        7: "Bloomington South",
         8: "Evansville Central",
     },
 }
