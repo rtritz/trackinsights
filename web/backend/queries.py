@@ -2407,6 +2407,67 @@ def _covered_rank_seasons():
     return [int(row[0]) for row in rows]
 
 
+# Per-school core payloads, precomputed by backend.jobs.precompute_core_cache.
+# get_school_dashboard_v2_core sits under every v3 endpoint (_v3_scope calls it
+# to resolve the season), and on the dashboard's critical path it is what the
+# loading message waits for.
+#
+# One file per gender, holding the payload each school gets when it asks with no
+# season -- which is exactly the first page load. A season the reader picks later
+# is not in here and is computed live, as before.
+#
+# Unlike the rank-history index this does NOT rebuild itself on a miss: building
+# it is minutes, not seconds, and doing that inside a request would hang the very
+# page it exists to speed up. A stale or missing file means normal speed, never
+# wrong data -- the fingerprint check makes it fall through to computing.
+CORE_CACHE_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', 'frontend', 'static', 'data', 'core_cache',
+)
+
+
+def _core_cache_path(gender):
+    return os.path.join(CORE_CACHE_DIR, '%s.json' % str(gender).lower())
+
+
+@lru_cache(maxsize=8)
+def _core_cache(gender, fingerprint):
+    """{school_id: payload} for the default season, or None if unusable."""
+    try:
+        with open(_core_cache_path(gender), encoding='utf-8') as handle:
+            payload = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(payload, dict) or payload.get('fingerprint') != fingerprint:
+        # Built against a different database. Ignoring it is the safe move; the
+        # job can be re-run whenever convenient.
+        return None
+    return payload.get('entries')
+
+
+def build_core_cache(gender, school_ids):
+    return {
+        'fingerprint': _db_fingerprint(),
+        'gender': gender,
+        'entries': {
+            str(school_id): _get_school_dashboard_v2_core_uncached(
+                school_id, gender=gender, season=None)
+            for school_id in school_ids
+        },
+    }
+
+
+def write_core_cache(gender, school_ids):
+    payload = build_core_cache(gender, school_ids)
+    os.makedirs(CORE_CACHE_DIR, exist_ok=True)
+    path = _core_cache_path(gender)
+    temp_path = '%s.%d.tmp' % (path, os.getpid())
+    with open(temp_path, 'w', encoding='utf-8') as handle:
+        json.dump(payload, handle, separators=(',', ':'), default=str)
+    os.replace(temp_path, path)
+    return path, payload
+
+
 def _clear_query_caches(*, keep=()):
     """Empty every lru_cache in this module.
 
@@ -5301,6 +5362,21 @@ def get_school_dashboard_v2_qualifiers(school_id: int, gender: str, year: int):
 # copies first -- so a shared instance is safe to hand out.
 @lru_cache(maxsize=2048)
 def get_school_dashboard_v2_core(school_id: int, gender: Optional[str] = None, season: Optional[str] = None):
+    """Core dashboard payload, served from the precomputed file where possible.
+
+    Only the no-season request is precomputed -- that is the one the dashboard's
+    loading message waits on. Anything else falls through and is computed.
+    """
+    if season is None and gender:
+        entries = _core_cache(gender, _db_fingerprint())
+        if entries is not None:
+            hit = entries.get(str(school_id))
+            if hit is not None:
+                return hit
+    return _get_school_dashboard_v2_core_uncached(school_id, gender=gender, season=season)
+
+
+def _get_school_dashboard_v2_core_uncached(school_id: int, gender: Optional[str] = None, season: Optional[str] = None):
     scope = _get_school_dashboard_v2_scope(school_id, gender=gender, season=season)
     if not scope:
         return None
