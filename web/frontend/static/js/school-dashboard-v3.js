@@ -1992,6 +1992,27 @@ document.addEventListener('DOMContentLoaded', function () {
                 gender: gender || state.gender,
                 season: season,
             });
+            // The four panel loaders below need core's resolved season -- but the
+            // server resolves it from the same arguments for every one of these
+            // endpoints (_v3_scope), so the URLs are already known here. Their
+            // requests start now and are awaited after core lands, which turns a
+            // serial core-then-panels page into one round trip's worth of
+            // waiting. Rendering still happens strictly after core, so nothing
+            // reads state.core before it is set.
+            //
+            // Each carries a no-op catch from the moment it is created: if core
+            // fails these are never awaited, and an unhandled rejection in a
+            // request nobody is listening to would surface as a console error.
+            const panelUrl = function (name) {
+                return '/api/v3/schools/' + schoolId + '/dashboard/' + name + '?' + query;
+            };
+            const pending = {};
+            ['ranking', 'season-h2h', 'returning', 'athletes'].forEach(function (name) {
+                const request = fetchJson(panelUrl(name));
+                request.catch(function () {});
+                pending[name] = request;
+            });
+
             const core = await fetchJson('/api/v3/schools/' + schoolId + '/dashboard/core?' + query);
             if (requestId !== state.requestId) {
                 return;
@@ -2008,9 +2029,9 @@ document.addEventListener('DOMContentLoaded', function () {
             refs.app.classList.remove('sd3-hidden');
 
             if (core.stage_results) {
-                void loadSeasonH2H(requestId);
-                void loadReturning(requestId);
-                void loadScorecard(requestId);
+                void loadSeasonH2H(requestId, pending['season-h2h']);
+                void loadReturning(requestId, pending['returning']);
+                void loadScorecard(requestId, pending['athletes']);
                 showSection(refs.summarySection, true);
                 showSection(refs.scorecardSection, true);
                 showSection(refs.programRankSection, true);
@@ -2021,7 +2042,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 // leaving them on here would flash an empty panel first.
                 refs.rankHeadline.innerHTML =
                     '<div class="sd3-rank-headline-move">Loading…</div>';
-                void loadRanking(requestId);
+                void loadRanking(requestId, pending['ranking']);
             } else {
                 // All-Time still has a table -- the records board -- even though
                 // there is no single season to rank.
@@ -2041,10 +2062,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
-    const loadRanking = async function (requestId) {
+    const loadRanking = async function (requestId, pending) {
         try {
             const query = buildQuery({ gender: state.gender, season: state.season });
-            const ranking = await fetchJson('/api/v3/schools/' + schoolId + '/dashboard/ranking?' + query);
+            const ranking = await (pending || fetchJson('/api/v3/schools/' + schoolId + '/dashboard/ranking?' + query));
             if (requestId === state.requestId) {
                 // Kept so a group-filter click can re-render the strip without refetching.
                 state.programRank = ranking;
@@ -2058,11 +2079,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
-    const loadSeasonH2H = async function (requestId) {
+    const loadSeasonH2H = async function (requestId, pending) {
 
         try {
             const query = buildQuery({ gender: state.gender, season: state.season });
-            const payload = await fetchJson('/api/v3/schools/' + schoolId + '/dashboard/season-h2h?' + query);
+            const payload = await (pending || fetchJson('/api/v3/schools/' + schoolId + '/dashboard/season-h2h?' + query));
             if (requestId !== state.requestId) { return; }
             renderSeasonH2H(payload);
         } catch (error) {
@@ -2070,11 +2091,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
-    const loadReturning = async function (requestId) {
+    const loadReturning = async function (requestId, pending) {
         emptyLookahead(refs.metricReturning, 'Loading…');
         try {
             const query = buildQuery({ gender: state.gender, season: state.season });
-            const payload = await fetchJson('/api/v3/schools/' + schoolId + '/dashboard/returning?' + query);
+            const payload = await (pending || fetchJson('/api/v3/schools/' + schoolId + '/dashboard/returning?' + query));
             if (requestId !== state.requestId) { return; }
             renderReturning(payload);
         } catch (error) {
@@ -2084,7 +2105,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Takes requestId like the other three loaders. Without it a fast gender or
     // season switch could let a stale response land on top of a newer one.
-    const loadScorecard = async function (requestId) {
+    const loadScorecard = async function (requestId, pending) {
         if (state.scorecard) {
             renderScorecard(state.scorecard);
             renderQualifiers(state.scorecard);
@@ -2093,7 +2114,7 @@ document.addEventListener('DOMContentLoaded', function () {
         refs.scorecardStatus.textContent = '';
         try {
             const query = buildQuery({ gender: state.gender, season: state.season });
-            const payload = await fetchJson('/api/v3/schools/' + schoolId + '/dashboard/athletes?' + query);
+            const payload = await (pending || fetchJson('/api/v3/schools/' + schoolId + '/dashboard/athletes?' + query));
             if (requestId !== undefined && requestId !== state.requestId) { return; }
             state.scorecard = payload;
             refs.scorecardStatus.textContent = '';
