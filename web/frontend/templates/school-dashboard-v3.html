@@ -1,12 +1,6 @@
 {% extends 'base.html' %}
 
 {% block title %}{% if school_name %}{{ school_name }} - {% endif %}Focus School Postseason Dashboard - Track Insights{% endblock %}
-{# This page styles itself end to end -- every class on it is sd3-* or its own
-   is-* state, defined in the <style> block below. So it opts out of the 1.4MB of
-   Tailwind and daisyUI the base template loads: none of it matched a single
-   selector here, and all of it blocked the first paint. #}
-{% block framework_css %}{% endblock %}
-
 {% block meta_description %}{% if school_name %}Compact postseason program profile for {{ school_name }}{% if school_city %} in {{ school_city }}{% endif %}, including postseason stage results, statewide program rank, and event strength.{% else %}Compact postseason school dashboard for Indiana high school track and field programs.{% endif %}{% endblock %}
 {% block og_title %}{% if school_name %}{{ school_name }} - Focus School Postseason Dashboard{% else %}Focus School Postseason Dashboard{% endif %} - Track Insights{% endblock %}
 
