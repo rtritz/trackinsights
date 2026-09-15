@@ -32,10 +32,16 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 
   <link href="{{ url_for('static', filename='css/output.css') }}" rel="stylesheet">
+  {# The Tailwind/daisyUI framework chrome: ~1.4MB, all of it render-blocking,
+     and the browser build compiles CSS at runtime on top of that. Pages that
+     style themselves entirely in their own <style> block override this with an
+     empty block and skip the lot. #}
+  {% block framework_css %}
   <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
   <link href="https://cdn.jsdelivr.net/combine/npm/daisyui@5/theme/autumn.css" rel="stylesheet" type="text/css" />
+  {% endblock %}
 
   <!-- Google Fonts (non-blocking) -->
   <link href="https://fonts.googleapis.com/css2?family=Oswald:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Racing+Sans+One&family=Contrail+One&family=Staatliches&display=swap" rel="stylesheet">
