@@ -2,6 +2,7 @@ import json
 import os
 from flask import jsonify, request, current_app
 from . import api_bp
+from common.const import CONST
 from ..queries import (
     get_athletes,
     get_athlete_by_id,
@@ -16,6 +17,17 @@ from ..queries import (
     get_hypothetical_ranking_options,
     get_hypothetical_result_rankings,
     get_school_dashboard_data,
+    get_school_dashboard_v2_core,
+    get_school_dashboard_v2_event_detail,
+    get_school_dashboard_v2_leaderboard,
+    get_school_dashboard_v3_scorecard,
+    get_school_dashboard_v3_athlete_scorecard,
+    get_school_dashboard_v3_program_rank,
+    get_school_dashboard_v3_season_h2h,
+    get_school_dashboard_v3_event_rankings,
+    get_school_dashboard_v3_returning,
+    get_school_dashboard_v3_season_status,
+    _school_dashboard_v3_stage_deltas as get_school_dashboard_v3_stage_deltas,
     _compute_school_percentiles,
     get_regional_qualifiers_status,
     get_regional_qualifiers,
@@ -291,7 +303,6 @@ def api_state_qualifiers_status():
         return jsonify({'error': str(exc)}), 500
 
 
-
 @api_bp.route('/state-qualifiers')
 def api_state_qualifiers():
     """Return state qualifier list for a specific gender and year, using precomputed JSON if available."""
@@ -427,4 +438,239 @@ def api_regional_top_list():
         'context': {'gender': gender, 'year': year},
         'events': events_out,
     })
+
+
+# ---------------------------------------------------------------------------
+# School dashboard v3 -- the only school dashboard API. The v2 page and its
+# endpoints are gone; the get_school_dashboard_v2_* query functions they shared
+# remain as the engine underneath, since v3 was built on them deliberately.
+# ---------------------------------------------------------------------------
+
+def _v3_season_status(gender, season):
+    """Season completeness, with a switch for tests.
+
+    The gate exists because qualifying cutoffs are read off a finished bracket, so
+    a season still being run would produce confident-looking nonsense. That makes
+    it far too strict for a fixture DB, which has one meet per round rather than
+    32 -- hence the config flag, off only under test.
+    """
+    if not current_app.config.get('V3_REQUIRE_COMPLETE_SEASON', True):
+        return {'complete': True, 'season': season}
+    return get_school_dashboard_v3_season_status(gender, season)
+
+
+def _v3_scope(school_id, gender, season):
+    core = get_school_dashboard_v2_core(school_id, gender=gender, season=season)
+    if not core:
+        return None, None, None
+    sel_gender = core['filters']['selected_gender']
+    sel_season = core['filters']['selected_season']
+    # Cutoffs are derived from the completed bracket, so a season still being run
+    # would produce authoritative-looking nonsense. Refuse it here, once, rather
+    # than in each endpoint.
+    status = _v3_season_status(sel_gender, sel_season)
+    if not status['complete']:
+        raise ValueError(status['reason'])
+    return core, sel_gender, sel_season
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/core')
+def api_get_school_dashboard_v3_core(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        data = get_school_dashboard_v2_core(school_id, gender=gender, season=season)
+        if not data:
+            return jsonify({'error': 'not found'}), 404
+        # Which seasons are finished, so the season control can mark the rest
+        # unavailable instead of letting a click fail.
+        sel_gender = data['filters']['selected_gender']
+        incomplete = {}
+        for value in data['filters'].get('seasons', []):
+            if value == 'all-time':
+                continue
+            status = _v3_season_status(sel_gender, value)
+            if not status['complete']:
+                incomplete[str(value)] = status['reason']
+        data = dict(data)
+        data['filters'] = dict(data['filters'])
+        data['filters']['incomplete_seasons'] = incomplete
+        # Each stage against the same stage last season. It rides on core rather
+        # than its own endpoint because the panel that needs it is already
+        # rendered from core -- a second request would only add latency.
+        sel_season = data['filters']['selected_season']
+        if data.get('stage_results') and sel_season != 'all-time':
+            data['stage_deltas'] = get_school_dashboard_v3_stage_deltas(
+                school_id, sel_gender, int(sel_season))
+        selected = data['filters']['selected_season']
+        if str(selected) in incomplete:
+            data['season_incomplete'] = incomplete[str(selected)]
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/scorecard')
+def api_get_school_dashboard_v3_scorecard(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        core, sel_gender, sel_season = _v3_scope(school_id, gender, season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        data = get_school_dashboard_v3_scorecard(school_id, sel_gender, sel_season)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/athletes')
+def api_get_school_dashboard_v3_athletes(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        core, sel_gender, sel_season = _v3_scope(school_id, gender, season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        data = get_school_dashboard_v3_athlete_scorecard(school_id, sel_gender, sel_season)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/ranking')
+def api_get_school_dashboard_v3_ranking(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        core, sel_gender, sel_season = _v3_scope(school_id, gender, season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        if sel_season == 'all-time':
+            return jsonify({'error': 'ranking requires a specific postseason season'}), 400
+        data = get_school_dashboard_v3_program_rank(school_id, sel_gender, int(sel_season))
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/season-h2h')
+def api_get_school_dashboard_v3_season_h2h(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        core, sel_gender, sel_season = _v3_scope(school_id, gender, season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        data = get_school_dashboard_v3_season_h2h(school_id, sel_gender, sel_season)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/returning')
+def api_get_school_dashboard_v3_returning(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        core, sel_gender, sel_season = _v3_scope(school_id, gender, season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        data = get_school_dashboard_v3_returning(school_id, sel_gender, sel_season)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/leaderboard')
+def api_get_school_dashboard_v3_leaderboard(school_id):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    # Absent or "all" means the whole field.
+    top_n_arg = (request.args.get('top_n', '') or '').strip().lower()
+    top_n = None
+    if top_n_arg and top_n_arg != 'all':
+        try:
+            top_n = int(top_n_arg)
+        except ValueError:
+            return jsonify({'error': 'top_n must be all or an integer'}), 400
+    enrollment_arg = (request.args.get('enrollment_max', '') or '').strip().lower()
+    enrollment_max = None
+    if enrollment_arg and enrollment_arg != 'all':
+        try:
+            enrollment_max = int(enrollment_arg)
+        except ValueError:
+            return jsonify({'error': 'enrollment_max must be all or an integer'}), 400
+
+    try:
+        core = get_school_dashboard_v2_core(school_id, gender=gender, season=season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        selected_season = core['filters']['selected_season']
+        if selected_season == 'all-time':
+            return jsonify({'error': 'leaderboard requires a specific postseason season'}), 400
+        group = (request.args.get('group', '') or '').strip() or None
+        data = get_school_dashboard_v2_leaderboard(
+            school_id,
+            core['filters']['selected_gender'],
+            int(selected_season),
+            top_n=top_n,
+            enrollment_max=enrollment_max,
+            group=group,
+        )
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/event-rankings/<path:event_name>')
+def api_get_school_dashboard_v3_event_rankings(school_id, event_name):
+    """The statewide field for one event, which the table's rank column opens."""
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    # Same contract as the leaderboard: absent or "all" means the whole field.
+    enrollment_arg = (request.args.get('enrollment_max', '') or '').strip().lower()
+    enrollment_max = None
+    if enrollment_arg and enrollment_arg != 'all':
+        try:
+            enrollment_max = int(enrollment_arg)
+        except ValueError:
+            return jsonify({'error': 'enrollment_max must be all or an integer'}), 400
+    try:
+        core = get_school_dashboard_v2_core(school_id, gender=gender, season=season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        data = get_school_dashboard_v3_event_rankings(
+            school_id,
+            core['filters']['selected_gender'],
+            core['filters']['selected_season'],
+            event_name,
+            enrollment_max=enrollment_max,
+        )
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
+
+@api_bp.route('/v3/schools/<int:school_id>/dashboard/events/<path:event_name>')
+def api_get_school_dashboard_v3_event_detail(school_id, event_name):
+    gender = request.args.get('gender', CONST.GENDER.BOYS).strip()
+    season = request.args.get('season')
+    try:
+        core = get_school_dashboard_v2_core(school_id, gender=gender, season=season)
+        if not core:
+            return jsonify({'error': 'not found'}), 404
+        selected_season = core['filters']['selected_season']
+        if selected_season == 'all-time':
+            return jsonify({'error': 'event detail requires a specific postseason season'}), 400
+        data = get_school_dashboard_v2_event_detail(
+            school_id,
+            core['filters']['selected_gender'],
+            int(selected_season),
+            event_name,
+        )
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify(data)
+
 

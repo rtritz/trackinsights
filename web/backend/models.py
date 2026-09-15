@@ -11,8 +11,12 @@ class School(db.Model):
     address = db.Column(db.String)
     city = db.Column(db.String)
     zip = db.Column(db.Integer)
-    longitude = db.Column(db.Integer)
-    latitude = db.Column(db.Integer)
+    longitude = db.Column(db.Float)
+    latitude = db.Column(db.Float)
+    # Logo, if any, lives at frontend/static/<CONST.SCHOOL_LOGO_STATIC_SUBDIR>/<school_id>.<CONST.SCHOOL_LOGO_EXT>
+    # -- every logo is converted to that one format/size (common/logo.py), so the file's
+    # existence on disk IS the "has a logo" signal; there is no DB column for it.
+    myihsaa_id = db.Column(db.String)  # stable myIHSAA/IHSAA "SchoolId" UUID -- survives the display name changing year to year
     athletes = db.relationship("Athlete", backref="school")
     relay_results = db.relationship("RelayResult", backref="school")
     enrollments = db.relationship("SchoolEnrollment", backref="school")
