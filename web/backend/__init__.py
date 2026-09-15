@@ -37,4 +37,18 @@ def create_app(config_class=Config):
     app.register_blueprint(main_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
 
+    # Query results are cached in-process and keyed on their arguments, so
+    # nothing evicts them when Track.db is replaced -- a worker would serve the
+    # rankings it computed at start-up until someone reloaded the web app. This
+    # notices the swap and clears them, so processing new results is all that
+    # updating results takes. The check is one os.stat per request.
+    from .queries import ensure_fresh_queries
+
+    @app.before_request
+    def _refresh_caches_if_db_changed():
+        try:
+            ensure_fresh_queries()
+        except Exception:
+            app.logger.exception('database freshness check failed')
+
     return app
