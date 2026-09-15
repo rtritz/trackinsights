@@ -23,6 +23,8 @@ class TestConfig:
     SECRET_KEY = "test-secret"
     SQLALCHEMY_DATABASE_URI = ""
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # The fixture seeds one meet per round; the real gate wants 32 sectionals.
+    V3_REQUIRE_COMPLETE_SEASON = False
 
 
 def _clear_query_caches():

@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from flask import render_template, request, url_for, Response
+import os
+
+from flask import render_template, request, url_for, Response, current_app
 from . import main_bp
 from ..queries import get_athletes
 from ..models import Athlete, School
@@ -236,6 +238,19 @@ def school_dashboard(school_id):
     )
 
 
+def _asset_version(filename):
+    """Cache-buster derived from the file's own mtime.
+
+    Without it a JS change is invisible until a hard refresh, which has already
+    caused one "the page isn't updating" round trip.
+    """
+    try:
+        path = os.path.join(current_app.static_folder, filename)
+        return str(int(os.path.getmtime(path)))
+    except (OSError, TypeError):
+        return '0'
+
+
 @main_bp.route('/school-dashboard-v3/<int:school_id>')
 def school_dashboard_v3(school_id):
     school = School.query.get(school_id)
@@ -244,17 +259,7 @@ def school_dashboard_v3(school_id):
         school_id=school_id,
         school_name=school.school_name if school else None,
         school_city=school.city if school else None,
-    )
-
-
-@main_bp.route('/school-dashboard-v2/<int:school_id>')
-def school_dashboard_v2(school_id):
-    school = School.query.get(school_id)
-    return render_template(
-        'school-dashboard-v2.html',
-        school_id=school_id,
-        school_name=school.school_name if school else None,
-        school_city=school.city if school else None,
+        asset_version=_asset_version('js/school-dashboard-v3.js'),
     )
 
 
