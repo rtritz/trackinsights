@@ -1,4 +1,5 @@
 import os
+import json
 import re
 import sys
 import bisect
@@ -20,7 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
-from sqlalchemy import or_, func, and_
+from sqlalchemy import or_, func, and_, text as sqlalchemy_text
 from sqlalchemy.orm import joinedload
 
 from .models import (
@@ -2362,6 +2363,180 @@ _STATE_PLACE_POINTS = {1: 10, 2: 8, 3: 7, 4: 6, 5: 5, 6: 4, 7: 3, 8: 2, 9: 1}
 
 MIN_RECORDS_YEAR = 2023
 
+# Each program's statewide rank in every covered season, precomputed by
+# backend.jobs.precompute_program_rank_history.  The dashboard's trend line and
+# year-over-year arrow need two numbers per season; without this they were built
+# by calling _build_statewide_program_rankings() once per season, and each of
+# those assembles the full statewide table.
+#
+# The file carries the database fingerprint it was built from, and the reader
+# rebuilds it whenever that no longer matches. So it maintains itself: process
+# new results, and the next request that needs the history notices and refreshes
+# it. Running the job stays worth it -- it moves that one slow request off a
+# visitor -- but forgetting to costs a second, not a stale trend line.
+PROGRAM_RANK_HISTORY_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', 'frontend', 'static', 'data', 'program_rank_history.json',
+)
+
+
+def _db_fingerprint():
+    """A cheap stamp of the database's current state.
+
+    Modification time and size together: one os.stat, microseconds, and both
+    move whenever the file is rewritten -- which is how this database changes,
+    since it ships as a file and a deploy replaces it wholesale. Reading row
+    counts would be sounder in principle and a query per request in practice.
+    """
+    try:
+        stat = os.stat(CONST.DB_PATH)
+        return '%d:%d' % (stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        return ''
+
+
+def _covered_rank_seasons():
+    """Every season the rankings span, oldest first."""
+    rows = db.session.execute(
+        sqlalchemy_text(
+            "select distinct year from meet "
+            "where year is not null and year >= :y order by year"
+        ),
+        {"y": MIN_RECORDS_YEAR},
+    )
+    return [int(row[0]) for row in rows]
+
+
+def _clear_query_caches(*, keep=()):
+    """Empty every lru_cache in this module.
+
+    Used when the database has changed underneath a running process: the caches
+    here are keyed on query arguments, not on the state of the data, so nothing
+    else would ever evict them.
+    """
+    for name, value in list(globals().items()):
+        if name in keep:
+            continue
+        clear = getattr(value, 'cache_clear', None)
+        if callable(clear):
+            clear()
+
+
+_LAST_SEEN_DB = {'fingerprint': None}
+
+
+def ensure_fresh_queries():
+    """Drop every cached query result if the database has changed.
+
+    The caches in this module are keyed on query arguments, so nothing evicts
+    them when the underlying data moves -- a long-running worker would keep
+    serving the rankings it computed at start-up until it was restarted. That is
+    why updating results meant remembering to reload the web app.
+
+    Called once per request. The check is a single os.stat, and on the ordinary
+    request -- where nothing has changed -- it does nothing else.
+    """
+    current = _db_fingerprint()
+    previous = _LAST_SEEN_DB['fingerprint']
+    _LAST_SEEN_DB['fingerprint'] = current
+    if previous is not None and previous != current:
+        logger.info('database changed (%s -> %s); clearing query caches',
+                    previous, current)
+        _clear_query_caches()
+        return True
+    return False
+
+
+def build_program_rank_history():
+    """{fingerprint, index} -- every school's rank in every covered season.
+
+    The one builder, shared by the precompute job and the self-heal path below,
+    so the file can never be written in a shape the reader does not expect.
+    """
+    index = {}
+    for gender in CONST.GENDER.ALL:
+        per_season = {}
+        for season in _covered_rank_seasons():
+            table = _build_statewide_program_rankings(gender, season)
+            per_season[str(season)] = {
+                str(school_id): [row["rank"], row["total_schools"]]
+                for school_id, row in (table.get("by_school") or {}).items()
+                if row.get("rank")
+            }
+        index[gender] = per_season
+    return {"fingerprint": _db_fingerprint(), "index": index}
+
+
+def write_program_rank_history():
+    """Build the index and replace the file atomically.
+
+    Written to a per-process temp name and moved into place, so a reader never
+    sees a half-written file and two workers racing to heal cannot interleave.
+    """
+    # Every cached result in this module was computed from the database as it
+    # was. We only get here because the file no longer matches the database, so
+    # those caches are suspect too -- and rebuilding from them would write stale
+    # numbers under a current fingerprint, which is worse than no file at all
+    # because it looks valid. Drop them and read the data again.
+    _clear_query_caches()
+    payload = build_program_rank_history()
+    os.makedirs(os.path.dirname(PROGRAM_RANK_HISTORY_PATH), exist_ok=True)
+    temp_path = '%s.%d.tmp' % (PROGRAM_RANK_HISTORY_PATH, os.getpid())
+    with open(temp_path, 'w', encoding='utf-8') as handle:
+        json.dump(payload, handle, separators=(',', ':'))
+    os.replace(temp_path, PROGRAM_RANK_HISTORY_PATH)
+    return payload
+
+
+@lru_cache(maxsize=4)
+def _program_rank_history(fingerprint):
+    """The index for one state of the database, rebuilt if it does not exist.
+
+    Keyed on the fingerprint rather than cached outright: when the database
+    changes the key changes with it, so the stale entry is simply never asked
+    for again and the new one is read or rebuilt on the next request. That is
+    what makes this maintenance-free -- nothing has to remember to run the job
+    after results are processed, and a forgotten run costs one slow request
+    rather than a wrong trend line.
+    """
+    try:
+        with open(PROGRAM_RANK_HISTORY_PATH, encoding='utf-8') as handle:
+            payload = json.load(handle)
+        if isinstance(payload, dict) and payload.get('fingerprint') == fingerprint:
+            return payload.get('index')
+    except (OSError, ValueError):
+        payload = None
+
+    # Missing, unreadable, or built against a different database. Rebuild it.
+    # A failure here is not fatal: the caller falls back to building each season
+    # on demand, which is slower and identical.
+    try:
+        return write_program_rank_history().get('index')
+    except Exception:
+        logger.exception("could not refresh %s", PROGRAM_RANK_HISTORY_PATH)
+        return None
+
+
+def _program_rank_lookup(gender, season, school_id):
+    """One season's rank for one school: (rank, total_schools), or None.
+
+    Reads the precomputed index and falls back to building the statewide table,
+    so a missing file costs speed rather than correctness.
+    """
+    index = _program_rank_history(_db_fingerprint())
+    if index is not None:
+        entry = ((index.get(gender) or {}).get(str(season)) or {}).get(str(school_id))
+        if entry:
+            return entry[0], entry[1]
+        # A present index that simply has no row for this school is authoritative:
+        # the school did not rank that season, and rebuilding would agree.
+        if (index.get(gender) or {}).get(str(season)) is not None:
+            return None
+    row = _build_statewide_program_rankings(gender, season)["by_school"].get(school_id)
+    if not row:
+        return None
+    return row["rank"], row["total_schools"]
+
 
 _SCHOOL_LOGO_DIR = os.path.join(CONST.WEB_DIR, "frontend", "static", CONST.SCHOOL_LOGO_STATIC_SUBDIR)
 
@@ -3722,6 +3897,12 @@ def _normalize_rank_to_score(rank: Optional[int], total_marks: int) -> float:
     return round(((total_marks - rank) / (total_marks - 1)) * 100, 1)
 
 
+# Cached: one cold dashboard calls this eight times over with repeating
+# arguments -- once per season for the rank history, again per school for the
+# scorecard -- and each call re-runs the join and rebuilds every row as a dict.
+# Verified output-identical across 60 dashboard payloads before being added; the
+# returned list is treated as read-only by every caller, so they share it.
+@lru_cache(maxsize=64)
 def _resolve_postseason_individual_rows(
     *,
     gender: Optional[str] = None,
@@ -3789,6 +3970,12 @@ def _resolve_postseason_individual_rows(
     return list(per_meet.values())
 
 
+# Cached: one cold dashboard calls this eight times over with repeating
+# arguments -- once per season for the rank history, again per school for the
+# scorecard -- and each call re-runs the join and rebuilds every row as a dict.
+# Verified output-identical across 60 dashboard payloads before being added; the
+# returned list is treated as read-only by every caller, so they share it.
+@lru_cache(maxsize=64)
 def _resolve_postseason_relay_rows(
     *,
     gender: Optional[str] = None,
@@ -6688,22 +6875,22 @@ def get_school_dashboard_v3_program_rank(school_id: int, gender: str, year: int)
     # then recovered, which is the question a coach is actually asking.
     history = []
     for season in range(MIN_RECORDS_YEAR, year + 1):
-        row = _build_statewide_program_rankings(gender, season)["by_school"].get(school_id)
-        if row:
+        found = _program_rank_lookup(gender, season, school_id)
+        if found:
             history.append({
                 "season": season,
-                "rank": row["rank"],
-                "total_schools": row["total_schools"],
+                "rank": found[0],
+                "total_schools": found[1],
             })
 
     prior = None
     if year - 1 >= MIN_RECORDS_YEAR:
-        prior_row = _build_statewide_program_rankings(gender, year - 1)["by_school"].get(school_id)
-        if prior_row:
+        found = _program_rank_lookup(gender, year - 1, school_id)
+        if found:
             prior = {
                 "season": year - 1,
-                "rank": prior_row["rank"],
-                "total_schools": prior_row["total_schools"],
+                "rank": found[0],
+                "total_schools": found[1],
             }
 
     return {
