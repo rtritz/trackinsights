@@ -69,7 +69,17 @@ class CONST:
     # standalone script run from any directory.
     _COMMON_DIR = os.path.dirname(os.path.abspath(__file__))
     _REPO_ROOT = os.path.dirname(_COMMON_DIR)
-    DB_PATH = os.path.join(_REPO_ROOT, "web", "data", "Track.db")
+    # Two layouts have to work. In the repo, common/ sits beside web/. A
+    # deployment that copies web/. into the app root and common/ next to it
+    # leaves backend/ and frontend/ directly beside common/, with no web/ at
+    # all -- so "<root>/web" is the right answer only when it actually exists.
+    # Getting this wrong is quiet rather than loud: Flask reads its database URI
+    # from config.py, so the app serves pages normally while every CONST-derived
+    # path points into a directory that is not there.
+    _WEB_DIR_CANDIDATE = os.path.join(_REPO_ROOT, "web")
+    WEB_DIR = (_WEB_DIR_CANDIDATE if os.path.isdir(_WEB_DIR_CANDIDATE)
+               else _REPO_ROOT)
+    DB_PATH = os.path.join(WEB_DIR, "data", "Track.db")
     OUTPUT_PATH = os.path.join(_REPO_ROOT, "output")
 
     # School logos live at web/frontend/static/<SCHOOL_LOGO_STATIC_SUBDIR>/<school_id>.<SCHOOL_LOGO_EXT>
@@ -83,4 +93,4 @@ class CONST:
     SCHOOL_LOGO_EXT = "webp"
     SCHOOL_LOGO_MAX_DIMENSION = 300  # px, longest side; smaller logos are never upscaled
     SCHOOL_LOGO_WEBP_QUALITY = 82  # visually near-lossless at logo display sizes; ~1/10th a PNG
-    WEB_DIR = os.path.join(_REPO_ROOT, "web")
+    # WEB_DIR is defined above, alongside DB_PATH, so both agree on the layout.

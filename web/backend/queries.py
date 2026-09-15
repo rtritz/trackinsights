@@ -2380,6 +2380,25 @@ PROGRAM_RANK_HISTORY_PATH = os.path.join(
 )
 
 
+def _active_db_path():
+    """The database this app is actually reading.
+
+    Not necessarily CONST.DB_PATH: Flask takes its URI from config.py, and the
+    test suite points it at a fixture. Fingerprinting CONST.DB_PATH while the app
+    served a different database meant the precomputed payloads looked valid for
+    data they were never built from -- which is how a test fixture got answered
+    with production rows.
+    """
+    try:
+        from flask import current_app
+        uri = current_app.config.get('SQLALCHEMY_DATABASE_URI') or ''
+    except Exception:
+        uri = ''
+    if uri.startswith('sqlite:///'):
+        return uri[len('sqlite:///'):]
+    return CONST.DB_PATH
+
+
 def _db_fingerprint():
     """A cheap stamp of the database's current state.
 
@@ -2389,7 +2408,7 @@ def _db_fingerprint():
     counts would be sounder in principle and a query per request in practice.
     """
     try:
-        stat = os.stat(CONST.DB_PATH)
+        stat = os.stat(_active_db_path())
         return '%d:%d' % (stat.st_mtime_ns, stat.st_size)
     except OSError:
         return ''
