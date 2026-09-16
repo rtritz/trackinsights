@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, app
 from flask_sqlalchemy import SQLAlchemy
 from config import Config
 
@@ -50,5 +50,10 @@ def create_app(config_class=Config):
             ensure_fresh_queries()
         except Exception:
             app.logger.exception('database freshness check failed')
+
+    #*************RTRA
+    from .flask_server_timing import init_timing
+    init_timing(app, db=db)
+    #*************RTRA
 
     return app
