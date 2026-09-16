@@ -1049,6 +1049,326 @@
     </div>
 
 </div>
+<!-- ============================================================
+     PERFORMANCE DIAGNOSTICS - paste this BEFORE the existing
+     <script src="...school-dashboard-v3.js"></script> line.
+
+     Requires no changes to school-dashboard-v3.js. It works by:
+       1. wrapping window.fetch to time every API call
+       2. watching each dashboard section with a MutationObserver
+          to record when it first receives content
+       3. reading the browser's own navigation/resource timings
+       4. reading Server-Timing headers if the server sends them
+
+     Remove the whole block when you're done diagnosing.
+     ============================================================ -->
+
+<div id="sd3-perf" class="sd3-panel"
+     style="margin:2rem auto 0; max-width:1200px; padding:1rem 1.25rem;
+            font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+            font-size:0.78rem; line-height:1.5;">
+  <div style="font-size:0.95rem;font-weight:700;margin-bottom:0.15rem;">
+    Page Performance Diagnostics
+  </div>
+  <div style="color:#a5b0bc;margin-bottom:0.9rem;">
+    Times are milliseconds from navigation start unless noted.
+  </div>
+  <div id="sd3-perf-body">Collecting…</div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var PERF = window.sd3Perf = {
+    fetches: [],      // {url, start, end, dur, status, bytes}
+    sections: [],     // {label, at}
+    marks: {},
+    measures: {}
+  };
+
+  // ---- optional manual API, in case you do want to hand-instrument later ----
+  PERF.mark = function (name) { this.marks[name] = performance.now(); };
+  PERF.measure = function (name, a, b) {
+    if (this.marks[a] != null && this.marks[b] != null) {
+      this.measures[name] = this.marks[b] - this.marks[a];
+    }
+  };
+
+  // Parses a raw "Server-Timing" header value, e.g.
+  //   'total;dur=22.0;desc="Total view time", db;dur=0.3;desc="Database (1 queries)"'
+  // into [{name, dur, desc}, ...]. Returns [] if the header is missing, which
+  // it will be for any endpoint not covered by init_timing (e.g. a different
+  // blueprint, or a view that returns before after_request runs).
+  function parseServerTiming(header) {
+    if (!header) return [];
+    return header.split(',').map(function (part) {
+      var bits = part.trim().split(';');
+      var name = bits[0].trim();
+      var dur = null, desc = name;
+      bits.slice(1).forEach(function (b) {
+        var kv = b.trim().split('=');
+        if (kv[0] === 'dur') dur = parseFloat(kv[1]);
+        if (kv[0] === 'desc') desc = kv[1].replace(/^"|"$/g, '');
+      });
+      return { name: name, dur: dur, desc: desc };
+    });
+  }
+
+  // ---- 1. wrap fetch -------------------------------------------------------
+  // This is the important one. It separates "server took N seconds to answer"
+  // from "browser took N seconds to draw", with no edits to the dashboard JS.
+  var nativeFetch = window.fetch;
+  if (typeof nativeFetch === 'function') {
+    window.fetch = function () {
+      var url = (arguments[0] && arguments[0].url) || String(arguments[0]);
+      var rec = { url: url, start: performance.now(), end: null,
+                  dur: null, status: null, bytes: null };
+      PERF.fetches.push(rec);
+      return nativeFetch.apply(this, arguments).then(function (res) {
+        rec.end = performance.now();
+        rec.dur = rec.end - rec.start;
+        rec.status = res.status;
+        rec.serverTiming = parseServerTiming(res.headers.get('Server-Timing'));
+        // clone so we can measure payload size without consuming the body
+        try {
+          res.clone().arrayBuffer().then(function (buf) {
+            rec.bytes = buf.byteLength;
+            schedule();
+          }).catch(function () {});
+        } catch (e) {}
+        schedule();
+        return res;
+      }).catch(function (err) {
+        rec.end = performance.now();
+        rec.dur = rec.end - rec.start;
+        rec.status = 'ERROR';
+        schedule();
+        throw err;
+      });
+    };
+  }
+
+  // Same for XMLHttpRequest, in case the dashboard uses it instead.
+  var XHR = window.XMLHttpRequest;
+  if (XHR && XHR.prototype) {
+    var open = XHR.prototype.open, send = XHR.prototype.send;
+    XHR.prototype.open = function (m, u) { this.__sd3url = u; return open.apply(this, arguments); };
+    XHR.prototype.send = function () {
+      var rec = { url: this.__sd3url || '(xhr)', start: performance.now(),
+                  end: null, dur: null, status: null, bytes: null };
+      PERF.fetches.push(rec);
+      this.addEventListener('loadend', function () {
+        rec.end = performance.now();
+        rec.dur = rec.end - rec.start;
+        rec.status = this.status;
+        try { rec.bytes = (this.responseText || '').length; } catch (e) {}
+        try { rec.serverTiming = parseServerTiming(this.getResponseHeader('Server-Timing')); } catch (e) {}
+        schedule();
+      });
+      return send.apply(this, arguments);
+    };
+  }
+
+  // ---- 2. watch each section fill in ---------------------------------------
+  // Records the moment each container first gets non-empty content, which is
+  // a proxy for "this section finished rendering" without touching the JS.
+  var WATCH = [
+    ['Summary: place',        'sd3-metric-place'],
+    ['Summary: points',       'sd3-metric-points'],
+    ['Regional qualifiers',   'sd3-regional-qualifiers'],
+    ['Closest misses',        'sd3-closest'],
+    ['State qualifiers',      'sd3-state-qualifiers'],
+    ['Statewide rank',        'sd3-rank-headline'],
+    ['Rank sparkline',        'sd3-rank-spark'],
+    ['Rank details',          'sd3-rank-details'],
+    ['Returning athletes',    'sd3-metric-returning'],
+    ['Head-to-head',          'sd3-metric-h2h'],
+    ['Complete playoff results', 'sd3-scorecard'],
+    ['Filter row',            'sd3-filter-row'],
+    ['School name',           'sd3-school-name']
+  ];
+
+  function watchSections() {
+    WATCH.forEach(function (pair) {
+      var label = pair[0], el = document.getElementById(pair[1]);
+      if (!el) return;
+      var obs = new MutationObserver(function () {
+        if (el.children.length || (el.textContent || '').trim().length > 1) {
+          PERF.sections.push({ label: label, at: performance.now() });
+          obs.disconnect();
+          schedule();
+        }
+      });
+      obs.observe(el, { childList: true, subtree: true, characterData: true });
+    });
+  }
+
+  // ---- 3. long tasks (main-thread blocking > 50ms) --------------------------
+  PERF.longTasks = [];
+  try {
+    new PerformanceObserver(function (list) {
+      list.getEntries().forEach(function (e) {
+        PERF.longTasks.push({ start: e.startTime, dur: e.duration });
+      });
+      schedule();
+    }).observe({ entryTypes: ['longtask'] });
+  } catch (e) {}
+
+  // ---- rendering -----------------------------------------------------------
+  function ms(v) { return v == null ? '—' : v.toFixed(1) + ' ms'; }
+  function kb(v) { return v == null ? '—' : (v / 1024).toFixed(1) + ' KB'; }
+  function esc(s) {
+    return String(s).replace(/[&<>]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
+    });
+  }
+  function shortUrl(u) {
+    try { var a = document.createElement('a'); a.href = u; return a.pathname + a.search; }
+    catch (e) { return u; }
+  }
+  function table(headers, rows) {
+    var h = '<table style="width:100%;border-collapse:collapse;margin:0.35rem 0 1rem;">';
+    h += '<tr>' + headers.map(function (t, i) {
+      return '<th style="text-align:' + (i ? 'right' : 'left') +
+             ';padding:3px 6px;border-bottom:1px solid #2a3440;color:#a5b0bc;' +
+             'font-weight:600;white-space:nowrap;">' + esc(t) + '</th>';
+    }).join('') + '</tr>';
+    h += rows.map(function (r) {
+      return '<tr>' + r.map(function (c, i) {
+        return '<td style="text-align:' + (i ? 'right' : 'left') +
+               ';padding:3px 6px;border-bottom:1px solid rgba(42,52,64,.6);' +
+               (i ? 'white-space:nowrap;' : 'word-break:break-all;') + '">' + c + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    return h + '</table>';
+  }
+  function head(t) {
+    return '<div style="font-weight:700;margin:1rem 0 0.1rem;">' + esc(t) + '</div>';
+  }
+
+  var pending = false;
+  function schedule() {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(function () { pending = false; render(); });
+  }
+
+  function render() {
+    var body = document.getElementById('sd3-perf-body');
+    if (!body) return;
+    var nav = performance.getEntriesByType('navigation')[0];
+    var out = '';
+
+    // --- the headline numbers ---
+    if (nav) {
+      var rows = [
+        ['Redirect + DNS + connect', ms(nav.requestStart - nav.startTime)],
+        ['<strong>Server think time (TTFB)</strong>',
+         '<strong>' + ms(nav.responseStart - nav.requestStart) + '</strong>'],
+        ['HTML download', ms(nav.responseEnd - nav.responseStart)],
+        ['HTML parse → DOMContentLoaded',
+         ms(nav.domContentLoadedEventEnd - nav.responseEnd)],
+        ['→ load event', ms(nav.loadEventEnd - nav.startTime)],
+        ['HTML transferred', kb(nav.transferSize)]
+      ];
+      out += head('Document') + table(['Phase', 'Time'], rows);
+
+      // Server-Timing, if Flask is sending it (see server snippet)
+      if (nav.serverTiming && nav.serverTiming.length) {
+        out += head('Server-Timing (from response headers)') +
+          table(['Server phase', 'Time'], nav.serverTiming.map(function (e) {
+            return [esc(e.description || e.name), ms(e.duration)];
+          }));
+      }
+    }
+
+    // --- API calls: the usual culprit ---
+    if (PERF.fetches.length) {
+      var total = 0;
+      var frows = PERF.fetches.slice().sort(function (a, b) {
+        return (b.dur || 0) - (a.dur || 0);
+      }).map(function (f) {
+        total += f.dur || 0;
+        var urlCell = esc(shortUrl(f.url));
+        if (f.serverTiming && f.serverTiming.length) {
+          urlCell += '<div style="color:#a5b0bc;font-size:0.72rem;margin-top:2px;">' +
+            f.serverTiming.map(function (st) {
+              return esc(st.desc) + ': ' + ms(st.dur);
+            }).join(' &nbsp;·&nbsp; ') + '</div>';
+        } else if (f.status === 200 || f.status === '200') {
+          urlCell += '<div style="color:#f0c674;font-size:0.72rem;margin-top:2px;">' +
+            'no Server-Timing header — this endpoint isn\'t covered by init_timing' +
+            '</div>';
+        }
+        return [urlCell, esc(String(f.status)), kb(f.bytes), ms(f.dur)];
+      });
+      frows.push(['<strong>Total (sum, not wall clock)</strong>', '', '',
+                  '<strong>' + ms(total) + '</strong>']);
+      out += head('API / data requests') +
+             table(['Endpoint', 'Status', 'Size', 'Duration'], frows);
+    } else {
+      out += head('API / data requests') +
+        '<div style="color:#a5b0bc;padding:0.3rem 0;">None observed yet.</div>';
+    }
+
+    // --- section fill times ---
+    if (PERF.sections.length) {
+      var prev = nav ? nav.responseEnd : 0;
+      var srows = PERF.sections.slice().sort(function (a, b) { return a.at - b.at; })
+        .map(function (s) {
+          var delta = s.at - prev; prev = s.at;
+          return [esc(s.label), ms(s.at), ms(delta)];
+        });
+      out += head('Section first-content times') +
+             table(['Section', 'At', 'Δ since previous'], srows);
+    }
+
+    // --- static assets ---
+    var res = performance.getEntriesByType('resource')
+      .filter(function (r) { return r.duration > 5; })
+      .sort(function (a, b) { return b.duration - a.duration; })
+      .slice(0, 15);
+    if (res.length) {
+      out += head('Slowest static resources (top 15)') +
+        table(['Resource', 'Type', 'Size', 'Duration'], res.map(function (r) {
+          return [esc(shortUrl(r.name)), esc(r.initiatorType),
+                  kb(r.transferSize), ms(r.duration)];
+        }));
+    }
+
+    // --- main-thread blocking ---
+    if (PERF.longTasks.length) {
+      var lt = PERF.longTasks.reduce(function (a, t) { return a + t.dur; }, 0);
+      out += head('Main-thread long tasks (>50 ms)') +
+        table(['Started at', 'Blocked for'],
+          PERF.longTasks.map(function (t) { return [ms(t.start), ms(t.dur)]; })
+            .concat([['<strong>Total blocking</strong>',
+                      '<strong>' + ms(lt) + '</strong>']]));
+    } else {
+      out += head('Main-thread long tasks (>50 ms)') +
+        '<div style="color:#a5b0bc;padding:0.3rem 0;">None — rendering is not the bottleneck.</div>';
+    }
+
+    // --- any manual measures ---
+    var mk = Object.keys(PERF.measures);
+    if (mk.length) {
+      out += head('Manual measures') +
+        table(['Name', 'Duration'], mk.map(function (k) {
+          return [esc(k), ms(PERF.measures[k])];
+        }));
+    }
+
+    body.innerHTML = out;
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { watchSections(); schedule(); });
+  } else { watchSections(); schedule(); }
+  window.addEventListener('load', function () { setTimeout(schedule, 300); });
+  setInterval(schedule, 2000);
+})();
+</script>
 
 <script src="{{ url_for('static', filename='js/school-dashboard-v3.js') }}?v={{ asset_version }}"></script>
 {% endblock %}
