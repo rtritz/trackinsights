@@ -156,6 +156,28 @@
        a rule with one label beside it reads as a truncated heading. */
     #school-dashboard-v3 .sd3-view-tabs.is-single .sd3-view-sep { display: none; }
 
+    /* The pane switch. Heavier than the Regional/Closest pair inside the report,
+       because these two swap the whole page rather than one table -- so they read
+       as a control with a selected state, not as a heading. */
+    #school-dashboard-v3 .sd3-tabs {
+        display: flex; gap: 0.25rem; margin: 0.25rem 0 1rem;
+        border-bottom: 1px solid var(--sd3-border);
+    }
+    #school-dashboard-v3 .sd3-tab {
+        appearance: none; background: none; border: 0; cursor: pointer;
+        font: inherit; font-size: 0.9rem; font-weight: 600; letter-spacing: 0.04em;
+        text-transform: uppercase; color: var(--sd3-muted);
+        padding: 0.55rem 0.95rem; border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+    }
+    #school-dashboard-v3 .sd3-tab:hover { color: var(--sd3-text); }
+    #school-dashboard-v3 .sd3-tab[aria-selected="true"] {
+        color: var(--sd3-text); border-bottom-color: var(--sd3-accent); cursor: default;
+    }
+    #school-dashboard-v3 .sd3-tab:focus-visible {
+        outline: 2px solid var(--sd3-accent); outline-offset: -2px; border-radius: 4px;
+    }
+
     /* Two readings of equal weight, a box each, side by side. */
     #school-dashboard-v3 .sd3-split {
         display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem;
@@ -879,6 +901,19 @@
             <!-- What the postseason produced, round by round. Three groups on one
                  card rather than three cards: they are one story read in the order
                  the season ran, and a reader compares across them constantly. -->
+            <!-- Two panes, because only the first one is free. Everything in the
+                 summary comes from the core payload the page already waits for;
+                 everything in the other pane costs a request each. Loading those
+                 on arrival meant every visitor paid for the whole report to read
+                 the four numbers most of them came for. -->
+            <div class="sd3-tabs" role="tablist">
+                <button type="button" class="sd3-tab" data-tab="summary"
+                        role="tab" aria-selected="true">Summary</button>
+                <button type="button" class="sd3-tab" data-tab="details"
+                        role="tab" aria-selected="false">Full Report</button>
+            </div>
+
+            <div id="sd3-pane-summary">
             <section id="sd3-summary-section" class="sd3-section">
                 <div class="sd3-section-title">Postseason Summary</div>
                 <div class="sd3-panel sd3-postseason">
@@ -914,6 +949,10 @@
                     </div>
                 </div>
             </section>
+
+            </div>
+
+            <div id="sd3-pane-details" class="sd3-hidden">
 
             <!-- Both sides of the regional cut, in one section. Who got over it
                  and who was nearest to it are the same question asked from either
@@ -974,6 +1013,8 @@
                 <div id="sd3-scorecard-status" class="sd3-subtle"></div>
                 <div id="sd3-scorecard" class="sd3-panel sd3-scorecard-wrap"></div>
             </section>
+
+            </div>
 
         </div>
     </div>
