@@ -7,11 +7,11 @@ field -- but getting them meant calling _build_statewide_program_rankings() once
 per season, and that builds the full statewide table each time.  A cold
 dashboard was paying for four of those to read eight numbers.
 
-Running this is OPTIONAL.  The file records the database fingerprint it was
-built from, and the dashboard rebuilds it automatically whenever that no longer
-matches -- so new results are picked up with nothing to remember.  What running
-it here buys is that the one slow rebuild happens now, rather than landing on
-whichever visitor arrives first after the data changed.
+RUN THIS AFTER RESULTS CHANGE.  The dashboard reads the file as it stands and
+does not check whether it still matches the database -- so a stale file means a
+stale trend line and a stale year-over-year arrow, silently.  (It used to
+self-heal, but rebuilding inside a request cost a fresh worker seconds and
+cleared every other cache to do it.)
 
 From web/:
     python -m backend.jobs.precompute_program_rank_history
