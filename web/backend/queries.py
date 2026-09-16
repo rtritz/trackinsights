@@ -2439,9 +2439,8 @@ def _covered_rank_seasons():
 # to resolve the season), and on the dashboard's critical path it is what the
 # loading message waits for.
 #
-# One file per gender, holding the payload each school gets when it asks with no
-# season -- which is exactly the first page load. A season the reader picks later
-# is not in here and is computed live, as before.
+# One file per gender, holding each school's payload for every season a reader
+# can land on: the default, each covered year, and all-time.
 #
 # Unlike the rank-history index this does NOT rebuild itself on a miss: building
 # it is minutes, not seconds, and doing that inside a request would hang the very
@@ -2472,15 +2471,44 @@ def _core_cache(gender, fingerprint):
     return payload.get('entries')
 
 
+def _core_season_key(season):
+    """The bucket a request's season argument reads from.
+
+    None is its own bucket rather than an alias for the newest season: the server
+    decides what "no season" resolves to, and encoding that decision here would
+    duplicate the rule and let the two drift.
+    """
+    return '_default' if season is None else str(season)
+
+
+def _core_cache_seasons():
+    """Every season value a reader can land on: none given, each year, all-time."""
+    return [None] + [str(year) for year in _covered_rank_seasons()] + ['all-time']
+
+
 def build_core_cache(gender, school_ids):
+    # Every season, not just the default. The default alone covered the first
+    # page load and left every season pill falling through to a live rebuild --
+    # which on the server was four and a half seconds and about thirty queries
+    # per click, while the initial load it was meant to fix served in under a
+    # millisecond.
+    entries = {}
+    for season in _core_cache_seasons():
+        bucket = {}
+        for school_id in school_ids:
+            try:
+                bucket[str(school_id)] = _get_school_dashboard_v2_core_uncached(
+                    school_id, gender=gender, season=season)
+            except ValueError:
+                # Not a season this school competed in. Left out rather than
+                # stored as an error, so the request falls through and the
+                # endpoint rejects it exactly as it does today.
+                continue
+        entries[_core_season_key(season)] = bucket
     return {
         'fingerprint': _db_fingerprint(),
         'gender': gender,
-        'entries': {
-            str(school_id): _get_school_dashboard_v2_core_uncached(
-                school_id, gender=gender, season=None)
-            for school_id in school_ids
-        },
+        'entries': entries,
     }
 
 
@@ -5389,12 +5417,14 @@ def get_school_dashboard_v2_core(school_id: int, gender: Optional[str] = None, s
     Only the no-season request is precomputed -- that is the one the dashboard's
     loading message waits on. Anything else falls through and is computed.
     """
-    if season is None and gender:
+    if gender:
         entries = _core_cache(gender, _db_fingerprint())
         if entries is not None:
-            hit = entries.get(str(school_id))
-            if hit is not None:
-                return hit
+            bucket = entries.get(_core_season_key(season))
+            if bucket is not None:
+                hit = bucket.get(str(school_id))
+                if hit is not None:
+                    return hit
     return _get_school_dashboard_v2_core_uncached(school_id, gender=gender, season=season)
 
 
