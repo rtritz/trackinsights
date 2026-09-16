@@ -38,9 +38,13 @@ def main():
         for gender in CONST.GENDER.ALL:
             started = time.perf_counter()
             path, payload = write_core_cache(gender, school_ids)
-            filled = sum(1 for v in payload['entries'].values() if v)
-            print('  %-5s %d/%d schools, %.1f KB, %.0fs'
-                  % (gender, filled, len(school_ids),
+            # entries is keyed by season, each holding one payload per school
+            # that competed in it -- so the count to report is the payloads, not
+            # the length of the outer dict, which is just the season count.
+            buckets = payload['entries']
+            rows = sum(len(bucket) for bucket in buckets.values())
+            print('  %-5s %d seasons, %d payloads (%d schools), %.1f KB, %.0fs'
+                  % (gender, len(buckets), rows, len(school_ids),
                      os.path.getsize(path) / 1e3, time.perf_counter() - started))
         print('fingerprint %s' % payload['fingerprint'])
 
