@@ -40,6 +40,9 @@ document.addEventListener('DOMContentLoaded', function () {
         positionBlock: document.getElementById('sd3-position-block'),
         rankDetails: document.getElementById('sd3-rank-details'),
         summarySection: document.getElementById('sd3-summary-section'),
+        tabs: document.querySelectorAll('#school-dashboard-v3 .sd3-tab'),
+        paneSummary: document.getElementById('sd3-pane-summary'),
+        paneDetails: document.getElementById('sd3-pane-details'),
         regionalSection: document.getElementById('sd3-regional-section'),
         regionalTabs: document.getElementById('sd3-regional-tabs'),
         stateSection: document.getElementById('sd3-state-section'),
@@ -78,6 +81,11 @@ document.addEventListener('DOMContentLoaded', function () {
         // Which of the two regional views is showing. Held here so a gender or
         // season change leaves the reader on the tab they chose.
         regionalView: 'qualifiers',
+        // Which pane is showing, and which load the details pane was filled for.
+        // Held across filter changes so a reader who opened the report keeps it
+        // open when they switch gender or season.
+        tab: 'summary',
+        detailsLoadedFor: null,
         // The event the detail popup is showing. Held here because the popup
         // reloads on every filter change, not only when it is opened.
         detailEvent: null,
@@ -1970,6 +1978,42 @@ document.addEventListener('DOMContentLoaded', function () {
         refs.leaderboardContent.innerHTML = table + note;
     };
 
+    // Fill the report pane, once per core load.
+    //
+    // Everything here costs a request, and on a slow host four of them on arrival
+    // is what the reader waits through. They are issued when the pane is first
+    // shown instead -- and not re-issued when the reader tabs back and forth,
+    // only when a new core payload makes the contents stale.
+    const loadDetailsIfVisible = function (requestId) {
+        if (state.tab !== 'details' || state.detailsLoadedFor === requestId) {
+            return;
+        }
+        state.detailsLoadedFor = requestId;
+        refs.rankHeadline.innerHTML =
+            '<div class="sd3-rank-headline-move">Loading\u2026</div>';
+        void loadSeasonH2H(requestId);
+        void loadReturning(requestId);
+        void loadScorecard(requestId);
+        void loadRanking(requestId);
+    };
+
+    const setTab = function (tab) {
+        state.tab = tab;
+        if (refs.paneSummary) {
+            refs.paneSummary.classList.toggle('sd3-hidden', tab !== 'summary');
+        }
+        if (refs.paneDetails) {
+            refs.paneDetails.classList.toggle('sd3-hidden', tab !== 'details');
+        }
+        (refs.tabs || []).forEach(function (button) {
+            button.setAttribute('aria-selected',
+                button.getAttribute('data-tab') === tab ? 'true' : 'false');
+        });
+        if (tab === 'details' && state.core) {
+            loadDetailsIfVisible(state.requestId);
+        }
+    };
+
     const loadCore = async function (gender, season) {
         const requestId = ++state.requestId;
         try {
@@ -1992,27 +2036,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 gender: gender || state.gender,
                 season: season,
             });
-            // The four panel loaders below need core's resolved season -- but the
-            // server resolves it from the same arguments for every one of these
-            // endpoints (_v3_scope), so the URLs are already known here. Their
-            // requests start now and are awaited after core lands, which turns a
-            // serial core-then-panels page into one round trip's worth of
-            // waiting. Rendering still happens strictly after core, so nothing
-            // reads state.core before it is set.
-            //
-            // Each carries a no-op catch from the moment it is created: if core
-            // fails these are never awaited, and an unhandled rejection in a
-            // request nobody is listening to would surface as a console error.
-            const panelUrl = function (name) {
-                return '/api/v3/schools/' + schoolId + '/dashboard/' + name + '?' + query;
-            };
-            const pending = {};
-            ['ranking', 'season-h2h', 'returning', 'athletes'].forEach(function (name) {
-                const request = fetchJson(panelUrl(name));
-                request.catch(function () {});
-                pending[name] = request;
-            });
-
             const core = await fetchJson('/api/v3/schools/' + schoolId + '/dashboard/core?' + query);
             if (requestId !== state.requestId) {
                 return;
@@ -2029,9 +2052,8 @@ document.addEventListener('DOMContentLoaded', function () {
             refs.app.classList.remove('sd3-hidden');
 
             if (core.stage_results) {
-                void loadSeasonH2H(requestId, pending['season-h2h']);
-                void loadReturning(requestId, pending['returning']);
-                void loadScorecard(requestId, pending['athletes']);
+                // A fresh core means the report below it is now stale.
+                state.detailsLoadedFor = null;
                 showSection(refs.summarySection, true);
                 showSection(refs.scorecardSection, true);
                 showSection(refs.programRankSection, true);
@@ -2040,9 +2062,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 // The three entry lists show themselves once the scorecard lands:
                 // a season with no regional qualifiers gets no such section, and
                 // leaving them on here would flash an empty panel first.
-                refs.rankHeadline.innerHTML =
-                    '<div class="sd3-rank-headline-move">Loading…</div>';
-                void loadRanking(requestId, pending['ranking']);
+                // Only if the reader is actually looking at it. On the summary
+                // tab these four requests are never issued at all.
+                loadDetailsIfVisible(requestId);
             } else {
                 // All-Time still has a table -- the records board -- even though
                 // there is no single season to rank.
@@ -2347,6 +2369,17 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
+    (refs.tabs || []).forEach(function (button) {
+        button.addEventListener('click', function () {
+            setTab(button.getAttribute('data-tab'));
+        });
+    });
+
+    // Paint the panes from state rather than trusting the markup to agree with
+    // it. The two are set independently -- one in the template, one in the state
+    // object -- and nothing but this keeps them in step.
+    setTab(state.tab);
 
     if (!Number.isFinite(schoolId) || schoolId <= 0) {
         showError('Invalid school identifier.');
