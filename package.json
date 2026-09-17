@@ -1,0 +1,30 @@
+{
+  "name": "trackinsights",
+  "version": "1.0.0",
+  "description": "An Indiana high school track & field data analysis app: athlete/school dashboards, result comparisons, percentile rankings, and meet-projection tools, built on a SQLite database of meet results.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rtritz/trackinsights.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/rtritz/trackinsights/issues"
+  },
+  "homepage": "https://github.com/rtritz/trackinsights#readme",
+  "dependencies": {
+    "@tailwindcss/cli": "^4.1.12",
+    "daisyui": "^5.7.39",
+    "tailwindcss": "^4.1.12"
+  }
+}

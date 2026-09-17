@@ -1,12 +1,15 @@
 from datetime import datetime
 
 import os
+import time
 
 from flask import render_template, request, url_for, Response, current_app
 from . import main_bp
 from ..queries import get_athletes
 from ..models import Athlete, School
 from ..videos import INTERVIEW_VIDEOS
+from ..services import dashboard_v4
+from common.const import CONST
 from common.regional_hosts import get_configured_regional_hosts
 from sqlalchemy.orm import joinedload
 
@@ -261,6 +264,80 @@ def school_dashboard_v3(school_id):
         school_city=school.city if school else None,
         asset_version=_asset_version('js/school-dashboard-v3.js'),
     )
+
+
+@main_bp.route('/school-dashboard-v4/<int:school_id>')
+@main_bp.route('/school-dashboard-v4/<int:school_id>/<gender>/<season>')
+def school_dashboard_v4(school_id, gender=None, season=None):
+    """The V4 dashboard: one indexed lookup, then render.
+
+    No analysis happens here. Everything on the page was computed by
+    backend.jobs.precompute_dashboard_v4 and is read back whole.
+
+    Gender and season are in the path rather than a query string so every view
+    is a real URL -- linkable, bookmarkable, and cacheable by the browser.
+    """
+    timings = []
+
+    def step(label, fn):
+        started = time.perf_counter()
+        try:
+            return fn()
+        finally:
+            timings.append((label, (time.perf_counter() - started) * 1000))
+
+    gender = gender or CONST.GENDER.BOYS
+    payload = step('cache lookup',
+                   lambda: dashboard_v4.load_payload(school_id, gender, season)
+                   if season else None)
+
+    if payload is None:
+        # No season asked for, or none cached under that name: fall back to the
+        # newest season this school has, so a bare URL always lands somewhere.
+        available = step('season list',
+                         lambda: dashboard_v4.season_choices(school_id, gender))
+        if available:
+            years = sorted([s for s in available if s.isdigit()], reverse=True)
+            season = years[0] if years else available[0]
+            payload = step('cache lookup',
+                           lambda: dashboard_v4.load_payload(school_id, gender, season))
+
+    if payload is None:
+        school = School.query.get(school_id)
+        return render_template(
+            'school-dashboard-v4.html',
+            payload=None,
+            school_id=school_id,
+            school_name=school.school_name if school else None,
+            status=dashboard_v4.cache_status(),
+            meta=dashboard_v4.cache_meta(),
+            timings=timings,
+            show_timings=_v4_show_timings(),
+            asset_version=_asset_version('js/school-dashboard-v4.js'),
+        ), (200 if school else 404)
+
+    return render_template(
+        'school-dashboard-v4.html',
+        payload=payload,
+        school_id=school_id,
+        school_name=(payload.get('school') or {}).get('name'),
+        status=dashboard_v4.cache_status(),
+        meta=dashboard_v4.cache_meta(),
+        timings=timings,
+        show_timings=_v4_show_timings(),
+        asset_version=_asset_version('js/school-dashboard-v4.js'),
+    )
+
+
+def _v4_show_timings():
+    """Per-section timings, shown only when asked for.
+
+    ?debug=timing in development, never by default -- the numbers are for
+    answering "where did the time go", not for visitors.
+    """
+    if not request.args.get('debug') == 'timing':
+        return False
+    return bool(current_app.debug) or os.environ.get('TI_ALLOW_TIMING') == '1'
 
 
 @main_bp.route('/interviews')
