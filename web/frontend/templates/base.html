@@ -781,6 +781,20 @@
         return;
       }
 
+      // Set by a page that is navigating within itself -- switching season or
+      // gender on a dashboard, say. Those are changes of view, not arrivals, and
+      // replaying the intro on each one makes the site feel slower than it is.
+      // Read once and cleared, so it never suppresses a genuine visit.
+      try {
+        if (sessionStorage.getItem('ti-skip-intro')) {
+          sessionStorage.removeItem('ti-skip-intro');
+          overlay.remove();
+          return;
+        }
+      } catch (error) {
+        /* A browser without sessionStorage just gets the intro. */
+      }
+
       const removeOverlay = () => {
         if (!overlay || !overlay.parentNode) {
           return;

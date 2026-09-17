@@ -47,6 +47,7 @@ def main(limit=None):
     app = create_app()
     started = time.perf_counter()
     rows = []
+    ranking_rows = []
     with app.app_context():
         school_ids = [r.school_id for r in School.query.with_entities(School.school_id)]
         if limit:
@@ -70,15 +71,20 @@ def main(limit=None):
                         continue
                     rows.append((school_id, gender, season, svc._encode(payload)))
                     built += 1
+                # The lists behind the rank figures: one set per gender/season,
+                # not per school. Built here because the statewide tables are
+                # already warm from the payloads above.
+                for event, payload in svc.build_rankings(gender, season, queries):
+                    ranking_rows.append((gender, season, event, svc._encode(payload)))
                 print('  %-5s %-8s %4d payloads  %5.0fs'
                       % (gender, season, built, time.perf_counter() - t0))
 
-    path = svc.write_cache(rows, svc.source_size())
+    path = svc.write_cache(rows, svc.source_size(), ranking_rows)
     size = os.path.getsize(path)
     print()
     print('wrote %s' % os.path.normpath(path))
-    print('  %d payloads, %.1f MB, %.0fs total'
-          % (len(rows), size / 1e6, time.perf_counter() - started))
+    print('  %d payloads, %d ranked lists, %.1f MB, %.0fs total'
+          % (len(rows), len(ranking_rows), size / 1e6, time.perf_counter() - started))
     meta = svc.cache_meta()
     print('  generated_at %s | data v%s | methodology v%s | source_size %s'
           % (meta.get('generated_at'), meta.get('data_version'),

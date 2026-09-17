@@ -37,11 +37,9 @@ WEB_DIR = os.path.abspath(os.path.join(HERE, '..', '..'))
 if WEB_DIR not in sys.path:
     sys.path.insert(0, WEB_DIR)
 
-# Ordered because the dashboard cache reads the rank history: building it first
-# means the dashboards are built against a current one rather than last week's.
+# Dashboards first: it is by far the longest job, so a failure in one of the
+# quick prediction builds surfaces after the expensive work is already safe.
 JOBS = [
-    ('program_rank_history', 'backend.jobs.precompute_program_rank_history'),
-    ('core_cache', 'backend.jobs.precompute_core_cache'),
     ('dashboard_v4', 'backend.jobs.precompute_dashboard_v4'),
     ('combined_rankings', 'backend.jobs.precompute_combined_rankings'),
     ('combined_results', 'backend.jobs.precompute_combined_results'),

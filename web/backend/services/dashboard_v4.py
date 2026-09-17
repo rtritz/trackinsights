@@ -128,6 +128,28 @@ def _decode(blob):
         return None
 
 
+def load_rankings(gender, season, event=''):
+    """One ranked list: the statewide program table, or one event's field.
+
+    Same shape as load_payload -- a single indexed lookup -- but fetched by the
+    page only when a reader actually opens a rank.
+    """
+    try:
+        conn = _connect(readonly=True)
+    except sqlite3.OperationalError:
+        return None
+    try:
+        row = conn.execute(
+            "SELECT payload FROM rankings WHERE gender=? AND season=? AND event=?",
+            (str(gender), str(season), str(event or '')),
+        ).fetchone()
+    except sqlite3.Error:
+        return None
+    finally:
+        conn.close()
+    return _decode(row[0]) if row else None
+
+
 def cache_meta():
     """Provenance of the cache: when it was built, and from what."""
     try:
@@ -376,7 +398,7 @@ def build_payload(school_id, gender, season, queries):
     `queries` is passed in rather than imported at module scope so this file can
     be imported by the route without dragging the whole query layer in with it.
     """
-    core = queries.get_school_dashboard_v2_core(school_id, gender=gender, season=season)
+    core = queries.get_school_dashboard_v4_core(school_id, gender=gender, season=season)
     if not core:
         return None
 
@@ -431,7 +453,7 @@ def build_payload(school_id, gender, season, queries):
         payload['overview']['year'] = stage_results.get('year')
 
     # The per-entry table drives three of the five tabs, so it is fetched once.
-    scorecard = queries.get_school_dashboard_v3_athlete_scorecard(
+    scorecard = queries.get_school_dashboard_v4_athlete_scorecard(
         school_id, gender, str(selected))
     rows = (scorecard or {}).get('rows') or []
     stages_present = (scorecard or {}).get('stages_present') or []
@@ -449,7 +471,7 @@ def build_payload(school_id, gender, season, queries):
         payload['regional']['just_missed'] = _just_missed(entered)
 
         year = int(selected)
-        rank = queries.get_school_dashboard_v3_program_rank(school_id, gender, year)
+        rank = queries.get_school_dashboard_v4_program_rank(school_id, gender, year)
         if rank:
             history = rank.get('rank_history') or []
             prior = rank.get('prior_rank') or None
@@ -469,7 +491,7 @@ def build_payload(school_id, gender, season, queries):
                 'spark': _spark(history),
             }
 
-        h2h = queries.get_school_dashboard_v3_season_h2h(school_id, gender, str(selected))
+        h2h = queries.get_school_dashboard_v4_season_h2h(school_id, gender, str(selected))
         if h2h and h2h.get('available') and h2h.get('seasons'):
             latest = h2h['seasons'][0]
             payload['outlook']['h2h'] = {
@@ -483,7 +505,7 @@ def build_payload(school_id, gender, season, queries):
         elif h2h:
             payload['outlook']['h2h'] = {'reason': h2h.get('reason')}
 
-        ret = queries.get_school_dashboard_v3_returning(school_id, gender, str(selected))
+        ret = queries.get_school_dashboard_v4_returning(school_id, gender, str(selected))
         if ret and ret.get('available'):
             points = ret.get('points') or {}
             payload['outlook']['returning'] = {
@@ -504,6 +526,61 @@ def build_payload(school_id, gender, season, queries):
     return payload
 
 
+def build_rankings(gender, season, queries):
+    """Every ranked list for one gender/season, as (event, payload) pairs.
+
+    Trimmed to what the popup prints. The underlying rows carry meet ids, event
+    types and lineups that no reader sees, and keeping them would multiply the
+    size of the one artifact that has to stay small enough to commit.
+    """
+    if str(season) == 'all-time':
+        return []
+    year = int(season)
+    out = []
+
+    table = queries._build_statewide_program_rankings(gender, year)
+    out.append(('', {
+        'kind': 'program',
+        'title': 'Statewide Program Rankings',
+        'subtitle': '%s %s \u2014 %d ranked programs' % (
+            gender, year, len(table['leaderboard'])),
+        'columns': ['Rank', 'School', 'Composite'],
+        'rows': [
+            {
+                'rank': row['rank'],
+                'school_id': row['school_id'],
+                'name': row['school_name'],
+                'value': round(row['composite_score'], 1)
+                if isinstance(row.get('composite_score'), (int, float)) else None,
+            }
+            for row in table['leaderboard']
+        ],
+    }))
+
+    for source, is_relay in ((queries._school_dashboard_v4_event_ranked_rows, False),
+                             (queries._school_dashboard_v4_relay_ranked_rows, True)):
+        for event, rows in (source(gender, year) or {}).items():
+            out.append((event, {
+                'kind': 'event',
+                'title': event,
+                'subtitle': '%s %s \u2014 %d %s ranked' % (
+                    gender, year, len(rows), 'relays' if is_relay else 'athletes'),
+                'columns': ['Rank', 'Relay' if is_relay else 'Athlete', 'School', 'Mark'],
+                'rows': [
+                    {
+                        'rank': row.get('rank'),
+                        'athlete_id': None if is_relay else row.get('athlete_id'),
+                        'name': 'Relay' if is_relay else _person_name(row.get('athlete_name')),
+                        'school_id': row.get('school_id'),
+                        'school': row.get('school_name'),
+                        'mark': row.get('result'),
+                    }
+                    for row in rows
+                ],
+            }))
+    return out
+
+
 # --------------------------------------------------------------------- writing
 
 SCHEMA = """
@@ -515,10 +592,21 @@ CREATE TABLE IF NOT EXISTS dashboard (
     payload   TEXT    NOT NULL,
     PRIMARY KEY (school_id, gender, season)
 );
+-- The lists a rank came out of. Shared by every school, so they are stored once
+-- per gender/season rather than copied into 414 payloads -- the statewide
+-- leaderboard alone would have added megabytes to a cache that is 10MB whole.
+-- Fetched only when a reader opens one.
+CREATE TABLE IF NOT EXISTS rankings (
+    gender  TEXT NOT NULL,
+    season  TEXT NOT NULL,
+    event   TEXT NOT NULL,   -- '' for the statewide program leaderboard
+    payload TEXT NOT NULL,
+    PRIMARY KEY (gender, season, event)
+);
 """
 
 
-def write_cache(rows, source_size):
+def write_cache(rows, source_size, ranking_rows=()):
     """Replace the cache with `rows` of (school_id, gender, season, payload).
 
     Built into a temporary file and moved into place, so a half-written cache is
@@ -537,6 +625,9 @@ def write_cache(rows, source_size):
             "INSERT OR REPLACE INTO dashboard (school_id,gender,season,payload) VALUES (?,?,?,?)",
             rows)
         conn.executemany(
+            "INSERT OR REPLACE INTO rankings (gender,season,event,payload) VALUES (?,?,?,?)",
+            ranking_rows)
+        conn.executemany(
             "INSERT OR REPLACE INTO meta (key,value) VALUES (?,?)",
             [
                 ('generated_at', datetime.now(timezone.utc).isoformat(timespec='seconds')),
@@ -550,6 +641,7 @@ def write_cache(rows, source_size):
                 # rewrites a mark without changing how large the file is.
                 ('source_hash', source_hash()),
                 ('rows', str(len(rows))),
+                ('ranking_rows', str(len(ranking_rows))),
             ])
         conn.commit()
     finally:
