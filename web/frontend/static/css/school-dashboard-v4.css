@@ -397,3 +397,21 @@
    "12th in this band" and "the 160th school in the state" at once. */
 #sd4 .rankbox-body td.of { color: var(--muted); }
 #sd4 .rankbox-note { padding: 0.9rem 1rem; color: var(--muted); font-size: 0.86rem; }
+
+/* Icon buttons: square, so the three read as one control group rather than
+   three differently-sized words. */
+#sd4 .jump.icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; padding: 0;
+}
+#sd4 .jump.icon svg {
+    width: 15px; height: 15px; fill: none; stroke: currentColor;
+    stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+/* When the school has more than one entry in the list, the jump cycles through
+   them and the count says how many there are to cycle through. */
+#sd4 .jump.icon .count {
+    font-size: 0.62rem; font-weight: 700; margin-left: 0.15rem;
+    font-variant-numeric: tabular-nums;
+}
+#sd4 .jump.icon[data-many] { width: auto; padding: 0 0.45rem; }
