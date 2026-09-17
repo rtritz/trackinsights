@@ -31,7 +31,7 @@ def _clear_query_caches():
     for func in (
         queries._get_event_types_map,
         queries._build_statewide_program_rankings,
-        queries.get_school_dashboard_v2_qualifiers,
+        queries.get_school_dashboard_v4_qualifiers,
         queries.get_regional_qualifiers,
         queries._schools_with_logos,
     ):
@@ -119,7 +119,7 @@ def _seed_core_data():
 
 @pytest.fixture()
 def app():
-    db_path = REPO_ROOT / "tests" / f"school_dashboard_v2_test_{uuid4().hex}.sqlite"
+    db_path = REPO_ROOT / "tests" / f"school_dashboard_test_{uuid4().hex}.sqlite"
     config = type(
         "LocalTestConfig",
         (TestConfig,),

@@ -88,60 +88,64 @@
                 </div>
             </div>
         </div>
-        {# Each gender/season is its own URL, so these are links rather than buttons. #}
+        {# Each gender/season is its own URL, so these are links rather than buttons.
+           data-filter marks them so the script can suppress the site's intro
+           animation on the way out -- switching season is a change of view, not
+           an arrival. #}
         <nav class="filters">
-            <div class="fgroup">
+            <div class="seg">
                 {% for g in filters.genders %}
-                    <a class="fopt {{ 'on' if g == filters.selected_gender }}"
+                    <a data-filter class="{{ 'on' if g == filters.selected_gender }}"
                        href="{{ url_for('main.school_dashboard_v4', school_id=school_id, gender=g, season=filters.selected_season) }}">{{ g }}</a>
                 {% endfor %}
             </div>
-            <span class="fsep"></span>
-            <div class="fgroup">
+            <div class="seasons">
                 {% for s in filters.seasons %}
-                    <a class="fopt {{ 'on' if s == filters.selected_season }}"
+                    <a data-filter class="fopt {{ 'on' if s == filters.selected_season }}"
                        href="{{ url_for('main.school_dashboard_v4', school_id=school_id, gender=filters.selected_gender, season=s) }}">{{ filters.season_labels.get(s, s) }}</a>
                 {% endfor %}
             </div>
         </nav>
     </header>
 
+    {% set has_program = payload.rank is not none
+                          or payload.outlook.h2h is not none
+                          or payload.outlook.returning is not none %}
     {% set tabs = [('overview','Overview', true),
-                   ('regional','Regional Qualifiers', payload.has_regional),
-                   ('state','State Qualifiers', payload.has_state),
-                   ('rank','Statewide Rank', payload.rank is not none),
-                   ('outlook','Outlook', payload.outlook.h2h is not none or payload.outlook.returning is not none),
-                   ('results','All Results', payload.results.rows | length > 0)] %}
-    <div class="tabs" role="tablist">
+                   ('qualifiers','Qualifiers', payload.has_regional or payload.has_state),
+                   ('analytics','Analytics', has_program)] %}
+    <div class="navtabs" role="tablist">
         {% for key, label, shown in tabs if shown %}
-            <button type="button" class="tab" role="tab" data-tab="{{ key }}"
+            <button type="button" class="navtab" role="tab" data-tab="{{ key }}"
                     aria-selected="{{ 'true' if loop.first else 'false' }}">{{ label }}</button>
         {% endfor %}
     </div>
 
     {# ---------------------------------------------------------- OVERVIEW #}
     <section class="pane" data-pane="overview">
+        {# The three rounds across one row: sectional, regional, state, in the
+           order the season ran. Stacked they spent most of a screen on six
+           numbers; a round the program never reached is a dimmed column rather
+           than a block of empty metrics. #}
         {% if payload.overview.stages %}
         <div class="section">
-            <div class="stitle">Postseason Summary</div>
-            <div class="panel pad">
+            <div class="rounds">
                 {% for stage in payload.overview.stages %}
-                    <div class="group">
-                        <div class="sub">{{ stage.heading }}</div>
-                        <div class="mrow two">
-                            <div class="metric">
-                                <div class="mlabel">{{ stage.count_label }}</div>
-                                <div class="mvalue">{{ stage.count }}</div>
-                                <div class="mctx">{{ stage.scoring }} {{ stage.scoring_label | lower }}</div>
-                            </div>
-                            <div class="metric">
-                                <div class="mlabel">Team Place</div>
-                                <div class="mvalue">
-                                    {%- if stage.team_rank %}{{ stage.team_rank | ordinal }}<span class="mden"> of {{ stage.total_teams }}</span>
-                                    {%- else %}&mdash;{% endif -%}
-                                </div>
-                                <div class="mctx">{% if stage.attended %}{{ stage.points | num if stage.points else 0 }} points{% else %}did not reach this round{% endif %}</div>
-                            </div>
+                    <div class="round {{ 'out' if not stage.attended }}">
+                        <div class="rname">{{ stage.heading }}</div>
+                        <div class="rfig">
+                            <b>{{ stage.count }}</b>
+                            <span>{{ stage.count_label | lower }}{% if stage.scoring %}, {{ stage.scoring }} {{ stage.scoring_label | lower }}{% endif %}</span>
+                        </div>
+                        <div class="rline">
+                            {%- if stage.team_rank %}
+                                <b>{{ stage.team_rank | ordinal }}</b> of {{ stage.total_teams }}
+                                &middot; {{ stage.points | num if stage.points else 0 }} points
+                            {%- elif stage.attended %}
+                                {{ stage.points | num if stage.points else 0 }} points
+                            {%- else %}
+                                did not reach this round
+                            {%- endif -%}
                         </div>
                     </div>
                 {% endfor %}
@@ -149,14 +153,72 @@
         </div>
         {% endif %}
 
+
+        <div class="section">
+            <div class="panel">
+                {% if payload.results.rows %}
+                <div class="tscroll"><table>
+                    <thead><tr>
+                        <th>Event</th><th>Athlete</th>
+                        {% for stage in payload.results.stages %}<th>{{ stage }} Result</th>{% endfor %}
+                        <th>State Rank</th>
+                    </tr></thead>
+                    <tbody>
+                    {% for row in payload.results.rows %}
+                        {% if row.empty %}
+                            <tr class="empty-row">
+                                <td>{{ row.event }}</td>
+                                <td colspan="{{ payload.results.stages | length + 2 }}">no entry</td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td>{{ row.event }}</td>
+                                <td>{{ who(row) }}{% if row.badge %}<span class="gem {{ row.badge | lower }}" title="{{ 'State Finals qualifier' if row.badge == 'SQ' else 'Regional qualifier' }}" aria-label="{{ 'State Finals qualifier' if row.badge == 'SQ' else 'Regional qualifier' }}"><i></i><em>{{ row.badge }}</em></span>{% endif %}</td>
+                                {% for stage in payload.results.stages %}
+                                    {% set cell = row.cells.get(stage) %}
+                                    {{ markcell(cell.mark if cell else none, cell.place if cell else none,
+                                                cell.prelim if cell else false, cell.has_mark if cell else true) }}
+                                {% endfor %}
+                                <td class="rank-cell">
+                                    {%- if row.rank -%}
+                                        <button type="button" class="ranklink" data-event="{{ row.event }}"
+                                                title="See the statewide {{ row.event }} rankings">
+                                            <b>{{ row.rank }}</b> / {{ row.rank_total }}</button>
+                                    {%- else -%}—{%- endif -%}
+                                </td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
+                    </tbody>
+                </table></div>
+                {% else %}
+                    <div class="note">No results on record for this season.</div>
+                {% endif %}
+            </div>
+        </div>
     </section>
 
     {# ------------------------------------------------- REGIONAL QUALIFIERS #}
-    {% if payload.has_regional %}
-    <section class="pane hidden" data-pane="regional">
+    {% if payload.has_regional or payload.has_state %}
+    <section class="pane hidden" data-pane="qualifiers">
+        {# Both sides of the regional cut under one heading: who got over it and
+           who came nearest are the same question asked from either side, and
+           stacked they made the reader scroll past one to reach the other. #}
+        <div class="vtabs">
+            {% if payload.regional.qualifiers %}
+            <button type="button" class="vtab" data-view="quals" aria-pressed="true">Regional Qualifiers</button>
+            {% endif %}
+            {% if payload.regional.qualifiers and payload.regional.just_missed %}
+            <span class="vsep" aria-hidden="true">|</span>
+            {% endif %}
+            {% if payload.regional.just_missed %}
+            <button type="button" class="vtab" data-view="misses"
+                    aria-pressed="{{ 'false' if payload.regional.qualifiers else 'true' }}">Closest Misses</button>
+            {% endif %}
+        </div>
+
         {% if payload.regional.qualifiers %}
-        <div class="section">
-            <div class="stitle">Regional Qualifiers</div>
+        <div class="section view" data-view="quals">
             <div class="panel"><div class="tscroll"><table class="qtable">
                 <thead><tr><th>Athlete</th><th>Event</th><th>Regional Result</th></tr></thead>
                 <tbody>
@@ -173,8 +235,7 @@
         {% endif %}
 
         {% if payload.regional.just_missed %}
-        <div class="section">
-            <div class="stitle">Closest Misses</div>
+        <div class="section view {{ 'hidden' if payload.regional.qualifiers }}" data-view="misses">
             <div class="panel"><div class="tscroll"><table class="qtable">
                 <thead><tr>
                     <th>Athlete</th><th>Event</th>
@@ -195,12 +256,11 @@
             </table></div></div>
         </div>
         {% endif %}
-    </section>
-    {% endif %}
 
-    {# ---------------------------------------------------- STATE QUALIFIERS #}
-    {% if payload.has_state %}
-    <section class="pane hidden" data-pane="state">
+        {# State sits with the regional rather than in a tab of its own: most
+           schools send nobody, and an empty tab in the strip is worse than a
+           section that simply is not there. #}
+        {% if payload.has_state %}
         <div class="section">
             <div class="stitle">State Qualifiers</div>
             <div class="panel"><div class="tscroll"><table class="qtable">
@@ -216,19 +276,22 @@
                 </tbody>
             </table></div></div>
         </div>
+        {% endif %}
     </section>
     {% endif %}
 
     {# ------------------------------------------------------ STATEWIDE RANK #}
+    {% if has_program %}
+    <section class="pane hidden" data-pane="analytics">
     {% if payload.rank %}
     {% set rank = payload.rank %}
-    <section class="pane hidden" data-pane="rank">
         <div class="section">
             <div class="stitle">Statewide Rank</div>
             <div class="panel pad">
                 {% if rank.is_ranked %}
                     <div class="rank-head">
-                        <span class="rank-big">{{ rank.rank | ordinal }} of {{ rank.total_schools }}</span>
+                        <button type="button" class="rank-big ranklink" data-event=""
+                                title="See the statewide program rankings">{{ rank.rank | ordinal }} of {{ rank.total_schools }}</button>
                         {% if rank.percentile is not none %}
                             <span class="rank-pct">({{ '%.1f' | format(rank.percentile) }} percentile)</span>
                         {% endif %}
@@ -292,12 +355,11 @@
                 {% endif %}
             </div>
         </div>
-    </section>
     {% endif %}
 
-    {# ------------------------------------------------------------- OUTLOOK #}
+    {# Outlook lives with the rank: both answer "where is this program", one now
+       and one next season. Neither fills a tab on its own. #}
     {% if payload.outlook.h2h or payload.outlook.returning %}
-    <section class="pane hidden" data-pane="outlook">
         <div class="section">
             <div class="split">
                 <div>
@@ -338,55 +400,10 @@
                 </div>
             </div>
         </div>
+    {% endif %}
     </section>
     {% endif %}
 
-    {# ------------------------------------------------------- ALL RESULTS #}
-    {# Last, and its own pane: at a median of 24 rows it is eight times any other
-       section and two thirds of the payload, so sharing the Overview buried six
-       summary figures under a screen of table. It is also a different kind of
-       reading -- looked up, not scanned. #}
-    {% if payload.results.rows %}
-    <section class="pane hidden" data-pane="results">
-        <div class="section">
-            <div class="stitle">Complete Playoff Results</div>
-            <div class="panel">
-                {% if payload.results.rows %}
-                <div class="tscroll"><table>
-                    <thead><tr>
-                        <th>Event</th><th>Athlete</th>
-                        {% for stage in payload.results.stages %}<th>{{ stage }} Result</th>{% endfor %}
-                        <th>State Rank</th>
-                    </tr></thead>
-                    <tbody>
-                    {% for row in payload.results.rows %}
-                        {% if row.empty %}
-                            <tr class="empty-row">
-                                <td>{{ row.event }}</td>
-                                <td colspan="{{ payload.results.stages | length + 2 }}">no entry</td>
-                            </tr>
-                        {% else %}
-                            <tr>
-                                <td>{{ row.event }}</td>
-                                <td>{{ who(row) }}{% if row.badge %}<span class="badge {{ row.badge | lower }}">{{ row.badge }}</span>{% endif %}</td>
-                                {% for stage in payload.results.stages %}
-                                    {% set cell = row.cells.get(stage) %}
-                                    {{ markcell(cell.mark if cell else none, cell.place if cell else none,
-                                                cell.prelim if cell else false, cell.has_mark if cell else true) }}
-                                {% endfor %}
-                                <td class="rank-cell">{% if row.rank %}<b>{{ row.rank }}</b> / {{ row.rank_total }}{% else %}—{% endif %}</td>
-                            </tr>
-                        {% endif %}
-                    {% endfor %}
-                    </tbody>
-                </table></div>
-                {% else %}
-                    <div class="note">No results on record for this season.</div>
-                {% endif %}
-            </div>
-        </div>
-    </section>
-    {% endif %}
 
     {% if meta.generated_at %}
         <div class="built">Dashboard data prepared {{ meta.generated_at }}</div>
@@ -400,7 +417,28 @@
 {% endif %}
 
 </div>
+
+{# Filled on demand from /api/v4/rankings -- these lists are shared by every
+   school and far larger than the page, so one is fetched only when opened. #}
+<div id="sd4-modal" class="rankbox" hidden aria-hidden="true">
+    <div class="rankbox-card" role="dialog" aria-modal="true" aria-labelledby="sd4-modal-title" tabindex="-1">
+        <div class="rankbox-head">
+            <div>
+                <h2 id="sd4-modal-title"></h2>
+                <div id="sd4-modal-sub" class="muted"></div>
+            </div>
+            <button type="button" class="rankbox-close" data-close>Close</button>
+        </div>
+        <div class="rankbox-actions">
+            <button type="button" id="sd4-jump" class="jump">Jump to us</button>
+        </div>
+        <div id="sd4-modal-body" class="rankbox-body"></div>
+    </div>
+</div>
 </div>
 
-<script src="{{ url_for('static', filename='js/school-dashboard-v4.js') }}?v={{ asset_version }}" defer></script>
+<script src="{{ url_for('static', filename='js/school-dashboard-v4.js') }}?v={{ asset_version }}"
+        data-school-id="{{ school_id }}"
+        data-gender="{{ filters.selected_gender }}"
+        data-season="{{ filters.selected_season }}" defer></script>
 {% endblock %}

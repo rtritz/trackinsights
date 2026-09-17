@@ -254,18 +254,6 @@ def _asset_version(filename):
         return '0'
 
 
-@main_bp.route('/school-dashboard-v3/<int:school_id>')
-def school_dashboard_v3(school_id):
-    school = School.query.get(school_id)
-    return render_template(
-        'school-dashboard-v3.html',
-        school_id=school_id,
-        school_name=school.school_name if school else None,
-        school_city=school.city if school else None,
-        asset_version=_asset_version('js/school-dashboard-v3.js'),
-    )
-
-
 @main_bp.route('/school-dashboard-v4/<int:school_id>')
 @main_bp.route('/school-dashboard-v4/<int:school_id>/<gender>/<season>')
 def school_dashboard_v4(school_id, gender=None, season=None):
