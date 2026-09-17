@@ -93,6 +93,11 @@
     var enrollInput = document.getElementById('sd4-enroll-max');
     // The list on screen, so changing the filter re-renders without refetching.
     var current = null;
+    // Which of our entries the next jump lands on, and the one the reader came
+    // from -- clicking a rank in the results table means "show me this athlete",
+    // not "show me whichever of ours ranks highest".
+    var jumpAt = 0;
+    var originAthlete = null;
     var lastFocused = null;
     // Keyed by event so reopening a list costs nothing.
     var cache = {};
@@ -153,7 +158,8 @@
             var rankCell = '<td class="' + (limit === null ? '' : 'of') + '">' +
                 esc(row.rank) + '</td>';
             var inFilter = limit === null ? '' : '<td>' + (index + 1) + '</td>';
-            return '<tr class="' + (mine ? 'us' : '') + '"' + (mine ? ' data-us' : '') + '>' +
+            return '<tr class="' + (mine ? 'us' : '') + '"' + (mine ? ' data-us' : '') +
+                (row.athlete_id ? ' data-athlete="' + row.athlete_id + '"' : '') + '>' +
                 rankCell + inFilter + cells + '</tr>';
         }).join('');
 
@@ -162,7 +168,43 @@
             : '<div class="rankbox-note">No schools match that enrollment limit.</div>';
         // A filter can remove the reader's own school, so the jump is offered
         // only when there is somewhere to jump to.
-        if (jump) { jump.hidden = !body.querySelector('[data-us]'); }
+        var ours = body.querySelectorAll('[data-us]');
+        if (jump) {
+            jump.hidden = !ours.length;
+            // Most schools have more than one entry in an event -- 292 of 375 in
+            // the 100m -- so the jump cycles rather than always landing on the
+            // same row, and says how many there are to cycle through.
+            if (ours.length > 1) {
+                jump.setAttribute('data-many', '');
+                jump.title = 'Jump through our ' + ours.length + ' entries';
+                jump.setAttribute('aria-label', jump.title);
+            } else {
+                jump.removeAttribute('data-many');
+                jump.title = 'Jump to our entry';
+                jump.setAttribute('aria-label', jump.title);
+            }
+            var badge = jump.querySelector('.count');
+            if (ours.length > 1) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'count';
+                    jump.appendChild(badge);
+                }
+                badge.textContent = ours.length;
+            } else if (badge) {
+                badge.remove();
+            }
+        }
+        // Start on the entry whose rank was clicked, when there was one.
+        jumpAt = 0;
+        if (originAthlete) {
+            for (var i = 0; i < ours.length; i++) {
+                if (ours[i].getAttribute('data-athlete') === String(originAthlete)) {
+                    jumpAt = i;
+                    break;
+                }
+            }
+        }
     }
 
     function openModal() {
@@ -181,8 +223,9 @@
         if (lastFocused && lastFocused.focus) { lastFocused.focus(); }
     }
 
-    function show(event) {
+    function show(event, athleteId) {
         if (!modal) { return; }
+        originAthlete = athleteId || null;
         openModal();
         title.textContent = event || 'Statewide Program Rankings';
         subtitle.textContent = 'Loading…';
@@ -222,7 +265,8 @@
         var link = event.target.closest('.ranklink');
         if (link) {
             event.preventDefault();
-            show(link.getAttribute('data-event') || '');
+            show(link.getAttribute('data-event') || '',
+                 link.getAttribute('data-athlete') || null);
         }
     });
 
@@ -240,15 +284,24 @@
 
     function scrollToRow(row) {
         if (!row) { return; }
+        // Clear the class from whichever row had it last. The animation ends
+        // transparent so a stale one is invisible, but leaving it on means every
+        // row ever jumped to still claims to be the current one.
+        body.querySelectorAll('.flash').forEach(function (old) {
+            old.classList.remove('flash');
+        });
         row.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        row.classList.remove('flash');
         void row.offsetWidth;               // restart the animation
         row.classList.add('flash');
     }
 
     if (jump) {
         jump.addEventListener('click', function () {
-            scrollToRow(body.querySelector('[data-us]'));
+            var ours = body.querySelectorAll('[data-us]');
+            if (!ours.length) { return; }
+            if (jumpAt >= ours.length) { jumpAt = 0; }
+            scrollToRow(ours[jumpAt]);
+            jumpAt = (jumpAt + 1) % ours.length;
         });
     }
     if (topButton) {
