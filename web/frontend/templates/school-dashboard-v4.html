@@ -1,0 +1,406 @@
+{% extends 'base.html' %}
+
+{% set school = (payload.school if payload else None) %}
+{% set filters = (payload.filters if payload else None) %}
+
+{% block title %}{{ school_name or 'School' }} - Postseason Dashboard - Track Insights{% endblock %}
+{% block meta_description %}Postseason program profile for {{ school_name or 'Indiana high school track and field programs' }}{% if school and school.city %} in {{ school.city }}{% endif %}: results by round, regional and state qualifiers, statewide rank, and next-season outlook.{% endblock %}
+
+{% block content %}
+{#
+  V4 renders every tab server-side from one precomputed payload. There are no API
+  calls, no client-side rendering, and no analysis in this template -- each loop
+  below walks a list that was shaped by backend/services/dashboard_v4.py.
+
+  Tab switching is a class toggle in school-dashboard-v4.js, so moving between
+  tabs costs nothing and works before the script loads (every pane is in the HTML).
+#}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/school-dashboard-v4.css') }}?v={{ asset_version }}">
+
+{% macro who(row) -%}
+    {%- if row.is_relay -%}
+        <span class="relay">Relay</span>
+    {%- elif row.athlete_id -%}
+        <a class="link" href="/athlete-dashboard/{{ row.athlete_id }}">{{ row.name }}</a>
+        {%- if row.grade %}<span class="grade {{ 'sr' if row.grade == 'SR' }}">{{ row.grade }}</span>{% endif -%}
+    {%- else -%}
+        {{ row.name or '—' }}
+    {%- endif -%}
+{%- endmacro %}
+
+{% macro markcell(mark, place, prelim, has_mark) -%}
+    <td>
+        {%- if mark -%}
+            <span class="mark {{ 'nomark' if has_mark is false }}"
+                  {% if has_mark is false %}title="Competed here but posted no valid mark"{% endif %}>{{ mark }}</span>
+            {%- if place %}<span class="submark">{{ place | ordinal }}{{ ' in prelims' if prelim }}</span>
+            {%- elif prelim %}<span class="submark">prelims</span>{% endif -%}
+        {%- else -%}
+            <span class="muted">—</span>
+        {%- endif -%}
+    </td>
+{%- endmacro %}
+
+<div id="sd4">
+<div class="shell">
+
+{# Shown whenever the cache no longer matches the results database. Worded for a
+   visitor rather than an operator -- they cannot fix it, but they should not be
+   told stale figures are current either. The instruction is in the title, where
+   whoever can fix it will look. #}
+{% if status and status.stale %}
+    <div class="stale" title="Regenerate with: python -m backend.jobs.precompute_dashboard_v4">
+        Results have changed since this page's data was prepared{% if status.generated_at %}
+        on {{ status.generated_at[:10] }}{% endif %}. Some figures may be out of date.
+    </div>
+{% endif %}
+
+{% if not payload %}
+    <div class="panel note">
+        <h1 style="font-size:1.4rem;margin:0 0 .5rem;">Dashboard not available</h1>
+        <p class="muted" style="margin:0;">
+            {% if school_name %}
+                There is no prepared dashboard for {{ school_name }} yet.
+            {% else %}
+                We couldn't find that school.
+            {% endif %}
+            {% if meta.generated_at %}
+                The cache was last built {{ meta.generated_at }}.
+            {% else %}
+                The dashboard cache has not been built — run
+                <code>python -m backend.jobs.precompute_dashboard_v4</code>.
+            {% endif %}
+        </p>
+    </div>
+{% else %}
+
+    <header class="toolbar">
+        <div class="ident">
+            {% if school.logo_url %}
+                <div class="logo"><img src="{{ school.logo_url }}" alt="{{ school.name }} logo"></div>
+            {% endif %}
+            <div style="min-width:0;">
+                <h1>{{ school.name }}</h1>
+                <div class="meta">
+                    {{ school.city }}{% if school.school_type %} | {{ school.school_type }}{% endif %}
+                    {%- if school.enrollment %} | Enrollment {{ school.enrollment }}
+                        ({{ school.enrollment_source_year }}){% endif %}
+                </div>
+            </div>
+        </div>
+        {# Each gender/season is its own URL, so these are links rather than buttons. #}
+        <nav class="filters">
+            <div class="fgroup">
+                {% for g in filters.genders %}
+                    <a class="fopt {{ 'on' if g == filters.selected_gender }}"
+                       href="{{ url_for('main.school_dashboard_v4', school_id=school_id, gender=g, season=filters.selected_season) }}">{{ g }}</a>
+                {% endfor %}
+            </div>
+            <span class="fsep"></span>
+            <div class="fgroup">
+                {% for s in filters.seasons %}
+                    <a class="fopt {{ 'on' if s == filters.selected_season }}"
+                       href="{{ url_for('main.school_dashboard_v4', school_id=school_id, gender=filters.selected_gender, season=s) }}">{{ filters.season_labels.get(s, s) }}</a>
+                {% endfor %}
+            </div>
+        </nav>
+    </header>
+
+    {% set tabs = [('overview','Overview', true),
+                   ('regional','Regional Qualifiers', payload.has_regional),
+                   ('state','State Qualifiers', payload.has_state),
+                   ('rank','Statewide Rank', payload.rank is not none),
+                   ('outlook','Outlook', payload.outlook.h2h is not none or payload.outlook.returning is not none),
+                   ('results','All Results', payload.results.rows | length > 0)] %}
+    <div class="tabs" role="tablist">
+        {% for key, label, shown in tabs if shown %}
+            <button type="button" class="tab" role="tab" data-tab="{{ key }}"
+                    aria-selected="{{ 'true' if loop.first else 'false' }}">{{ label }}</button>
+        {% endfor %}
+    </div>
+
+    {# ---------------------------------------------------------- OVERVIEW #}
+    <section class="pane" data-pane="overview">
+        {% if payload.overview.stages %}
+        <div class="section">
+            <div class="stitle">Postseason Summary</div>
+            <div class="panel pad">
+                {% for stage in payload.overview.stages %}
+                    <div class="group">
+                        <div class="sub">{{ stage.heading }}</div>
+                        <div class="mrow two">
+                            <div class="metric">
+                                <div class="mlabel">{{ stage.count_label }}</div>
+                                <div class="mvalue">{{ stage.count }}</div>
+                                <div class="mctx">{{ stage.scoring }} {{ stage.scoring_label | lower }}</div>
+                            </div>
+                            <div class="metric">
+                                <div class="mlabel">Team Place</div>
+                                <div class="mvalue">
+                                    {%- if stage.team_rank %}{{ stage.team_rank | ordinal }}<span class="mden"> of {{ stage.total_teams }}</span>
+                                    {%- else %}&mdash;{% endif -%}
+                                </div>
+                                <div class="mctx">{% if stage.attended %}{{ stage.points | num if stage.points else 0 }} points{% else %}did not reach this round{% endif %}</div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+    </section>
+
+    {# ------------------------------------------------- REGIONAL QUALIFIERS #}
+    {% if payload.has_regional %}
+    <section class="pane hidden" data-pane="regional">
+        {% if payload.regional.qualifiers %}
+        <div class="section">
+            <div class="stitle">Regional Qualifiers</div>
+            <div class="panel"><div class="tscroll"><table class="qtable">
+                <thead><tr><th>Athlete</th><th>Event</th><th>Regional Result</th></tr></thead>
+                <tbody>
+                {% for row in payload.regional.qualifiers %}
+                    <tr>
+                        <td>{{ who(row) }}</td>
+                        <td>{{ row.event }}</td>
+                        {{ markcell(row.mark, row.place, row.prelim, row.has_mark) }}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table></div></div>
+        </div>
+        {% endif %}
+
+        {% if payload.regional.just_missed %}
+        <div class="section">
+            <div class="stitle">Closest Misses</div>
+            <div class="panel"><div class="tscroll"><table class="qtable">
+                <thead><tr>
+                    <th>Athlete</th><th>Event</th>
+                    <th title="How far short of the advancement standard, and that margin as a share of the standard. Ordered closest first: a raw margin is not comparable across events. Entries greyed out were further than 3% off and are listed only to fill the shortlist.">Margin</th>
+                </tr></thead>
+                <tbody>
+                {% for row in payload.regional.just_missed %}
+                    <tr class="{{ 'far' if row.far }}">
+                        <td>{{ who(row) }}</td>
+                        <td>{{ row.event }}</td>
+                        <td>
+                            <span class="mark">{{ row.gap or '—' }}</span>
+                            <span class="submark">{{ row.share_pct }}% off the cut</span>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table></div></div>
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {# ---------------------------------------------------- STATE QUALIFIERS #}
+    {% if payload.has_state %}
+    <section class="pane hidden" data-pane="state">
+        <div class="section">
+            <div class="stitle">State Qualifiers</div>
+            <div class="panel"><div class="tscroll"><table class="qtable">
+                <thead><tr><th>Athlete</th><th>Event</th><th>State Result</th></tr></thead>
+                <tbody>
+                {% for row in payload.state.qualifiers %}
+                    <tr>
+                        <td>{{ who(row) }}</td>
+                        <td>{{ row.event }}</td>
+                        {{ markcell(row.mark, row.place, row.prelim, row.has_mark) }}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table></div></div>
+        </div>
+    </section>
+    {% endif %}
+
+    {# ------------------------------------------------------ STATEWIDE RANK #}
+    {% if payload.rank %}
+    {% set rank = payload.rank %}
+    <section class="pane hidden" data-pane="rank">
+        <div class="section">
+            <div class="stitle">Statewide Rank</div>
+            <div class="panel pad">
+                {% if rank.is_ranked %}
+                    <div class="rank-head">
+                        <span class="rank-big">{{ rank.rank | ordinal }} of {{ rank.total_schools }}</span>
+                        {% if rank.percentile is not none %}
+                            <span class="rank-pct">({{ '%.1f' | format(rank.percentile) }} percentile)</span>
+                        {% endif %}
+                    </div>
+                    {% if rank.prior and rank.movement is not none %}
+                        <div class="move">
+                            {% if rank.movement > 0 %}<span class="up">▲ {{ rank.movement }}</span> places
+                            {% elif rank.movement < 0 %}<span class="down">▼ {{ -rank.movement }}</span> places
+                            {% else %}unchanged{% endif %}
+                            from {{ rank.prior.season }}
+                        </div>
+                    {% endif %}
+
+                    {% if rank.percentile is not none %}
+                    {% set pct = rank.percentile %}
+                    <span class="scale">
+                        <span class="track {{ 'below' if pct < 50 }}">
+                            <span class="fill" style="width:{{ '%.1f' | format(pct) }}%"><span class="cap"></span></span>
+                        </span>
+                        <span class="scale-val">
+                            <span style="{% if pct < 12 %}left:0{% elif pct > 88 %}left:100%;transform:translateX(-100%){% else %}left:{{ '%.1f' | format(pct) }}%;transform:translateX(-50%){% endif %}">{{ '%.1f' | format(pct) }}%</span>
+                        </span>
+                    </span>
+                    {% endif %}
+
+                    {% if rank.spark %}
+                    {% set sp = rank.spark %}
+                    <div class="spark">
+                        <div class="spark-cap">Statewide rank across {{ sp.seasons }} seasons — <em>higher is better</em></div>
+                        <svg class="{{ sp.tone }}" viewBox="0 0 {{ sp.width }} {{ sp.height }}" role="img"
+                             aria-label="Statewide rank by season, best rank at the top">
+                            <path d="{{ sp.path }}" fill="none" stroke="currentColor" stroke-width="2.6"
+                                  stroke-linejoin="round" stroke-linecap="round" opacity="0.85"/>
+                            {% for pt in sp.points %}
+                                <circle cx="{{ pt.x }}" cy="{{ pt.y }}" r="3.4" fill="currentColor">
+                                    <title>{{ pt.season }}: {{ pt.rank | ordinal }} of {{ pt.total }}</title>
+                                </circle>
+                            {% endfor %}
+                        </svg>
+                        <div class="spark-years">
+                            {% for pt in sp.points %}
+                                <span style="left:{{ '%.2f' | format(100 * pt.x / sp.width) }}%">{{ pt.season }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <details>
+                        <summary>How this works</summary>
+                        <p>Every participant in each event is ranked statewide using their best playoff
+                        mark. Each ranking is then converted to a score from 1–100, with the top-ranked
+                        athlete receiving a score of 100. This process is repeated for every event.</p>
+                        <p>A team's Composite Score is the average of its normalized scores across all
+                        events. A higher Composite Score indicates stronger overall performance across
+                        the events.</p>
+                    </details>
+                {% else %}
+                    <div class="rank-big">Not ranked</div>
+                    <div class="move">No valid postseason marks this season, so this program is absent
+                        from the statewide table rather than scored zero.</div>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    {# ------------------------------------------------------------- OUTLOOK #}
+    {% if payload.outlook.h2h or payload.outlook.returning %}
+    <section class="pane hidden" data-pane="outlook">
+        <div class="section">
+            <div class="split">
+                <div>
+                    <div class="stitle">Returning Athletes</div>
+                    <div class="panel pad look">
+                        {% set ret = payload.outlook.returning %}
+                        {% if ret and ret.athletes_total %}
+                            <div class="mvalue">{{ ret.athletes_returning }}<span class="mden"> of {{ ret.athletes_total }} athletes</span></div>
+                            <div class="mctx">
+                                {% if ret.points_total %}
+                                    {% if ret.points_returning == ret.points_total %}All {{ ret.points_total | num }} individual points return
+                                    {% else %}{{ ret.points_returning | num }} of {{ ret.points_total | num }} individual points return{% endif %}
+                                {% else %}No points scored{% endif %}
+                                · returning in {{ ret.next_year }}
+                            </div>
+                        {% else %}
+                            <div class="mvalue">—</div>
+                            <div class="mctx">{{ (ret.reason if ret else none) or 'Nothing to project for this season.' }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div>
+                    <div class="stitle">Head-to-Head</div>
+                    <div class="panel pad look">
+                        {% set h2h = payload.outlook.h2h %}
+                        {% if h2h and h2h.result %}
+                            {% set margin = h2h.points_for - h2h.points_against %}
+                            <div class="mvalue {{ 'up' if margin > 0 else ('down' if margin < 0 else '') }}">
+                                {{ 'W' if h2h.result == 'WIN' else ('L' if h2h.result == 'LOSS' else 'T') }}
+                                {{ h2h.points_for | num }} – {{ h2h.points_against | num }}<span class="mden"> vs {{ h2h.season }} roster</span>
+                            </div>
+                            <div class="mctx">Simulated dual · {{ h2h.events_won }} events won, {{ h2h.events_lost }} lost</div>
+                        {% else %}
+                            <div class="mvalue">—</div>
+                            <div class="mctx">{{ (h2h.reason if h2h else none) or 'No earlier season to compare against.' }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    {# ------------------------------------------------------- ALL RESULTS #}
+    {# Last, and its own pane: at a median of 24 rows it is eight times any other
+       section and two thirds of the payload, so sharing the Overview buried six
+       summary figures under a screen of table. It is also a different kind of
+       reading -- looked up, not scanned. #}
+    {% if payload.results.rows %}
+    <section class="pane hidden" data-pane="results">
+        <div class="section">
+            <div class="stitle">Complete Playoff Results</div>
+            <div class="panel">
+                {% if payload.results.rows %}
+                <div class="tscroll"><table>
+                    <thead><tr>
+                        <th>Event</th><th>Athlete</th>
+                        {% for stage in payload.results.stages %}<th>{{ stage }} Result</th>{% endfor %}
+                        <th>State Rank</th>
+                    </tr></thead>
+                    <tbody>
+                    {% for row in payload.results.rows %}
+                        {% if row.empty %}
+                            <tr class="empty-row">
+                                <td>{{ row.event }}</td>
+                                <td colspan="{{ payload.results.stages | length + 2 }}">no entry</td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td>{{ row.event }}</td>
+                                <td>{{ who(row) }}{% if row.badge %}<span class="badge {{ row.badge | lower }}">{{ row.badge }}</span>{% endif %}</td>
+                                {% for stage in payload.results.stages %}
+                                    {% set cell = row.cells.get(stage) %}
+                                    {{ markcell(cell.mark if cell else none, cell.place if cell else none,
+                                                cell.prelim if cell else false, cell.has_mark if cell else true) }}
+                                {% endfor %}
+                                <td class="rank-cell">{% if row.rank %}<b>{{ row.rank }}</b> / {{ row.rank_total }}{% else %}—{% endif %}</td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
+                    </tbody>
+                </table></div>
+                {% else %}
+                    <div class="note">No results on record for this season.</div>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if meta.generated_at %}
+        <div class="built">Dashboard data prepared {{ meta.generated_at }}</div>
+    {% endif %}
+
+    {% if show_timings %}
+        <div class="panel timing">
+            {% for label, ms in timings %}{{ label }}: <b>{{ '%.2f' | format(ms) }}ms</b>{% if not loop.last %} · {% endif %}{% endfor %}
+        </div>
+    {% endif %}
+{% endif %}
+
+</div>
+</div>
+
+<script src="{{ url_for('static', filename='js/school-dashboard-v4.js') }}?v={{ asset_version }}" defer></script>
+{% endblock %}
