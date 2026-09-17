@@ -430,7 +430,22 @@
             <button type="button" class="rankbox-close" data-close>Close</button>
         </div>
         <div class="rankbox-actions">
+            {# Enrollment bands rather than a free range: these are the divisions
+               a coach already thinks in, and a slider over 400 schools invites
+               fiddling for an answer that does not change. #}
+            <select id="sd4-enroll" aria-label="Enrollment filter">
+                <option value="">All schools</option>
+                <option value="500">Under 500</option>
+                <option value="1000">Under 1,000</option>
+                <option value="1500">Under 1,500</option>
+                <option value="custom">Custom maximum…</option>
+            </select>
+            <input id="sd4-enroll-max" type="number" min="1" step="1"
+                   placeholder="Max enrollment" class="hidden" aria-label="Custom maximum enrollment">
+            <span class="spacer"></span>
+            <button type="button" id="sd4-top" class="jump">Top</button>
             <button type="button" id="sd4-jump" class="jump">Jump to us</button>
+            <button type="button" id="sd4-bottom" class="jump">Bottom</button>
         </div>
         <div id="sd4-modal-body" class="rankbox-body"></div>
     </div>

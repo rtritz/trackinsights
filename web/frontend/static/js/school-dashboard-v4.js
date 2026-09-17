@@ -87,34 +87,81 @@
     var subtitle = document.getElementById('sd4-modal-sub');
     var body = document.getElementById('sd4-modal-body');
     var jump = document.getElementById('sd4-jump');
+    var topButton = document.getElementById('sd4-top');
+    var bottomButton = document.getElementById('sd4-bottom');
+    var enrollSelect = document.getElementById('sd4-enroll');
+    var enrollInput = document.getElementById('sd4-enroll-max');
+    // The list on screen, so changing the filter re-renders without refetching.
+    var current = null;
     var lastFocused = null;
     // Keyed by event so reopening a list costs nothing.
     var cache = {};
 
+    function schoolLink(id, label) {
+        return id
+            ? '<a class="link" href="/school-dashboard/' + id + '">' + esc(label) + '</a>'
+            : esc(label);
+    }
+
+    // The enrollment ceiling currently in force, or null for no filter.
+    function enrollmentLimit() {
+        if (!enrollSelect) { return null; }
+        if (enrollSelect.value === 'custom') {
+            var typed = parseInt(enrollInput && enrollInput.value, 10);
+            return typed > 0 ? typed : null;
+        }
+        var preset = parseInt(enrollSelect.value, 10);
+        return preset > 0 ? preset : null;
+    }
+
     function renderList(payload) {
         var isProgram = payload.kind === 'program';
-        var head = '<thead><tr>' + payload.columns.map(function (c) {
+        var limit = enrollmentLimit();
+        // A school with no enrollment on file is left out of a filtered view
+        // rather than treated as zero -- "under 500" should not quietly mean
+        // "under 500, plus everyone we have no figure for".
+        var rows = limit === null
+            ? payload.rows
+            : payload.rows.filter(function (row) {
+                return typeof row.enrollment === 'number' && row.enrollment <= limit;
+            });
+
+        // Filtering renumbers the list, but the statewide rank stays beside it:
+        // a reader wants "4th in this band" without losing "160th in the state".
+        var columns = payload.columns.slice();
+        if (limit !== null) { columns.splice(1, 0, 'In filter'); }
+
+        var head = '<thead><tr>' + columns.map(function (c) {
             return '<th>' + esc(c) + '</th>';
         }).join('') + '</tr></thead>';
 
-        var rows = payload.rows.map(function (row) {
+        var lines = rows.map(function (row, index) {
             var mine = row.school_id === SCHOOL;
             var name = isProgram
-                ? esc(row.name)
+                ? schoolLink(row.school_id, row.name)
                 : (row.athlete_id
                     ? '<a class="link" href="/athlete-dashboard/' + row.athlete_id + '">' +
                       esc(row.name) + '</a>'
                     : esc(row.name));
+            var enrolled = typeof row.enrollment === 'number' ? row.enrollment : '\u2014';
             var cells = isProgram
-                ? '<td>' + name + '</td><td>' + esc(row.value == null ? '—' : row.value) + '</td>'
-                : '<td>' + name + '</td><td>' + esc(row.school) + '</td><td>' +
-                  esc(row.mark == null ? '—' : row.mark) + '</td>';
-            return '<tr class="' + (mine ? 'us' : '') + '"' +
-                (mine ? ' data-us' : '') + '><td>' + esc(row.rank) + '</td>' + cells + '</tr>';
+                ? '<td>' + name + '</td><td>' + esc(row.value == null ? '\u2014' : row.value) +
+                  '</td><td>' + esc(enrolled) + '</td>'
+                : '<td>' + name + '</td><td>' + schoolLink(row.school_id, row.school) +
+                  '</td><td>' + esc(row.mark == null ? '\u2014' : row.mark) + '</td><td>' +
+                  esc(enrolled) + '</td>';
+            var rankCell = '<td class="' + (limit === null ? '' : 'of') + '">' +
+                esc(row.rank) + '</td>';
+            var inFilter = limit === null ? '' : '<td>' + (index + 1) + '</td>';
+            return '<tr class="' + (mine ? 'us' : '') + '"' + (mine ? ' data-us' : '') + '>' +
+                rankCell + inFilter + cells + '</tr>';
         }).join('');
 
-        body.innerHTML = '<table>' + head + '<tbody>' + rows + '</tbody></table>';
-        // Only offer the jump when there is somewhere to jump to.
+        body.innerHTML = rows.length
+            ? '<table>' + head + '<tbody>' + lines + '</tbody></table>'
+            : '<div class="rankbox-note">No schools match that enrollment limit.</div>';
+        // A filter can remove the reader's own school, so the jump is offered
+        // only when there is somewhere to jump to.
         if (jump) { jump.hidden = !body.querySelector('[data-us]'); }
     }
 
@@ -144,6 +191,7 @@
 
         if (cache[event] !== undefined) {
             var hit = cache[event];
+            current = hit;
             subtitle.textContent = hit.subtitle;
             title.textContent = hit.title;
             renderList(hit);
@@ -159,6 +207,7 @@
             })
             .then(function (payload) {
                 cache[event] = payload;
+                current = payload;
                 title.textContent = payload.title;
                 subtitle.textContent = payload.subtitle;
                 renderList(payload);
@@ -189,14 +238,42 @@
         });
     }
 
+    function scrollToRow(row) {
+        if (!row) { return; }
+        row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        row.classList.remove('flash');
+        void row.offsetWidth;               // restart the animation
+        row.classList.add('flash');
+    }
+
     if (jump) {
         jump.addEventListener('click', function () {
-            var row = body.querySelector('[data-us]');
-            if (!row) { return; }
-            row.scrollIntoView({ block: 'center', behavior: 'smooth' });
-            row.classList.remove('flash');
-            void row.offsetWidth;           // restart the animation
-            row.classList.add('flash');
+            scrollToRow(body.querySelector('[data-us]'));
+        });
+    }
+    if (topButton) {
+        topButton.addEventListener('click', function () { body.scrollTop = 0; });
+    }
+    if (bottomButton) {
+        bottomButton.addEventListener('click', function () {
+            body.scrollTop = body.scrollHeight;
+        });
+    }
+
+    // Changing the filter re-renders what is already loaded; nothing is refetched.
+    if (enrollSelect) {
+        enrollSelect.addEventListener('change', function () {
+            var custom = enrollSelect.value === 'custom';
+            if (enrollInput) {
+                enrollInput.classList.toggle('hidden', !custom);
+                if (custom) { enrollInput.focus(); }
+            }
+            if (current) { renderList(current); }
+        });
+    }
+    if (enrollInput) {
+        enrollInput.addEventListener('input', function () {
+            if (current) { renderList(current); }
         });
     }
 
