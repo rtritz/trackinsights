@@ -335,6 +335,9 @@
     text-decoration-color: var(--border); text-underline-offset: 0.2em;
 }
 #sd4 .ranklink:hover { color: var(--accent); text-decoration-color: var(--accent); }
+/* The rank itself is a <b> with its own colour, which would otherwise keep its
+   own on hover and leave only the denominator changing. */
+#sd4 .ranklink:hover b { color: var(--accent); }
 #sd4 .ranklink:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #sd4 .rank-big.ranklink { text-decoration-thickness: 2px; text-decoration-color: var(--accent); }
 
@@ -375,3 +378,22 @@
 #sd4 .rankbox-body tr.us td { font-weight: 600; }
 #sd4 .flash { animation: sd4-flash 1.4s ease-out 1; }
 @keyframes sd4-flash { 0%, 40% { background: var(--accent-soft); } 100% { background: transparent; } }
+
+/* ---- popup controls ---- */
+#sd4 .rankbox-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+#sd4 .rankbox-actions .spacer { flex: 1 1 auto; }
+#sd4 .rankbox-actions select,
+#sd4 .rankbox-actions input {
+    appearance: none; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.35rem 0.7rem; font: inherit; font-size: 0.85rem;
+}
+#sd4 .rankbox-actions input { width: 9rem; }
+#sd4 .rankbox-actions select:focus-visible,
+#sd4 .rankbox-actions input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* The platform paints the open dropdown and only honours these two. */
+#sd4 .rankbox-actions option { background: var(--surface-2); color: var(--text); }
+/* The statewide rank stays visible when a filter is on, so a reader can see both
+   "12th in this band" and "the 160th school in the state" at once. */
+#sd4 .rankbox-body td.of { color: var(--muted); }
+#sd4 .rankbox-note { padding: 0.9rem 1rem; color: var(--muted); font-size: 0.86rem; }

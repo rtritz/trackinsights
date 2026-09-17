@@ -538,13 +538,21 @@ def build_rankings(gender, season, queries):
     year = int(season)
     out = []
 
+    # Enrollment for every school, resolved once. The popup filters on it, and
+    # looking it up per row would be 394 lookups for the program table alone.
+    enrollments = {}
+    for school in queries.School.query.options(
+            queries.joinedload(queries.School.enrollments)).all():
+        meta = queries._resolve_school_enrollment_for_year(school, year)
+        enrollments[school.school_id] = meta.get('value')
+
     table = queries._build_statewide_program_rankings(gender, year)
     out.append(('', {
         'kind': 'program',
         'title': 'Statewide Program Rankings',
         'subtitle': '%s %s \u2014 %d ranked programs' % (
             gender, year, len(table['leaderboard'])),
-        'columns': ['Rank', 'School', 'Composite'],
+        'columns': ['Rank', 'School', 'Composite', 'Enrollment'],
         'rows': [
             {
                 'rank': row['rank'],
@@ -552,6 +560,7 @@ def build_rankings(gender, season, queries):
                 'name': row['school_name'],
                 'value': round(row['composite_score'], 1)
                 if isinstance(row.get('composite_score'), (int, float)) else None,
+                'enrollment': enrollments.get(row['school_id']),
             }
             for row in table['leaderboard']
         ],
@@ -565,7 +574,8 @@ def build_rankings(gender, season, queries):
                 'title': event,
                 'subtitle': '%s %s \u2014 %d %s ranked' % (
                     gender, year, len(rows), 'relays' if is_relay else 'athletes'),
-                'columns': ['Rank', 'Relay' if is_relay else 'Athlete', 'School', 'Mark'],
+                'columns': ['Rank', 'Relay' if is_relay else 'Athlete', 'School',
+                            'Mark', 'Enrollment'],
                 'rows': [
                     {
                         'rank': row.get('rank'),
@@ -574,6 +584,7 @@ def build_rankings(gender, season, queries):
                         'school_id': row.get('school_id'),
                         'school': row.get('school_name'),
                         'mark': row.get('result'),
+                        'enrollment': enrollments.get(row.get('school_id')),
                     }
                     for row in rows
                 ],
