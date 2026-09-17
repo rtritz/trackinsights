@@ -32,6 +32,31 @@ def create_app(config_class=Config):
         with app.app_context():
             db.create_all()
 
+    # "166" -> "166th". Used by the V4 dashboard, which prints a lot of places
+    # and ranks; a filter keeps that formatting out of both the template and the
+    # precomputed payload, so the cache stores numbers and the page decides how
+    # to say them.
+    @app.template_filter('ordinal')
+    def _ordinal(value):
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            return value
+        if 11 <= (number % 100) <= 13:
+            return '%dth' % number
+        return '%d%s' % (number, {1: 'st', 2: 'nd', 3: 'rd'}.get(number % 10, 'th'))
+
+    # Points can be halves -- ties split the combined value of the slots they
+    # occupy -- so they are floats. "27.0 points" is noise; "27.5" is the reason
+    # they are floats at all.
+    @app.template_filter('num')
+    def _num(value):
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return value
+        return '%d' % number if number == int(number) else ('%g' % number)
+
     # register blueprints
     from .routes import main_bp, api_bp
     app.register_blueprint(main_bp)

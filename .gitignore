@@ -21,3 +21,5 @@ build/
 web/data/Track_backup_*.db
 web/data/Track_archive.db
 
+node_modules/
+package-lock.json

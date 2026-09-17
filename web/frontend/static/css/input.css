@@ -8,13 +8,13 @@
 
 @import "tailwindcss";
 /* ./tailwindcss-windows-x64.exe -i ./frontend/static/css/input.css -o ./frontend/static/css/output.css --watch */
+/* The empty include:/exclude:/prefix: lines that used to sit here made daisyUI
+   emit ":root:has()" -- an empty :has(), which is invalid CSS. One invalid
+   selector voids the whole selector list, so the browser dropped the entire
+   theme block and every --color-* variable with it. Omit the keys instead of
+   giving them empty values. */
 @plugin "daisyui" {
   themes: autumn --default, autumn --prefersdark;
-  root: ":root";
-  include: ;
-  exclude: ;
-  prefix: ;
-  logs: true;
 }
 
 @theme {
