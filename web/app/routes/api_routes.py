@@ -304,7 +304,7 @@ def api_state_qualifiers():
     # Prefer precomputed JSON for speed
     precomputed_path = os.path.join(
         current_app.root_path,
-        '..', 'static', 'data', 'state_predictions',
+        'static', 'data', 'state_predictions',
         f'state_qualifiers_{year}_{gender.lower()}.json',
     )
     if os.path.exists(precomputed_path):
@@ -349,7 +349,7 @@ def api_regional_top_list():
     file_prefix = 'combined_rankings' if source == 'rankings' else 'combined_results'
     precomputed_path = os.path.join(
         current_app.root_path,
-        '..', 'static', 'data', 'regional_predictions',
+        'static', 'data', 'regional_predictions',
         f'{file_prefix}_{year}_{gender.lower()}.json',
     )
     if os.path.exists(precomputed_path):
