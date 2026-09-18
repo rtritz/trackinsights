@@ -9,8 +9,8 @@ import sqlite3
 
 import pytest
 
-from backend import queries
-from backend.services import dashboard_v4 as svc
+from app import queries
+from app.services import dashboard_v4 as svc
 
 
 # ------------------------------------------------------------------ payload

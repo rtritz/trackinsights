@@ -10,7 +10,7 @@ env/
 .vscode/
 .DS_Store
 .claude
-web/backend/jobs/logs/
+web/app/jobs/logs/
 standalone/scripts/logs/
 *.egg-info/
 build/

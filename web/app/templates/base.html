@@ -1,0 +1,811 @@
+﻿<!doctype html>
+<html lang="en" data-theme="autumn">
+
+<head>
+  
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-P89D9K8HGV"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-P89D9K8HGV');
+</script>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>{% block title %}Track Insights - Indiana High School Track & Field Data{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Explore Indiana high school track and field data ΓÇö athlete dashboards, school comparisons, percentile rankings, and sectional projections.{% endblock %}">
+  <link rel="canonical" href="{% block canonical %}{{ request.url }}{% endblock %}">
+
+  <meta property="og:title" content="{% block og_title %}Track Insights - Indiana High School Track & Field Data{% endblock %}" />
+  <meta property="og:description" content="{% block og_description %}Explore Indiana high school track and field data ΓÇö athlete dashboards, school comparisons, percentile rankings, and sectional projections.{% endblock %}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="{{ request.url }}" />
+  <meta property="og:image" content="{{ url_for('static', filename='images/favicon-ti.webp', _external=True) }}" />
+
+  <link rel="icon" type="image/webp" href="{{ url_for('static', filename='images/favicon-ti.webp') }}" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+  <link href="{{ url_for('static', filename='css/output.css') }}" rel="stylesheet">
+  {# Tailwind and daisyUI are compiled into output.css above, from input.css.
+     These four were fetched on every page: 1.1MB of daisyUI, 38KB of themes, and
+     a 282KB browser build that compiled CSS at runtime -- all render-blocking,
+     all redundant once the stylesheet is built properly. Rebuild with:
+       cd web && npx @tailwindcss/cli -i ./app/static/css/input.css                                       -o ./app/static/css/output.css --minify #}
+
+  <!-- Google Fonts (non-blocking) -->
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Racing+Sans+One&family=Contrail+One&family=Staatliches&display=swap" rel="stylesheet">
+
+  <style>
+
+    .font-impact {
+      font-family: 'Oswald', 'Arial Narrow', 'Segoe UI', 'Arial', sans-serif;
+      font-style: italic;
+      font-weight: 700;
+    }
+
+    .racing-sans-one-regular {
+      font-family: "Racing Sans One", sans-serif;
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    .contrail-one-regular {
+      font-family: "Contrail One", sans-serif;
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    .staatliches-regular {
+      font-family: "Staatliches", sans-serif;
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    .font-oswald-italic-bold {
+      font-family: "Oswald", sans-serif;
+      font-optical-sizing: auto;
+      font-weight: 900;
+      font-style: italic;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen bg-base-200 text-base-content"
+      data-home-url="{{ url_for('main.home') }}"
+      data-search-url="{{ url_for('main.search_page') }}">
+
+  <div id="loading-overlay" class="fixed inset-0 bg-white z-[9999] flex flex-col items-center justify-center">
+    <div class="text-center">
+      <div id="track-text" class="font-impact italic text-primary text-8xl md:text-9xl font-bold opacity-0">
+        Track
+      </div>
+      <div id="insights-text" class="font-impact italic text-primary text-8xl md:text-9xl font-bold opacity-0">
+        Insights
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @keyframes floatIn {
+      from {
+        opacity: 0;
+        transform: translateY(50px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes slideOutRight {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+
+      to {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+    }
+
+    .float-in {
+      animation: floatIn 0.2s ease-out forwards;
+    }
+
+    .slide-out {
+      animation: slideOutRight .5s ease-in-out forwards;
+    }
+
+    @keyframes menuSlideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes menuSlideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+
+      to {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+    }
+
+    @keyframes menuItemFloatIn {
+      from {
+        opacity: 0;
+        transform: translateY(50px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes menuItemFloatOut {
+      from {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      to {
+        opacity: 0;
+        transform: translateY(50px);
+      }
+    }
+  </style>
+
+  
+  <nav class="navbar fixed top-0 left-0 right-0 w-screen max-w-screen px-3 sm:px-5 z-50 bg-white shadow-md md:bg-transparent md:shadow-none md:pointer-events-none navbar-mobile-pad" aria-label="Primary" style="--nav-top-desktop: 0.75rem;">
+    <div class="flex w-full items-center justify-center relative md:hidden min-w-0">
+      <a href="{{ url_for('main.home') }}" class="font-impact italic text-primary text-3xl font-bold tracking-wide truncate">Track Insights</a>
+      <div class="flex items-center gap-2 shrink-0 absolute right-0">
+        <a href="{{ url_for('main.search_page') }}" class="btn btn-circle btn-sm border-2 border-gray-900 text-primary bg-white/90 mobile-nav-btn"
+          aria-label="Go to search">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            stroke-width="2">
+            <circle cx="11" cy="11" r="6" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </a>
+        <button type="button" id="mobile-nav-toggle"
+          class="btn btn-circle btn-primary btn-sm text-white border-2 border-gray-900 mobile-nav-btn" aria-label="Open menu">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="desktop-nav hidden md:flex w-full gap-2 sm:gap-3 relative overflow-visible justify-end pointer-events-none" style="padding-left: 2.5rem; padding-right: 2.5rem; padding-top: var(--nav-top-desktop);">
+      <a href="{{ url_for('main.home') }}" aria-label="Home" class="nav-pill pointer-events-auto">
+        <span class="nav-pill__icon-bubble" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="nav-pill__icon" aria-hidden="true"
+            focusable="false">
+            <path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-6v-6h-4v6H4a1 1 0 0 1-1-1z" fill="none" stroke="currentColor"
+              stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+        <span class="nav-pill__label">Home</span>
+      </a>
+      <div id="nav-search-pill" class="search-pill pointer-events-auto" data-open="false" role="button" tabindex="0"
+        aria-expanded="false" aria-controls="nav-search-results">
+        <span class="search-pill__icon-bubble" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round" class="search-pill__icon">
+            <circle cx="11" cy="11" r="6" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </span>
+        <span class="search-pill__label">Search</span>
+        <div class="search-pill__content">
+          <form id="navSearchForm" class="search-pill__form" role="search" onsubmit="return false;" novalidate>
+            <label for="navSearchInput" class="sr-only">Search for your athlete's name and school</label>
+            <input id="navSearchInput" name="q" type="text" placeholder="Search for your athlete's name and school"
+              autocomplete="off" class="search-pill__input" />
+          </form>
+          <button type="button" id="nav-search-close" class="search-pill__close" aria-label="Close search">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <a href="{{ url_for('main.insights_page') }}" id="queries-toggle" aria-label="Insights" class="nav-pill pointer-events-auto">
+        <span class="nav-pill__icon-bubble" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" class="nav-pill__icon" fill="currentColor"
+            aria-hidden="true" focusable="false">
+            <path
+              d="m665.216 768 110.848 192h-73.856L591.36 768H433.024L322.176 960H248.32l110.848-192H160a32 32 0 0 1-32-32V192H64a32 32 0 0 1 0-64h896a32 32 0 1 1 0 64h-64v544a32 32 0 0 1-32 32H665.216zM832 192H192v512h640V192zM352 448a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0v-64a32 32 0 0 1 32-32zm160-64a32 32 0 0 1 32 32v128a32 32 0 0 1-64 0V416a32 32 0 0 1 32-32zm160-64a32 32 0 0 1 32 32v192a32 32 0 1 1-64 0V352a32 32 0 0 1 32-32z" />
+          </svg>
+        </span>
+        <span class="nav-pill__label">Insights</span>
+      </a>
+      <a href="{{ url_for('main.interviews_page') }}" aria-label="Interviews" class="nav-pill nav-pill--wide pointer-events-auto">
+        <span class="nav-pill__icon-bubble" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="nav-pill__icon" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M15 10l4.553-2.277A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+          </svg>
+        </span>
+        <span class="nav-pill__label">Interviews</span>
+      </a>
+      <a href="{{ url_for('main.home') }}#about" id="about-toggle" aria-label="About" class="nav-pill pointer-events-auto">
+        <span class="nav-pill__icon-bubble" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="nav-pill__icon" aria-hidden="true"
+            focusable="false">
+            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <rect x="11.1" y="10.4" width="1.8" height="6.1" rx="0.9" fill="currentColor" />
+            <circle cx="12" cy="7.3" r="1.2" fill="currentColor" />
+          </svg>
+        </span>
+        <span class="nav-pill__label">About</span>
+      </a>
+      <div id="nav-search-results" class="search-results-panel text-base-content pointer-events-auto"></div>
+    </div>
+  </nav>
+  <div id="mobile-nav-overlay"
+    class="fixed inset-0 bg-[#9b0a14] text-white hidden flex-col items-center justify-center gap-8 px-6 py-10 z-[60]">
+    <button type="button" id="mobile-nav-close" class="absolute top-6 right-6 btn btn-ghost btn-circle text-white"
+      aria-label="Close menu">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+    <nav class="flex flex-col items-center gap-6 text-2xl font-impact tracking-wider text-center">
+      <a href="{{ url_for('main.home') }}" class="mobile-menu-link uppercase">Home</a>
+      <a href="{{ url_for('main.search_page') }}" class="mobile-menu-link uppercase">Search</a>
+      <a href="{{ url_for('main.insights_page') }}" class="mobile-menu-link uppercase">Insights</a>
+      <a href="{{ url_for('main.interviews_page') }}" class="mobile-menu-link uppercase">Interviews</a>
+      <a href="{{ url_for('main.home') }}#about" class="mobile-menu-link uppercase">About</a>
+    </nav>
+  </div>
+  
+
+  <style>
+    /* Shared navbar button sizing */
+    .desktop-nav {
+      --nav-pill-size: 3.2rem;
+      --nav-icon-size: 2rem;
+    }
+
+    @media (min-width: 768px) {
+      .desktop-nav {
+        --nav-pill-size: 3.4rem;
+        --nav-icon-size: 2.1rem;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .desktop-nav {
+        --nav-pill-size: 3rem;
+        --nav-icon-size: 1.85rem;
+      }
+    }
+
+    .mobile-nav-btn {
+      box-shadow: 3px 3px 0 0 #111827;
+      transition: box-shadow 100ms ease, transform 100ms ease;
+    }
+
+    .mobile-nav-btn:active {
+      box-shadow: none !important;
+      transform: translate(3px, 3px);
+    }
+
+    .back-btn {
+      position: fixed;
+      top: 1.25rem;
+      left: 1rem;
+      z-index: 70;
+      height: 2rem;
+      width: 2rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 2px solid #111827;
+      background: #8c0327;
+      color: #ffffff;
+      box-shadow: 3px 3px 0 0 #111827;
+      appearance: none;
+      -webkit-appearance: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      cursor: pointer;
+      transition: box-shadow 100ms ease, transform 100ms ease, background 180ms ease, color 180ms ease;
+    }
+
+    .back-btn:hover {
+      background: #6b0220;
+      box-shadow: 4px 4px 0 0 #111827;
+      outline: none;
+    }
+
+    .back-btn:focus-visible {
+      background: #6b0220;
+      box-shadow: 4px 4px 0 0 #111827;
+      outline: none;
+    }
+
+    .back-btn:active {
+      box-shadow: none;
+      transform: translate(3px, 3px);
+      background: #6b0220;
+    }
+
+    @media (min-width: 640px) {
+      .back-btn {
+        left: 1.25rem;
+      }
+    }
+
+    @media (min-width: 768px) {
+      .back-btn {
+        top: 1.75rem;
+        left: 2.5rem;
+        height: 2.5rem;
+        width: 2.5rem;
+      }
+    }
+
+    .search-pill {
+      position: relative;
+      display: flex;
+      align-items: center;
+      background: #8c0327;
+      color: #ffffff;
+      border: 2px solid #111827;
+      border-radius: 999px;
+      width: var(--nav-pill-size);
+      height: var(--nav-pill-size);
+      padding: 0;
+      box-shadow: 3px 3px 0 0 #111827;
+      cursor: pointer;
+      overflow: hidden;
+      transition: width 340ms cubic-bezier(0.22, 1, 0.36, 1), height 220ms ease, padding 220ms ease, box-shadow 100ms ease, transform 100ms ease;
+    }
+
+    .search-pill:not([data-open="true"]):not(.open):hover,
+    .search-pill:not([data-open="true"]):not(.open):focus-visible {
+      width: calc(var(--nav-pill-size) + 5.35rem);
+      justify-content: flex-start;
+      padding: 0 0.65rem 0 0.55rem;
+      box-shadow: 4px 4px 0 0 #111827;
+    }
+
+    .search-pill:not([data-open="true"]):not(.open):hover .search-pill__icon-bubble,
+    .search-pill:not([data-open="true"]):not(.open):focus-visible .search-pill__icon-bubble {
+      position: static;
+      transform: none;
+      width: 2.4rem;
+      height: 2.4rem;
+      margin-right: 0.55rem;
+    }
+
+    .search-pill:not([data-open="true"]):not(.open):hover .search-pill__label,
+    .search-pill:not([data-open="true"]):not(.open):focus-visible .search-pill__label {
+      opacity: 1;
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+
+    .search-pill:not([data-open="true"]):not(.open):active {
+      box-shadow: none;
+      transform: translate(3px, 3px);
+    }
+
+    .search-pill[data-open="true"],
+    .search-pill.open {
+      width: 80%;
+      height: var(--nav-pill-size);
+      padding: 0 0.55rem 0 0.7rem;
+      box-shadow: 4px 4px 0 0 #111827;
+      cursor: text;
+      background: #ffffff;
+      border-color: #111827;
+      color: var(--primary-color);
+    }
+
+    .search-pill__icon-bubble {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: calc(var(--nav-pill-size) - 0.4rem);
+      height: calc(var(--nav-pill-size) - 0.4rem);
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      color: currentColor;
+      transition: width 220ms ease, height 220ms ease, margin 220ms ease;
+    }
+
+    .search-pill:not([data-open="true"]):not(.open) .search-pill__icon-bubble {
+      color: #ffffff;
+    }
+
+    .search-pill[data-open="true"] .search-pill__icon-bubble,
+    .search-pill.open .search-pill__icon-bubble {
+      position: static;
+      transform: none;
+      width: 2.5rem;
+      height: 2.5rem;
+      margin-right: 0.6rem;
+      flex-shrink: 0;
+    }
+
+    .search-pill__icon {
+      width: var(--nav-icon-size);
+      height: var(--nav-icon-size);
+    }
+
+    .search-pill[data-open="true"] .search-pill__icon,
+    .search-pill.open .search-pill__icon {
+      width: 2.2rem;
+      height: 2.2rem;
+    }
+
+    .search-pill__content {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      width: 100%;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(0.4rem);
+      transition: opacity 160ms ease;
+    }
+
+    .search-pill[data-open="true"] .search-pill__content,
+    .search-pill.open .search-pill__content {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+
+    .search-pill__form {
+      flex: 1 1 auto;
+      display: flex;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .search-pill__input {
+      flex: 1 1 auto;
+      min-width: 0;
+      border: none;
+      background: transparent;
+      color: inherit;
+      font-size: clamp(0.95rem, 1.3vw, 1.05rem);
+      padding: 0.35rem 0.4rem;
+    }
+
+    .search-pill__input::placeholder {
+      color: rgba(140, 3, 39, 0.55);
+    }
+
+    .search-pill__input:focus-visible {
+      outline: none;
+    }
+
+    .search-pill__close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.1rem;
+      height: 2.1rem;
+      border-radius: 999px;
+      background: transparent;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.85);
+      transition: background 160ms ease, color 160ms ease,  opacity 160ms ease;
+    }
+
+    .search-pill[data-open="true"] .search-pill__close,
+    .search-pill.open .search-pill__close {
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1);
+    }
+
+    .search-pill__close:hover,
+    .search-pill__close:focus-visible {
+      background: rgba(140, 3, 39, 0.12);
+      outline: none;
+    }
+
+    .search-pill__label {
+      font-size: clamp(0.9rem, 1.2vw, 1.05rem);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      opacity: 0;
+      transform: translateX(-0.35rem);
+      transition: opacity 160ms ease;
+      pointer-events: none;
+      color: #ffffff;
+    }
+
+    .search-pill[data-open="true"] .search-pill__label,
+    .search-pill.open .search-pill__label {
+      display: none;
+    }
+
+    .nav-pill {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: var(--nav-pill-size);
+      height: var(--nav-pill-size);
+      border-radius: 999px;
+      border: 2px solid #111827;
+      background: #ffffff;
+      color: var(--primary-color);
+      padding: 0;
+      cursor: pointer;
+      overflow: hidden;
+      box-shadow: 3px 3px 0 0 #111827;
+      flex-shrink: 0;
+      flex-grow: 0;
+      transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1), padding 200ms ease, box-shadow 100ms ease, transform 100ms ease, color 180ms ease;
+    }
+
+    .nav-pill:hover,
+    .nav-pill:focus-visible,
+    .nav-pill.is-active {
+      width: calc(var(--nav-pill-size) + 6.2rem);
+      justify-content: flex-start;
+      padding: 0 0.65rem 0 0.55rem;
+      box-shadow: 4px 4px 0 0 #111827;
+      outline: none;
+    }
+
+    .nav-pill--wide:hover,
+    .nav-pill--wide:focus-visible,
+    .nav-pill--wide.is-active {
+      width: calc(var(--nav-pill-size) + 8rem);
+    }
+
+    .nav-pill:active {
+      box-shadow: none;
+      transform: translate(3px, 3px);
+    }
+
+    .nav-pill__icon-bubble {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: calc(var(--nav-pill-size) - 0.4rem);
+      height: calc(var(--nav-pill-size) - 0.4rem);
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      transition: width 200ms ease, height 200ms ease,  margin 200ms ease;
+    }
+
+    .nav-pill:hover .nav-pill__icon-bubble,
+    .nav-pill:focus-visible .nav-pill__icon-bubble,
+    .nav-pill.is-active .nav-pill__icon-bubble {
+      position: static;
+      transform: none;
+      width: 2.4rem;
+      height: 2.4rem;
+      margin-right: 0.55rem;
+    }
+
+    .nav-pill__icon {
+      width: var(--nav-icon-size);
+      height: var(--nav-icon-size);
+    }
+
+    .nav-pill:hover .nav-pill__icon,
+    .nav-pill:focus-visible .nav-pill__icon,
+    .nav-pill.is-active .nav-pill__icon {
+      transform: translateX(0.04rem);
+    }
+
+    .nav-pill__label {
+      font-size: clamp(0.9rem, 1.2vw, 1.05rem);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      opacity: 0;
+      transform: translateX(-0.35rem);
+      transition: opacity 160ms ease;
+      pointer-events: none;
+    }
+
+    .nav-pill:hover .nav-pill__label,
+    .nav-pill:focus-visible .nav-pill__label,
+    .nav-pill.is-active .nav-pill__label {
+      opacity: 1;
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+
+    @media (max-width: 640px) {
+      .search-pill[data-open="true"],
+      .search-pill.open {
+        width: min(92vw, 100%);
+      }
+
+      .search-pill:not([data-open="true"]):not(.open):hover,
+      .search-pill:not([data-open="true"]):not(.open):focus-visible {
+        width: calc(var(--nav-pill-size) + 4.6rem);
+      }
+
+      .nav-pill:hover,
+      .nav-pill:focus-visible,
+      .nav-pill.is-active {
+        width: calc(var(--nav-pill-size) + 5.4rem);
+      }
+    }
+
+    .search-results-panel {
+      position: absolute;
+      top: calc(100% + clamp(0.75rem, 2vw, 1.25rem));
+      left: var(--results-left, 0);
+      right: auto;
+      width: var(--results-width, min(85vw, 960px));
+      max-height: min(70vh, 540px);
+      overflow-y: auto;
+      background: rgba(255, 255, 255, 0.98);
+      border: 2px solid var(--primary-color);
+      border-radius: 1.5rem;
+      box-shadow: 0 24px 52px rgba(17, 24, 39, 0.25);
+      padding: clamp(1.15rem, 2.4vw, 1.75rem);
+      opacity: 0;
+      transform-origin: top left;
+      transform: translateY(-0.4rem) scale(0.99);
+      pointer-events: none;
+      transition: opacity 200ms ease;
+      z-index: 55;
+    }
+
+    .search-results-panel.open {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+
+    .search-results-panel ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .search-results-panel .no-results,
+    .search-results-panel .loading {
+      font-size: 0.95rem;
+      color: rgba(75, 85, 99, 0.92);
+    }
+
+    @media (max-width: 640px) {
+      .search-results-panel {
+        width: var(--results-width, min(94vw, 92vw));
+        right: auto;
+        border-radius: 1.5rem;
+      }
+    }
+
+    #mobile-nav-overlay {
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 200ms ease;
+    }
+
+    #mobile-nav-overlay.flex {
+      pointer-events: auto;
+      opacity: 1;
+    }
+
+    .mobile-menu-link {
+      font-size: clamp(1.75rem, 6vw, 2.75rem);
+      letter-spacing: 0.2em;
+      position: relative;
+    }
+
+    .mobile-menu-link::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: -0.4rem;
+      width: 0;
+      height: 3px;
+      background: #fff;
+      transition: width 200ms ease;
+    }
+
+    .mobile-menu-link:hover::after,
+    .mobile-menu-link:focus-visible::after {
+      width: 80%;
+    }
+
+    .navbar-mobile-pad {
+      padding-top: 0;
+    }
+
+    @media (max-width: 767px) and (orientation: portrait) {
+      .navbar-mobile-pad {
+        padding-top: 0.5rem; /* Reduced for better vertical centering */
+      }
+    }
+
+    @media (min-width: 768px) {
+      .navbar-mobile-pad {
+        padding-top: 0.5rem; /* Tailwind pt-2 */
+      }
+    }
+  </style>
+  
+  <script src="{{ url_for('static', filename='js/intro-overlay.js') }}?v={{ asset_version('js/intro-overlay.js') }}" defer></script>
+
+  <script src="{{ url_for('static', filename='js/site-nav.js') }}?v={{ asset_version('js/site-nav.js') }}" defer></script>
+
+  <main>
+  {% block content %}{% endblock %}
+  </main>
+
+  <footer class="hidden footer sm:footer-horizontal bg-base-200 text-black items-center p-4 relative">
+    <aside class="hidden grid-flow-col items-center">
+      <svg width="36" height="36" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill-rule="evenodd"
+        clip-rule="evenodd" class="fill-current">
+        <path
+          d="M22.672 15.226l-2.432.811.841 2.515c.33 1.019-.209 2.127-1.23 2.456-1.15.325-2.148-.321-2.463-1.226l-.84-2.518-5.013 1.677.84 2.517c.391 1.203-.434 2.542-1.831 2.542-.88 0-1.601-.564-1.86-1.314l-.842-2.516-2.431.809c-1.135.328-2.145-.317-2.463-1.229-.329-1.018.211-2.127 1.231-2.456l2.432-.809-1.621-4.823-2.432.808c-1.355.384-2.558-.59-2.558-1.839 0-.817.509-1.582 1.327-1.846l2.433-.809-.842-2.515c-.33-1.02.211-2.129 1.232-2.458 1.02-.329 2.13.209 2.461 1.229l.842 2.515 5.011-1.677-.839-2.517c-.403-1.238.484-2.553 1.843-2.553.819 0 1.585.509 1.85 1.326l.841 2.517 2.431-.81c1.02-.33 2.131.211 2.461 1.229.332 1.018-.21 2.126-1.23 2.456l-2.433.809 1.622 4.823 2.433-.809c1.242-.401 2.557.484 2.557 1.838 0 .819-.51 1.583-1.328 1.847m-8.992-6.428l-5.01 1.675 1.619 4.828 5.011-1.674-1.62-4.829z">
+        </path>
+      </svg>
+      <p>Copyright ┬⌐ 2025 - All right reserved</p>
+    </aside>
+    <nav class="grid-flow-col gap-4 md:place-self-center md:justify-self-end">
+      <a href="https://www.instagram.com/trackinsights/" target="_blank" rel="noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="fill-current">
+          <path
+            d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z">
+          </path>
+        </svg>
+      </a>
+    </nav>
+  </footer>
+
+  <div id="ti-footer-lightbulb-slot"
+    class="footer footer-horizontal fixed bottom-0 left-0 w-full justify-start bg-transparent pl-4 pb-4 pr-0 pt-0 overflow-visible pointer-events-none z-[84]"></div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+
+</html>

@@ -7,4 +7,7 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-me')
     SQLALCHEMY_DATABASE_URI = f"sqlite:///{DATABASE_PATH}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    DEBUG = True
+    # Off unless asked for. Flask's debugger executes arbitrary code typed into
+    # the browser, so this must never default to on for a deployed site. Local
+    # development is unaffected: wsgi.py passes debug=True to app.run() directly.
+    DEBUG = os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes')

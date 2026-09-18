@@ -71,7 +71,7 @@ class CONST:
     _REPO_ROOT = os.path.dirname(_COMMON_DIR)
     # Two layouts have to work. In the repo, common/ sits beside web/. A
     # deployment that copies web/. into the app root and common/ next to it
-    # leaves backend/ and frontend/ directly beside common/, with no web/ at
+    # leaves app/ and data/ directly beside common/, with no web/ at
     # all -- so "<root>/web" is the right answer only when it actually exists.
     # Getting this wrong is quiet rather than loud: Flask reads its database URI
     # from config.py, so the app serves pages normally while every CONST-derived
@@ -82,7 +82,7 @@ class CONST:
     DB_PATH = os.path.join(WEB_DIR, "data", "Track.db")
     OUTPUT_PATH = os.path.join(_REPO_ROOT, "output")
 
-    # School logos live at web/frontend/static/<SCHOOL_LOGO_STATIC_SUBDIR>/<school_id>.<SCHOOL_LOGO_EXT>
+    # School logos live at web/app/static/<SCHOOL_LOGO_STATIC_SUBDIR>/<school_id>.<SCHOOL_LOGO_EXT>
     # -- every logo is converted to this single format/size (see common/logo.py),
     # so a school's logo file existing at that exact path IS the "has a logo"
     # signal; there is no DB column for it. This is the single place the
