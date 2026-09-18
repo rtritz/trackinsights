@@ -45,7 +45,7 @@ def percentiles_report_page():
         'insights/report-viewer.html',
         title='Percentiles Summary Report',
         description='A comprehensive overview of track & field percentiles across all events, genders, and meet types.',
-        pdf_url=url_for('static', filename='percentiles_by10_readable.pdf'),
+        pdf_url=url_for('static', filename='reports/percentiles_by10_readable.pdf'),
         download_name='TrackInsights_Percentiles_Summary.pdf',
     )
 
@@ -56,7 +56,7 @@ def top_returning_athletes_report_page():
         'insights/report-viewer.html',
         title='Top Returning Athletes Report',
         description='A summary of the top returning Indiana high school track and field athletes.',
-        pdf_url=url_for('static', filename='top_returning_athletes.pdf'),
+        pdf_url=url_for('static', filename='reports/top_returning_athletes.pdf'),
         download_name='TrackInsights_Top_Returning_Athletes.pdf',
         show_credit_banner=True,
     )

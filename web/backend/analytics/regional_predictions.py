@@ -33,7 +33,7 @@ def _score_event(rows, ascending):
     Ties on the exact same mark share a place and split that place's (plus
     any following places the tie group occupies) combined point value
     evenly across the tied schools -- the same tie math
-    web/backend/scripts/calculate_team_scores.py uses for an actual
+    standalone/scripts/calculate_team_scores.py uses for an actual
     completed meet, so a jump-off/countback-free projection still
     distributes points consistently with real scoring.
     """
