@@ -1,0 +1,539 @@
+/* Athlete Result Detail
+ *
+ * Moved out of athlete-result-detail.html, where it sat as 529 lines inside a <script> tag.
+ * Here it gets syntax checking, the browser can cache it, and "where is the
+ * code for this page?" has the obvious answer: the file named after the page.
+ *
+ * It reads what it needs from the DOM rather than from Jinja, which is what
+ * made moving it safe. Keep it that way -- pass values in with data- attributes
+ * rather than templating them into the JavaScript.
+ */
+
+// @ts-nocheck
+document.addEventListener('DOMContentLoaded', async () => {
+  const detailRoot = document.getElementById('detail-root');
+  const loadingState = document.getElementById('loading-state');
+  const errorState = document.getElementById('error-state');
+  const detailContent = document.getElementById('detail-content');
+  const rankingsContainer = document.getElementById('rankings-container');
+  const whereRankCard = document.getElementById('where-rank-card');
+  const whereRankToggle = document.getElementById('where-rank-toggle');
+  const whereRankPanel = document.getElementById('where-rank-panel');
+  const whereRankChevron = document.getElementById('where-rank-chevron');
+  const whereRankSummary = document.getElementById('where-rank-summary');
+  const whereRankTableBody = document.getElementById('where-rank-table-body');
+
+  const athleteId = Number(detailRoot?.dataset?.athleteId);
+  const meetId = Number(detailRoot?.dataset?.meetId);
+  const eventName = detailRoot?.dataset?.eventName || '';
+  const resultType = detailRoot?.dataset?.resultType || 'Final';
+
+  if (!Number.isFinite(athleteId) || !Number.isFinite(meetId) || !eventName) {
+    console.error('Missing identifiers for result detail view.');
+    loadingState.classList.add('hidden');
+    errorState.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      meet_id: meetId,
+      event: eventName,
+      result_type: resultType,
+    });
+
+    const response = await fetch(`/api/athletes/${athleteId}/result-rankings?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error('Ranking data not found');
+    }
+
+    const data = await response.json();
+    if (!data || !data.rankings) {
+      throw new Error('Incomplete ranking payload');
+    }
+
+    loadingState.classList.add('hidden');
+    detailContent.classList.remove('hidden');
+
+    const isRelayEvent = data?.context?.event_type === 'Relay';
+
+    renderSummary(data, isRelayEvent);
+    renderWhereDoIRank(data.where_do_i_rank, data.context, isRelayEvent);
+    renderRankings(data.rankings, rankingsContainer, isRelayEvent, data.context);
+  } catch (error) {
+    console.error('Error loading ranking detail:', error);
+    loadingState.classList.add('hidden');
+    errorState.classList.remove('hidden');
+  }
+
+  if (whereRankToggle && whereRankPanel && whereRankChevron) {
+    whereRankToggle.addEventListener('click', () => {
+      const isHidden = whereRankPanel.classList.toggle('hidden');
+      const expanded = !isHidden;
+      whereRankToggle.setAttribute('aria-expanded', expanded.toString());
+      whereRankChevron.classList.toggle('rotate-180', expanded);
+    });
+  }
+
+  function renderWhereDoIRank(whereData, context = {}, isRelay = false) {
+    if (!whereRankCard) {
+      return;
+    }
+    if (!whereData || !Array.isArray(whereData.sectional_results) || !whereData.sectional_results.length) {
+      whereRankCard.classList.add('hidden');
+      if (whereRankToggle) {
+        whereRankToggle.setAttribute('aria-expanded', 'false');
+      }
+      if (whereRankPanel) {
+        whereRankPanel.classList.add('hidden');
+      }
+      if (whereRankChevron) {
+        whereRankChevron.classList.remove('rotate-180');
+      }
+      return;
+    }
+    whereRankCard.classList.remove('hidden');
+
+    const stageLabel = (context?.meet_type || 'Sectional').trim() || 'Sectional';
+    const stageLabelLower = stageLabel.toLowerCase();
+    const pluralStageLabel = stageLabelLower.endsWith('s') ? stageLabelLower : `${stageLabelLower}s`;
+    const yearLabel = context?.year ? `${context.year}` : '';
+    const combinedLabel = [yearLabel, stageLabel].filter(Boolean).join(' ').trim();
+    const contextSuffix = combinedLabel ? ` (${combinedLabel})` : '';
+
+    const projectionsHeading = whereRankCard.querySelector('h2');
+    if (projectionsHeading) {
+      const headingYearPrefix = yearLabel ? `${yearLabel} ` : '';
+      projectionsHeading.textContent = `${headingYearPrefix}${stageLabel} Projections`;
+    }
+
+    const projectionsColumnHeader = document.querySelector('#where-rank-table thead th[data-column="projection-location"]');
+    if (projectionsColumnHeader) {
+      projectionsColumnHeader.textContent = stageLabel;
+    }
+
+    if (whereRankPanel) {
+      whereRankPanel.classList.add('hidden');
+    }
+    if (whereRankToggle) {
+      whereRankToggle.setAttribute('aria-expanded', 'false');
+    }
+    if (whereRankChevron) {
+      whereRankChevron.classList.remove('rotate-180');
+    }
+    const sectionalResults = [...whereData.sectional_results];
+    sectionalResults.sort((a, b) => {
+      const aNum = Number(a?.meet_num);
+      const bNum = Number(b?.meet_num);
+      const aHasNum = Number.isFinite(aNum);
+      const bHasNum = Number.isFinite(bNum);
+
+      if (aHasNum && bHasNum && aNum !== bNum) {
+        return aNum - bNum;
+      }
+      if (aHasNum && !bHasNum) {
+        return -1;
+      }
+      if (!aHasNum && bHasNum) {
+        return 1;
+      }
+      const aName = a?.sectional_name || '';
+      const bName = b?.sectional_name || '';
+      return aName.localeCompare(bName);
+    });
+
+    const totalSectionals = sectionalResults.length;
+    const projectedRanks = sectionalResults
+      .map(result => Number(result.projected_place))
+      .filter(value => Number.isFinite(value));
+
+    const averageRank = projectedRanks.length
+      ? projectedRanks.reduce((sum, value) => sum + value, 0) / projectedRanks.length
+      : null;
+
+    const summaryText = averageRank != null
+      ? `Avg projected rank ${averageRank.toFixed(1)} over ${totalSectionals} ${pluralStageLabel}${contextSuffix}`
+      : `${totalSectionals} ${pluralStageLabel}${contextSuffix}`;
+
+    if (whereRankSummary) {
+      whereRankSummary.textContent = summaryText;
+    }
+
+    const descriptionEl = document.getElementById('where-rank-description');
+    if (descriptionEl) {
+      const baseDescription = `See how this performance would place at every ${stageLabelLower}s statewide`;
+      descriptionEl.textContent = combinedLabel
+        ? `${baseDescription} for ${combinedLabel}s.`
+        : `${baseDescription}.`;
+    }
+
+    whereRankTableBody.innerHTML = '';
+    sectionalResults.forEach(row => {
+      const isOwnMeet = Number(row.meet_id) === meetId;
+      const tr = document.createElement('tr');
+      tr.className = 'transition-colors duration-150 hover:bg-primary/5';
+      if (isOwnMeet) {
+        tr.classList.add('bg-primary/10');
+      }
+
+      const promoteCell = (element, baseClass) => {
+        element.className = baseClass;
+        if (isOwnMeet) {
+          element.classList.add('text-primary', 'font-semibold');
+        }
+        return element;
+      };
+
+      const nameTd = promoteCell(document.createElement('td'), 'text-sm sm:text-base');
+      nameTd.textContent = row.sectional_name || 'Sectional';
+      tr.appendChild(nameTd);
+
+      const placeTd = promoteCell(document.createElement('td'), 'text-sm sm:text-base');
+      placeTd.textContent = row.projected_place_label || ordinal(row.projected_place);
+      tr.appendChild(placeTd);
+
+      const fieldTd = promoteCell(document.createElement('td'), 'text-sm sm:text-base');
+      if (row.field_size) {
+        const unitLabel = isRelay ? 'relays' : 'athletes';
+        fieldTd.textContent = `${row.field_size} ${unitLabel}`;
+      } else {
+        fieldTd.textContent = '—';
+      }
+      tr.appendChild(fieldTd);
+      whereRankTableBody.appendChild(tr);
+    });
+  }
+
+  function renderSummary(data, isRelay = false) {
+    const { context, target_result: target } = data;
+    const titleEl = document.getElementById('result-title');
+    const subtitleEl = document.getElementById('result-subtitle');
+    const tagsEl = document.getElementById('result-tags');
+
+    titleEl.textContent = `${context.event} • ${context.meet_type}`;
+
+    const placeText = target.place ? `Placed ${ordinal(target.place)}` : 'Placement unavailable';
+    subtitleEl.textContent = `${target.result} (${context.result_type}) — ${placeText}`;
+
+    tagsEl.innerHTML = '';
+    tagsEl.appendChild(buildTag(`Year: ${context.year}`));
+    tagsEl.appendChild(buildTag(`Gender: ${context.gender || 'N/A'}`));
+    if (target.school_name) {
+      tagsEl.appendChild(buildTag(`School: ${target.school_name}`));
+    }
+    if (target.enrollment) {
+      tagsEl.appendChild(buildTag(`Enrollment: ${target.enrollment}`));
+    }
+    if (isRelay && target.relay_team) {
+      const cleanedRelayTeam = target.relay_team.replace(/\s+,/g, ',');
+      tagsEl.appendChild(buildTag(`Relay Team: ${cleanedRelayTeam}`));
+    }
+    if (target.meet_host) {
+      const host = target.meet_host + (target.meet_num ? ` (Meet ${target.meet_num})` : '');
+      tagsEl.appendChild(buildTag(`Meet Host: ${host}`));
+    }
+  }
+
+  function renderRankings(rankings, container, isRelay = false, context = {}) {
+    container.innerHTML = '';
+
+    const configs = [
+      { key: 'overall', title: 'Overall Rank', description: 'See how your performance ranks among all participants for ' },
+      { key: 'like_schools', title: 'Similar Enrollment Rank', description: 'See how your performance ranks among participants from schools of similar size to yours for' },
+      { key: 'same_grade', title: 'Grade-Level Rank', description: 'See how your performance ranks among participants in your grade level for' },
+    ];
+
+    const activeConfigs = isRelay
+      ? configs.filter(config => config.key !== 'same_grade')
+      : configs;
+
+    activeConfigs.forEach((config, index) => {
+      const rankingData = rankings[config.key];
+      const card = document.createElement('div');
+      card.className = 'card bg-white border border-base-200 shadow-sm overflow-hidden';
+
+      const detailId = `ranking-panel-${config.key}-${index}`;
+
+      const summaryButton = document.createElement('button');
+      summaryButton.type = 'button';
+      summaryButton.className = 'flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-5 py-4 text-left bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary border-b border-base-200 cursor-pointer';
+      summaryButton.setAttribute('aria-controls', detailId);
+      summaryButton.setAttribute('aria-expanded', 'false');
+
+      const summaryInfo = document.createElement('div');
+      const title = document.createElement('h2');
+      title.className = 'text-lg sm:text-xl font-semibold text-primary';
+      const contextPrefix = context?.year && context?.meet_type ? `${context.year} ${context.meet_type} • ` : '';
+      title.textContent = `${contextPrefix}${config.title}`;
+      summaryInfo.appendChild(title);
+      summaryButton.appendChild(summaryInfo);
+
+      const summaryRight = document.createElement('div');
+      summaryRight.className = 'flex items-center justify-between gap-2 sm:gap-3 text-sm font-medium text-gray-700 w-full sm:w-auto';
+
+      const summaryRank = document.createElement('span');
+      summaryRank.textContent = getSummaryText(rankingData);
+      summaryRight.appendChild(summaryRank);
+
+      const chevron = buildChevronIcon();
+      summaryRight.appendChild(chevron);
+
+      summaryButton.appendChild(summaryRight);
+
+      card.appendChild(summaryButton);
+
+      const detail = document.createElement('div');
+      detail.className = 'card-body space-y-4 hidden';
+      detail.id = detailId;
+
+      const description = document.createElement('p');
+      description.className = 'text-sm text-gray-600';
+      const descriptor = context?.year && context?.meet_type
+        ? `${config.description} ${context.year} ${context.meet_type}s.`
+        : config.description;
+      description.textContent = descriptor;
+      detail.appendChild(description);
+
+      if (!rankingData) {
+        const empty = document.createElement('p');
+        empty.className = 'text-sm text-gray-500 italic';
+        empty.textContent = 'Not enough data to generate this ranking.';
+        detail.appendChild(empty);
+      } else {
+        const headline = document.createElement('p');
+        headline.className = 'text-lg sm:text-xl font-semibold text-gray-800';
+        headline.textContent = `Ranked ${rankingData.rank} of ${rankingData.total}`;
+        detail.appendChild(headline);
+
+        if (rankingData.criteria) {
+          const chips = document.createElement('div');
+          chips.className = 'flex flex-wrap gap-2 text-xs sm:text-sm';
+          const criteriaEntries = getCriteriaEntries(config.key, rankingData.criteria);
+          criteriaEntries.forEach(([key, value]) => {
+            chips.appendChild(buildTag(`${formatLabel(key)}: ${value}`));
+          });
+          detail.appendChild(chips);
+        }
+
+        detail.appendChild(buildLeaderboardTable(rankingData.top_results, isRelay));
+      }
+
+      summaryButton.addEventListener('click', () => {
+        const isHidden = detail.classList.toggle('hidden');
+        const expanded = !isHidden;
+        summaryButton.setAttribute('aria-expanded', expanded.toString());
+        chevron.classList.toggle('rotate-180', expanded);
+      });
+
+      card.appendChild(detail);
+      container.appendChild(card);
+    });
+  }
+
+  function buildLeaderboardTable(entries, isRelay = false) {
+    const INITIAL_LIMIT = 10;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'space-y-3';
+
+    const tableWrapper = document.createElement('div');
+    tableWrapper.className = 'overflow-x-auto';
+
+    const table = document.createElement('table');
+    table.className = 'table table-compact w-full text-sm sm:text-base';
+
+    const nameHeader = isRelay ? 'Relay Team' : 'Athlete';
+
+    const thead = document.createElement('thead');
+    thead.innerHTML = `
+      <tr class="text-primary text-sm sm:text-base uppercase">
+        <th class="w-16">Rank</th>
+        <th class="whitespace-nowrap">${nameHeader}</th>
+        <th class="whitespace-nowrap">School</th>
+        <th>Result</th>
+        <th>Place</th>
+      </tr>
+    `;
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    const normalizeRelayText = (text) => {
+      if (!text || !isRelay) return text;
+      return text.replace(/\s+,/g, ',');
+    };
+
+    // Find target entry index
+    const targetIndex = entries.findIndex(e => e.is_target);
+    const targetInInitial = targetIndex >= 0 && targetIndex < INITIAL_LIMIT;
+
+    let showAll = entries.length <= INITIAL_LIMIT;
+
+    const renderRows = () => {
+      tbody.innerHTML = '';
+      const visibleEntries = showAll ? entries : entries.slice(0, INITIAL_LIMIT);
+
+      // If not showing all and target is outside initial, add it at the end
+      const displayEntries = [...visibleEntries];
+      if (!showAll && !targetInInitial && targetIndex >= 0) {
+        const targetEntry = entries[targetIndex];
+        if (!displayEntries.includes(targetEntry)) {
+          displayEntries.push({ _separator: true });
+          displayEntries.push(targetEntry);
+        }
+      }
+
+      displayEntries.forEach(entry => {
+        if (entry._separator) {
+          const tr = document.createElement('tr');
+          tr.className = 'border-t-2 border-dashed border-base-300';
+          const td = document.createElement('td');
+          td.colSpan = 5;
+          td.className = 'text-center text-xs text-gray-400 py-1';
+          td.textContent = '···';
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+          return;
+        }
+
+        const tr = document.createElement('tr');
+        const rowBaseClass = 'transition-colors duration-150 hover:bg-primary/5';
+        tr.className = entry.is_target
+          ? `${rowBaseClass} bg-primary/10 text-primary font-semibold`
+          : rowBaseClass;
+
+        const rankTd = document.createElement('td');
+        rankTd.textContent = entry.rank;
+        rankTd.className = 'text-sm sm:text-base';
+        tr.appendChild(rankTd);
+
+        const nameTd = document.createElement('td');
+        nameTd.className = 'text-sm sm:text-base';
+        nameTd.textContent = normalizeRelayText(entry.name) || '—';
+        tr.appendChild(nameTd);
+
+        const schoolTd = document.createElement('td');
+        schoolTd.className = 'hidden sm:table-cell text-sm sm:text-base';
+        schoolTd.textContent = entry.school || '—';
+        tr.appendChild(schoolTd);
+
+        const resultTd = document.createElement('td');
+        resultTd.className = 'text-sm sm:text-base';
+        resultTd.textContent = entry.result || '—';
+        tr.appendChild(resultTd);
+
+        const placeTd = document.createElement('td');
+        placeTd.className = 'hidden md:table-cell text-sm sm:text-base';
+        placeTd.textContent = entry.place != null ? ordinal(entry.place) : '—';
+        tr.appendChild(placeTd);
+
+        tbody.appendChild(tr);
+      });
+    };
+
+    renderRows();
+    table.appendChild(tbody);
+    tableWrapper.appendChild(table);
+    wrapper.appendChild(tableWrapper);
+
+    // Add Show More / Show Less button if there are more entries
+    if (entries.length > INITIAL_LIMIT) {
+      const toggleBtn = document.createElement('button');
+      toggleBtn.type = 'button';
+      toggleBtn.className = 'btn btn-sm btn-ghost text-primary';
+      const updateBtnText = () => {
+        toggleBtn.textContent = showAll
+          ? 'Show top 10'
+          : `Show all ${entries.length} results`;
+      };
+      updateBtnText();
+
+      toggleBtn.addEventListener('click', () => {
+        showAll = !showAll;
+        renderRows();
+        updateBtnText();
+      });
+
+      wrapper.appendChild(toggleBtn);
+    }
+
+    return wrapper;
+  }
+
+  function getCriteriaEntries(sectionKey, criteria) {
+    const entries = Object.entries(criteria || {});
+    if (sectionKey !== 'like_schools') {
+      return entries;
+    }
+
+    const enrollmentOrder = ['enrollment', 'min_enrollment', 'max_enrollment'];
+    const ordered = enrollmentOrder
+      .filter(key => key in criteria)
+      .map(key => [key, criteria[key]]);
+
+    const remaining = entries.filter(([key]) => !enrollmentOrder.includes(key));
+    return [...ordered, ...remaining];
+  }
+
+  function getSummaryText(rankingData) {
+    if (!rankingData) {
+      return 'No data yet';
+    }
+    return `Rank ${rankingData.rank} / ${rankingData.total}`;
+  }
+
+  function buildChevronIcon() {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 20 20');
+    svg.setAttribute('fill', 'currentColor');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.classList.add('h-5', 'w-5', 'text-gray-500', 'transition-transform', 'duration-200');
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('fill-rule', 'evenodd');
+    path.setAttribute('clip-rule', 'evenodd');
+    path.setAttribute('d', 'M5.23 7.21a.75.75 0 011.06.02L10 11l3.71-3.77a.75.75 0 111.08 1.04l-4.25 4.32a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z');
+    svg.appendChild(path);
+
+    return svg;
+  }
+
+  function buildTag(text) {
+    const span = document.createElement('span');
+    span.className = 'badge badge-outline rounded-full px-3 py-2 h-auto min-h-[2.25rem] whitespace-normal break-words text-left';
+    span.textContent = text;
+    return span;
+  }
+
+  function formatLabel(label) {
+    return label.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+  }
+
+  function formatResultTypeCounts(counts) {
+    if (!counts) {
+      return '—';
+    }
+    const preferred = ['Final', 'Prelim'];
+    const pieces = [];
+    preferred.forEach(key => {
+      if (counts[key]) {
+        pieces.push(`${key}: ${counts[key]}`);
+      }
+    });
+    Object.entries(counts).forEach(([key, value]) => {
+      if (!preferred.includes(key)) {
+        pieces.push(`${formatLabel(key)}: ${value}`);
+      }
+    });
+    return pieces.length ? pieces.join(' • ') : '—';
+  }
+
+  function ordinal(value) {
+    if (value == null) return '—';
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '—';
+    const mod100 = n % 100;
+    const suffix = (mod100 >= 11 && mod100 <= 13)
+      ? 'th'
+      : { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th';
+    return `${n}${suffix}`;
+  }
+});

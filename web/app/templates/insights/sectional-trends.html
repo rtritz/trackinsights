@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block title %}Sectional Event Trends - Track Insights{% endblock %}
+{% block meta_description %}Analyze how Indiana high school track and field sectional event depth and qualification standards change over time. See median marks and cutoff performances.{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-white pt-20 sm:pt-24 pb-5 px-3 sm:px-6">
+  <div class="relative max-w-6xl mx-auto">
+    <div
+      class="absolute inset-0 -z-10 mx-0 sm:mx-[-40px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none">
+    </div>
+    <div class="relative space-y-8">
+      <header class="text-center space-y-4">
+        <h1 class="font-impact italic text-4xl sm:text-5xl text-primary">
+          Sectional Event Trends
+        </h1>
+        <p class="text-base-content/70 max-w-2xl mx-auto">
+          Analyze how event depth and qualification standards change over time. See median marks, cutoff performances, and the percent difference between the two.
+        </p>
+      </header>
+
+      <div class="rounded-[32px] bg-white/90 ring-1 ring-base-200 shadow-[0_25px_70px_rgba(15,23,42,0.08)] p-4 sm:p-6">
+        <div class="flex flex-wrap lg:flex-nowrap gap-6 items-stretch">
+          <!-- Filter Panel -->
+          <section
+            class="bg-white border border-base-200/80 rounded-2xl shadow-lg shadow-base-300/40 w-full lg:w-[20rem] shrink-0 flex flex-col">
+            <div class="gap-4 p-4 flex-1 flex flex-col" id="filter-card">
+              <h2 class="text-lg font-semibold text-base-content">Filters</h2>
+
+              <fieldset class="space-y-2">
+                <legend class="text-[11px] uppercase tracking-wide text-gray-500">Gender</legend>
+                <div id="gender-chip-group" class="flex flex-wrap gap-2"></div>
+              </fieldset>
+
+              <fieldset class="space-y-2">
+                <legend class="text-[11px] uppercase tracking-wide text-gray-500">Event</legend>
+                <div id="event-chip-group" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5"></div>
+              </fieldset>
+            </div>
+          </section>
+
+          <!-- Results Panel -->
+          <section
+            class="bg-white border border-base-200/80 rounded-2xl shadow-xl shadow-base-300/30 min-h-[520px] flex-1 min-w-0 flex flex-col">
+            <div class="space-y-4 p-4 flex-1 flex flex-col">
+              <div id="results-header" class="hidden">
+                <h2 id="results-title" class="text-xl font-semibold text-primary"></h2>
+              </div>
+
+              <div id="results-error" class="hidden alert alert-error">
+                <span id="results-error-message">Something went wrong.</span>
+              </div>
+
+              <div id="results-loading" class="hidden">
+                <div class="flex flex-col items-center justify-center h-48 text-center">
+                  <span class="loading loading-spinner loading-lg text-primary"></span>
+                  <p class="mt-3 text-sm text-gray-500">Loading trends data…</p>
+                </div>
+              </div>
+
+              <div id="results-empty" class="flex flex-col items-center justify-center h-48 text-center text-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <p>Select a gender and event to view trends</p>
+              </div>
+
+              <div id="results-content" class="hidden flex-1 flex flex-col gap-6">
+                <!-- Chart Container -->
+                <div class="bg-white border border-base-200 rounded-xl p-4">
+                  <div id="chart-legend-container" class="flex flex-wrap justify-center gap-4 mb-3"></div>
+                  <div style="height: 280px; position: relative;">
+                    <canvas id="trends-chart"></canvas>
+                  </div>
+                </div>
+
+                <!-- Data Table -->
+                <div class="overflow-x-auto border border-base-200 rounded-lg">
+                  <table class="table text-sm bg-white">
+                    <thead id="results-head">
+                      <tr>
+                        <th>Season</th>
+                        <th>Median Mark</th>
+                        <th>State Cutoff</th>
+                        <th>% Diff. Between Median and Cutoff</th>
+                      </tr>
+                    </thead>
+                    <tbody id="results-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tooltip for difficulty rankings -->
+<div id="difficulty-tooltip" class="hidden fixed z-50 bg-white border border-base-300 rounded-lg shadow-xl p-4 max-w-xs max-h-80 overflow-y-auto">
+  <h4 class="font-semibold text-sm text-primary mb-2">Event Difficulty Rankings</h4>
+  <ol id="difficulty-tooltip-list" class="text-xs space-y-1"></ol>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script src="{{ url_for('static', filename='js/sectional-trends.js') }}?v={{ asset_version('js/sectional-trends.js') }}" defer></script>
+{% endblock %}

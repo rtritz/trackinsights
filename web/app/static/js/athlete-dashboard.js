@@ -1,0 +1,423 @@
+/* Athlete dashboard.
+ *
+ * Moved out of athlete-dashboard.html, where it sat as 413 lines inside a
+ * <script> tag. Living here it gets syntax checking, it can be cached by the
+ * browser, and "where is the code for this page?" has the obvious answer: the
+ * file named after the page.
+ *
+ * It takes the athlete from a data- attribute on the page rather than from a
+ * Jinja expression, which is what made moving it safe -- keep it that way.
+ */
+
+// @ts-nocheck
+document.addEventListener('DOMContentLoaded', async function () {
+const loadingState = document.getElementById('loading-state');
+const errorState = document.getElementById('error-state');
+const dashboardContent = document.getElementById('dashboard-content');
+const athleteId = Number(dashboardContent?.dataset?.athleteId);
+const shareButton = document.getElementById('copy-dashboard-link');
+const shareStatus = document.getElementById('share-dashboard-status');
+
+    if (!Number.isFinite(athleteId) || athleteId <= 0) {
+        console.error('Invalid athlete identifier for dashboard view.');
+        loadingState.classList.add('hidden');
+        errorState.classList.remove('hidden');
+        return;
+    }
+
+    const copyTextToClipboard = async (text) => {
+        const fallbackCopy = () => {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', 'true');
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textarea);
+                return successful;
+            } catch (error) {
+                document.body.removeChild(textarea);
+                return false;
+            }
+        };
+
+        if (navigator?.clipboard?.writeText && window.isSecureContext) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (error) {
+                console.warn('Clipboard copy failed, falling back', error);
+                return fallbackCopy();
+            }
+        }
+
+        return fallbackCopy();
+    };
+
+    const setShareStatus = (message, tone = 'muted') => {
+        if (!shareStatus) {
+            return;
+        }
+        shareStatus.textContent = message;
+        shareStatus.classList.remove('text-green-600', 'text-red-600', 'text-gray-600');
+        const toneClass = tone === 'success' ? 'text-green-600' : tone === 'error' ? 'text-red-600' : 'text-gray-600';
+        shareStatus.classList.add('text-xs', toneClass);
+    };
+
+    const resetShareButton = () => {
+        if (!shareButton) {
+            return;
+        }
+        shareButton.disabled = false;
+        shareButton.textContent = 'Copy share link';
+    };
+
+    const handleShareButtonClick = async () => {
+        if (!shareButton) {
+            return;
+        }
+        const url = window.location.href.split('#')[0];
+        shareButton.disabled = true;
+        const succeeded = await copyTextToClipboard(url);
+        if (succeeded) {
+            shareButton.textContent = 'Link copied!';
+            setShareStatus('Copied to clipboard', 'success');
+        } else {
+            shareButton.textContent = 'Copy failed';
+            setShareStatus('Unable to copy link', 'error');
+        }
+        setTimeout(resetShareButton, 1800);
+    };
+
+    if (shareButton) {
+        shareButton.addEventListener('click', handleShareButtonClick);
+    }
+
+    const prelimTooltipMessage = 'Prelim result only — no finals performance recorded.';
+
+    function createStageCell(stageData) {
+        const td = document.createElement('td');
+        td.className = 'text-xs sm:text-sm lg:text-base leading-relaxed overflow-visible';
+
+        if (!stageData) {
+            td.textContent = '–';
+            td.classList.add('text-gray-400');
+            return td;
+        }
+
+        const createPrelimMarker = () => {
+            const tooltip = document.createElement('span');
+            tooltip.className = 'tooltip tooltip-bottom tooltip-error ml-1 align-middle overflow-visible';
+            tooltip.dataset.tip = prelimTooltipMessage;
+
+            const marker = document.createElement('span');
+            marker.textContent = '(P)';
+            marker.className = 'text-[10px] sm:text-xs font-semibold text-primary cursor-pointer';
+            marker.setAttribute('role', 'note');
+            marker.tabIndex = 0;
+
+            tooltip.appendChild(marker);
+            return tooltip;
+        };
+
+        const textValue = stageData.text || '–';
+        const isPrelimOnly = stageData.result_type === 'Prelim';
+        if (stageData.has_detail && stageData.meet_id && stageData.event) {
+            const encodedEvent = encodeURIComponent(stageData.event);
+            let detailUrl = `/athlete-dashboard/${athleteId}/result/${stageData.meet_id}/${encodedEvent}`;
+            if (stageData.result_type) {
+                detailUrl += `?result_type=${encodeURIComponent(stageData.result_type)}`;
+            }
+
+            const link = document.createElement('a');
+            link.href = detailUrl;
+            link.textContent = textValue;
+            link.className = 'text-primary font-semibold underline decoration-solid underline-offset-2 hover:text-primary/80';
+            link.title = `See ranking breakdown for ${stageData.meet_type || 'this result'}`;
+            td.appendChild(link);
+            if (isPrelimOnly) {
+                td.appendChild(createPrelimMarker());
+            }
+        } else {
+            if (isPrelimOnly) {
+                td.appendChild(document.createTextNode(textValue + ' '));
+                td.appendChild(createPrelimMarker());
+            } else {
+                td.textContent = textValue;
+            }
+        }
+
+        return td;
+    }
+
+    const stageConfigs = {
+        sectional: {
+            title: 'Sectional Spotlight',
+            accent: 'text-rose-700',
+            encouragements: [
+                'A finals appearance is within reach. Keep pushing!',
+                'Your next PR will land you in the sectional finals.',
+                'Stay focused and keep training hard!'
+            ],
+        },
+        regional: {
+            title: 'Regional Rise',
+            accent: 'text-rose-700',
+            encouragements: [
+                'Regional history gets written by grinders like you.',
+                'You’re one race away from owning the regional stage.',
+                'Stay patient; the regional badge is saving you a spot.',
+            ],
+        },
+        state: {
+            title: 'State Legends',
+            accent: 'text-rose-700',
+            encouragements: [
+                'State is calling. Answer with your next PR.',
+                'Can\'t wait to see you on the big stage.',
+                'The state heat sheets have room for your name. Keep pushing.',
+            ],
+        },
+    };
+
+    const fallbackEncouragement = 'Keep grinding—your next milestone is closer than you think.';
+
+    function getStageEncouragement(stageKey) {
+        if (stageKey === 'state' && Math.random() < 0.01) {
+            return 'John Pork wants you here...!';
+        }
+
+        const options = stageConfigs[stageKey]?.encouragements;
+        if (Array.isArray(options) && options.length > 0) {
+            const randomIndex = Math.floor(Math.random() * options.length);
+            return options[randomIndex];
+        }
+        return fallbackEncouragement;
+    }
+
+    function getMedalCircleClass(place) {
+        if (place === 1) {
+            return 'bg-yellow-300 text-yellow-900 shadow-lg shadow-yellow-500/50 ring-2 ring-white/60';
+        }
+        if (place === 2) {
+            return 'bg-slate-200 text-slate-800 shadow-md shadow-slate-400/40 ring-2 ring-white/50';
+        }
+        if (place === 3) {
+            return 'bg-amber-600 text-white shadow-lg shadow-amber-700/40 ring-2 ring-white/40';
+        }
+        if (typeof place === 'number' && place > 3) {
+            return 'bg-sky-100 text-sky-700 shadow-inner ring-2 ring-white/30';
+        }
+        return 'bg-slate-100 text-slate-700 shadow-inner ring-2 ring-white/30';
+    }
+
+    function createMedalElement(entry) {
+        const wrapper = document.createElement('button');
+        wrapper.type = 'button';
+        wrapper.className = 'group relative flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition z-0';
+        wrapper.setAttribute('aria-label', `${entry.event || 'Event'} medal`);
+
+        const circleClass = getMedalCircleClass(entry.place);
+        const circle = document.createElement('div');
+        circle.className = `w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-lg font-extrabold tracking-tight shadow-lg ${circleClass}`;
+        circle.textContent = entry.place_label || 'Q';
+
+        const detailPanel = document.createElement('div');
+        detailPanel.className = 'absolute top-full left-1/2 -translate-x-1/2 mt-3 w-48 sm:w-56 rounded-2xl bg-white shadow-2xl border border-rose-100 p-3 text-[11px] sm:text-xs text-gray-700 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto transition z-20';
+
+        const detailLines = [
+            entry.year ? `${entry.year}${entry.is_relay ? ' • Relay' : ''}` : (entry.is_relay ? 'Relay' : null),
+            entry.result ? `Result: ${entry.result}` : null,
+            entry.place_label ? `Place: ${entry.place_label}` : null,
+        ].filter(Boolean);
+
+        detailPanel.innerHTML = `
+            <p class="font-bold text-gray-900 text-sm">${entry.event || 'Event'}</p>
+            <div class="mt-1 space-y-1">
+                ${detailLines.map(line => `<p>${line}</p>`).join('') || '<p>Qualified</p>'}
+            </div>
+        `;
+
+        wrapper.appendChild(circle);
+        wrapper.appendChild(detailPanel);
+
+        const elevate = () => {
+            wrapper.style.zIndex = '40';
+        };
+        const resetElevation = () => {
+            wrapper.style.zIndex = '';
+        };
+
+        wrapper.addEventListener('mouseenter', elevate);
+        wrapper.addEventListener('mouseleave', resetElevation);
+        wrapper.addEventListener('focus', elevate);
+        wrapper.addEventListener('blur', resetElevation);
+
+        return wrapper;
+    }
+
+    try {
+        // Fetch athlete dashboard data from API
+        const response = await fetch(`/api/athletes/${athleteId}/dashboard`);
+
+        if (!response.ok) {
+            throw new Error('Athlete not found');
+        }
+
+        const data = await response.json();
+
+        // Hide loading, show content
+        loadingState.classList.add('hidden');
+        dashboardContent.classList.remove('hidden');
+
+        // Populate athlete info
+        document.getElementById('athlete-name').textContent = data.athlete.full_name;
+        const schoolEl = document.getElementById('athlete-school');
+        if (data.athlete.school && data.athlete.school_id) {
+            schoolEl.textContent = data.athlete.school;
+            schoolEl.href = `/school-dashboard/${data.athlete.school_id}`;
+        } else {
+            schoolEl.textContent = data.athlete.school || 'No school';
+            schoolEl.removeAttribute('href');
+            schoolEl.style.textDecoration = 'none';
+            schoolEl.style.cursor = 'default';
+        }
+
+        // Show school logo if available
+        if (data.athlete.logo_url) {
+            const logoImg = document.getElementById('school-logo');
+            const logoContainer = document.getElementById('school-logo-container');
+            const logoLink = document.getElementById('school-logo-link');
+            logoImg.src = data.athlete.logo_url;
+            logoImg.alt = (data.athlete.school || 'School') + ' logo';
+            if (data.athlete.school_id) {
+                logoLink.href = `/school-dashboard/${data.athlete.school_id}`;
+            } else {
+                logoLink.removeAttribute('href');
+                logoLink.style.cursor = 'default';
+            }
+            logoContainer.classList.remove('hidden');
+        }
+
+        // Set gender badge
+        const genderBadge = document.getElementById('athlete-gender');
+        if (data.athlete.gender) {
+            const genderText = data.athlete.gender === 'M' ? 'Boys' : data.athlete.gender === 'F' ? 'Girls' : data.athlete.gender;
+            const genderClass = data.athlete.gender === 'Boys'
+                ? 'font-bold px-2 py-0.5 border-2 border-blue-500 text-blue-600 rounded-full'
+                : data.athlete.gender === 'Girls'
+                    ? 'font-bold px-2 py-0.5 border-2 border-pink-500 text-pink-600 rounded-full'
+                    : 'font-bold px-2 py-0.5 border-2 border-gray-400 text-gray-600 rounded-full';
+            genderBadge.textContent = genderText;
+            genderBadge.className = genderClass;
+        } else {
+            genderBadge.classList.add('hidden');
+        }
+
+        // Set class year badge
+        const classBadge = document.getElementById('athlete-class');
+        if (data.athlete.graduation_year) {
+            classBadge.textContent = `Class of ${data.athlete.graduation_year}`;
+        } else {
+            classBadge.classList.add('hidden');
+        }
+
+        // Populate badges
+        const badgesContainer = document.getElementById('badges-container');
+        badgesContainer.innerHTML = '';
+
+        const badgeStages = ['sectional', 'regional', 'state'];
+        badgeStages.forEach(stageKey => {
+            const stageData = data.badges[stageKey];
+            const config = stageConfigs[stageKey];
+
+            const badgeCard = document.createElement('div');
+            badgeCard.className = 'rounded-3xl border border-gray-200 bg-gray-50/80 p-4 sm:p-6 flex flex-col gap-4 shadow-sm';
+
+            const headingLabel = stageData?.label || `${stageKey.charAt(0).toUpperCase()}${stageKey.slice(1)} Stage`;
+            const totalAppearances = stageData?.entries?.length || 0;
+            const emptyStateText = getStageEncouragement(stageKey);
+
+            badgeCard.innerHTML = `
+                    <div class="flex flex-wrap items-center gap-3 justify-between">
+                        <div>
+                            <h3 class="text-2xl font-black text-gray-900">${config.title}</h3>
+                            <p class="hidden text-sm text-gray-600">${headingLabel}</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-3 sm:gap-4" data-stage-medals="${stageKey}"></div>
+                    ${(!stageData || !stageData.entries || stageData.entries.length === 0)
+                    ? `<p class="text-sm text-gray-500 italic">${emptyStateText}</p>`
+                    : ''}
+                `;
+
+            const medalWrap = badgeCard.querySelector(`[data-stage-medals="${stageKey}"]`);
+            if (stageData?.entries?.length) {
+                stageData.entries.forEach(entry => {
+                    medalWrap.appendChild(createMedalElement(entry));
+                });
+            }
+
+            badgesContainer.appendChild(badgeCard);
+        });
+
+        // Populate playoff history
+        const playoffContainer = document.getElementById('playoff-history-container');
+        playoffContainer.innerHTML = '';
+
+        if (data.playoff_history && data.playoff_history.length > 0) {
+            // Create table
+            const table = document.createElement('div');
+            table.className = 'overflow-x-auto overflow-y-visible w-full max-w-full';
+            table.innerHTML = `
+                    <table class="table table-compact sm:table-normal w-full min-w-full">
+                        <thead>
+                            <tr class="text-primary">
+                                <th class="text-sm sm:text-base lg:text-lg">Year</th>
+                                <th class="text-sm sm:text-base lg:text-lg">Event</th>
+                                <th class="text-sm sm:text-base lg:text-lg">Sectional</th>
+                                <th class="text-sm sm:text-base lg:text-lg">Regional</th>
+                                <th class="text-sm sm:text-base lg:text-lg">State</th>
+                            </tr>
+                        </thead>
+                        <tbody id="playoff-table-body">
+                        </tbody>
+                    </table>
+                `;
+            playoffContainer.appendChild(table);
+
+            // Populate table rows
+            const tbody = document.getElementById('playoff-table-body');
+            data.playoff_history.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-primary/5';
+
+                const yearCell = document.createElement('td');
+                yearCell.className = 'font-semibold text-xs sm:text-sm lg:text-base whitespace-nowrap';
+                yearCell.textContent = row.year || '–';
+                tr.appendChild(yearCell);
+
+                const eventCell = document.createElement('td');
+                eventCell.className = 'text-xs sm:text-sm lg:text-base';
+                eventCell.textContent = row.event || '–';
+                tr.appendChild(eventCell);
+
+                tr.appendChild(createStageCell(row.sectional));
+                tr.appendChild(createStageCell(row.regional));
+                tr.appendChild(createStageCell(row.state));
+
+                tbody.appendChild(tr);
+            });
+        } else {
+            playoffContainer.innerHTML = '<p class="text-gray-600 text-center py-8">No playoff history available</p>';
+        }
+
+    } catch (error) {
+        console.error('Error loading athlete data:', error);
+        loadingState.classList.add('hidden');
+        errorState.classList.remove('hidden');
+    }
+});

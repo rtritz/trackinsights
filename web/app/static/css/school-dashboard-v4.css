@@ -1,0 +1,417 @@
+/* School Dashboard V4.
+ *
+ * A separate stylesheet rather than a <style> block: V3 inlined ~60KB into every
+ * page, which the browser re-downloaded on each view and could never cache. This
+ * is fetched once and reused across schools, seasons and genders.
+ *
+ * Everything is scoped under #sd4 so it cannot reach the shared nav or any other
+ * page's markup. */
+
+#sd4 {
+    --bg: #0b0f14;
+    --surface: #131920;
+    --surface-2: #1a2129;
+    --border: #2a3440;
+    --text: #f5f7fa;
+    --muted: #a5b0bc;
+    --accent: #6ea8fe;
+    --accent-soft: rgba(110, 168, 254, 0.16);
+    --success: #7ad7a2;
+    --warn: #f0c674;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 5.5rem 0 4rem;
+}
+#sd4 * { box-sizing: border-box; }
+#sd4 .shell { max-width: 1200px; margin: 0 auto; padding: 0 1rem; }
+#sd4 .panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+}
+#sd4 a.link { color: var(--accent); text-decoration: none; }
+#sd4 a.link:hover { text-decoration: underline; }
+#sd4 .muted { color: var(--muted); }
+#sd4 .hidden { display: none !important; }
+
+/* ---- header ---- */
+#sd4 .toolbar {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem;
+    flex-wrap: wrap; justify-content: space-between;
+}
+#sd4 .ident { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+#sd4 .logo {
+    width: 58px; height: 58px; border-radius: 10px; background: #fff;
+    display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+}
+#sd4 .logo img { max-width: 46px; max-height: 46px; }
+#sd4 h1 {
+    font-family: Oswald, system-ui, sans-serif; font-style: italic; font-weight: 600;
+    font-size: 2rem; line-height: 1.1; margin: 0;
+}
+#sd4 .meta { font-size: 0.85rem; color: var(--muted); margin-top: 0.15rem; }
+
+/* Filters are links, not buttons: each view is a real URL. Two rows, because
+   gender and season are different questions -- side by side they read as one
+   long strip of options and the eye has to find the divider to tell them apart. */
+#sd4 .filters { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; }
+@media (max-width: 760px) { #sd4 .filters { align-items: flex-start; } }
+
+/* Gender is a two-state toggle: there are exactly two, always both available,
+   and one is always chosen -- a segmented control says that, where two separate
+   pills leave it looking like you could pick neither.
+   Named .seg, not .toggle: daisyUI ships a .toggle component (a checkbox switch)
+   and it is compiled into output.css site-wide now, so that name would inherit
+   its width and appearance rules on top of these. */
+#sd4 .seg {
+    display: inline-flex; align-items: stretch; border: 1px solid var(--border);
+    border-radius: 999px; overflow: hidden; background: var(--surface-2);
+    /* The template renders these links on separate lines, and the whitespace
+       between them was opening a gap inside the pill before the first label.
+       Zeroing it here beats contorting the markup with Jinja whitespace control. */
+    font-size: 0; line-height: 0;
+}
+/* Each half is its own flex box rather than an inline link: inline anchors take
+   their height from the line box, which the shared stylesheet was collapsing --
+   the pill lost its height and the labels spilled out of it. */
+#sd4 .seg a {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--muted); text-decoration: none; padding: 0.4rem 1.05rem;
+    line-height: 1; white-space: nowrap;
+}
+#sd4 .seg a + a { border-left: 1px solid var(--border); }
+#sd4 .seg a:hover { color: var(--text); }
+#sd4 .seg a.on { background: var(--accent); color: #0b0f14; }
+
+#sd4 .seasons { display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; }
+#sd4 .fopt {
+    font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--muted); text-decoration: none; padding: 0.25rem 0.6rem; border-radius: 999px;
+    border: 1px solid transparent;
+}
+#sd4 .fopt:hover { color: var(--text); }
+#sd4 .fopt.on {
+    color: var(--text); border-color: var(--accent); background: var(--accent-soft);
+}
+
+/* ---- tabs ---- */
+#sd4 .navtabs {
+    display: flex; gap: 0.25rem; margin: 1.1rem 0 1rem;
+    border-bottom: 1px solid var(--border); overflow-x: auto;
+}
+#sd4 .navtab {
+    appearance: none; background: none; border: 0; cursor: pointer; white-space: nowrap;
+    font: inherit; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--muted);
+    padding: 0.6rem 1rem; border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+#sd4 .navtab:hover { color: var(--text); }
+#sd4 .navtab[aria-selected="true"] {
+    color: var(--text); border-bottom-color: var(--accent); cursor: default;
+}
+#sd4 .navtab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+#sd4 .section { margin-top: 1.25rem; }
+#sd4 .section:first-child { margin-top: 0; }
+#sd4 .stitle {
+    font-size: 0.95rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 0.6rem;
+}
+
+/* ---- metric slots: figure, qualifier, context ---- */
+#sd4 .pad { padding: 1.15rem 1.25rem; }
+#sd4 .mrow {
+    display: grid; gap: 1px; background: var(--border);
+    border-radius: 12px; overflow: hidden;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+#sd4 .mrow.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#sd4 .metric { background: var(--surface-2); padding: 18px 16px; min-width: 0; }
+#sd4 .mlabel {
+    font-size: 12px; color: var(--muted); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+}
+#sd4 .mvalue {
+    font-size: 28px; font-weight: 500; line-height: 1.3;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+#sd4 .mden { font-size: 16px; font-weight: 400; color: var(--muted); }
+#sd4 .mctx { font-size: 13px; color: var(--muted); margin-top: 0.2rem; line-height: 1.5; }
+#sd4 .mgroup + .mgroup { margin-top: 1.5rem; }
+
+/* The three rounds across one row instead of three stacked blocks. Stacked, each
+   round got a full-width strip for two small numbers and the card ran most of a
+   screen for six figures; side by side they also read as the progression they
+   are -- sectional, regional, state, left to right. */
+#sd4 .rounds {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px; background: var(--border); border-radius: 12px; overflow: hidden;
+}
+#sd4 .round { background: var(--surface-2); padding: 16px 18px; min-width: 0; }
+#sd4 .round.out { background: var(--surface); }
+#sd4 .rname {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 0.55rem;
+}
+#sd4 .rfig { display: flex; align-items: baseline; gap: 0.45rem; }
+#sd4 .rfig b { font-size: 30px; font-weight: 500; line-height: 1.1; font-variant-numeric: tabular-nums; }
+#sd4 .rfig span { font-size: 13px; color: var(--muted); }
+#sd4 .rline {
+    margin-top: 0.5rem; font-size: 13px; color: var(--muted); line-height: 1.55;
+    font-variant-numeric: tabular-nums;
+}
+#sd4 .rline b { color: var(--text); font-weight: 600; }
+#sd4 .round.out .rfig b { color: var(--muted); }
+@media (max-width: 760px) { #sd4 .rounds { grid-template-columns: minmax(0, 1fr); } }
+#sd4 .pair { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+#sd4 .sub { margin-bottom: 0.7rem; font-size: 14px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+@media (max-width: 860px) {
+    #sd4 .mrow { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    #sd4 .pair { grid-template-columns: minmax(0,1fr); }
+}
+@media (max-width: 560px) {
+    #sd4 .mrow, #sd4 .mrow.two { grid-template-columns: minmax(0,1fr); }
+    #sd4 .mvalue { font-size: 24px; }
+}
+
+/* ---- tables ---- */
+#sd4 .tscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+#sd4 table { width: 100%; border-collapse: collapse; font-size: 0.92rem; font-variant-numeric: tabular-nums; }
+#sd4 th, #sd4 td {
+    text-align: left; padding: 0.7rem 0.75rem;
+    border-bottom: 1px solid var(--border); vertical-align: top;
+}
+#sd4 th {
+    color: var(--muted); font-size: 0.78rem; text-transform: uppercase;
+    letter-spacing: 0.08em; font-weight: 600;
+}
+#sd4 tr:last-child td { border-bottom: 0; }
+/* Fixed columns so the qualifier and near-miss tables line up with each other. */
+#sd4 .qtable { table-layout: fixed; }
+#sd4 .qtable th:nth-child(1) { width: 46%; }
+#sd4 .qtable th:nth-child(2) { width: 26%; }
+#sd4 .qtable th:nth-child(3) { width: 28%; }
+@media (max-width: 900px) {
+    #sd4 table { font-size: 0.82rem; }
+    #sd4 th, #sd4 td { padding: 0.4rem 0.45rem; white-space: nowrap; }
+    #sd4 .qtable { table-layout: auto; }
+    #sd4 .qtable th { width: auto; }
+}
+/* Mark on top, what it earned beneath. */
+#sd4 .mark { display: block; font-variant-numeric: tabular-nums; }
+#sd4 .submark {
+    display: block; margin-top: 0.1rem; font-size: 0.74rem; color: var(--muted);
+}
+#sd4 .nomark { color: var(--muted); font-style: italic; cursor: help; }
+#sd4 .relay { color: var(--muted); }
+/* Past the 3% line, present only to reach the floor of three. */
+#sd4 tr.far td { opacity: 0.55; }
+#sd4 tr.far .link { color: var(--muted); }
+#sd4 .empty-row td { color: var(--muted); font-style: italic; }
+#sd4 .note { padding: 0.9rem 1rem; color: var(--muted); font-size: 0.86rem; }
+
+/* Class year, in the letters coaches use. */
+#sd4 .grade {
+    display: inline-block; margin-left: 0.35rem; padding: 0.05rem 0.35rem;
+    border: 1px solid var(--border); border-radius: 4px;
+    font-size: 0.66rem; font-weight: 700; letter-spacing: 0.06em; color: var(--muted);
+}
+#sd4 .grade.sr { color: var(--warn); }
+/* Recognition beside a name: the stage columns carry the fact, this is the part
+   an athlete actually wants to see. */
+/* A cut stone, not a chip. The label sits in a separate element because
+   clip-path cuts descendants too -- letters inside the cut would lose their
+   corners along with the gem. Silver for the regional, gold for the state. */
+#sd4 .gem {
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    width: 1.72rem; height: 1.26rem; flex: 0 0 auto; margin-left: 0.4rem;
+    vertical-align: -0.25rem; cursor: help;
+}
+#sd4 .gem i {
+    position: absolute; inset: 0; font-style: normal;
+    background: linear-gradient(150deg, #e8eef6 0%, #9aa8bb 45%, #6b788c 100%);
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+    clip-path: polygon(50% 0%, 100% 27%, 100% 73%, 50% 100%, 0% 73%, 0% 27%);
+}
+#sd4 .gem.sq i { background: linear-gradient(150deg, #fff0bd 0%, #edc153 45%, #c08e1c 100%); }
+/* The facet across the crown. */
+#sd4 .gem i::after {
+    content: ''; position: absolute; inset: 0; background: rgba(255, 255, 255, 0.42);
+    clip-path: polygon(50% 0%, 100% 27%, 50% 46%, 0% 27%);
+}
+/* Dark letters: both stones are light, so one colour reads on either. */
+#sd4 .gem em {
+    position: relative; z-index: 1; font-style: normal;
+    font-size: 0.64rem; font-weight: 800; color: #141a22; line-height: 1;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+#sd4 .rank-cell { white-space: nowrap; color: var(--muted); }
+#sd4 .rank-cell b { color: var(--text); font-weight: 600; }
+
+/* ---- statewide rank ---- */
+#sd4 .rank-head { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+#sd4 .rank-big {
+    font-size: 1.8rem; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums;
+}
+#sd4 .rank-pct { font-size: 0.95rem; color: var(--muted); }
+#sd4 .move { font-size: 0.82rem; margin-top: 0.15rem; color: var(--muted); }
+#sd4 .move .up { color: var(--success); font-weight: 700; }
+#sd4 .move .down { color: var(--warn); font-weight: 700; }
+#sd4 .scale { display: block; margin-top: 1rem; }
+#sd4 .track {
+    position: relative; display: block; height: 14px; border-radius: 999px;
+    background: var(--surface-2); border: 1px solid var(--border);
+}
+#sd4 .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: var(--success); }
+#sd4 .track.below .fill { background: var(--warn); }
+#sd4 .cap { position: absolute; right: 0; top: -3px; bottom: -3px; width: 2px; border-radius: 1px; background: var(--text); }
+#sd4 .scale-val { position: relative; display: block; height: 1.1rem; margin-top: 0.3rem; }
+#sd4 .scale-val span {
+    position: absolute; top: 0; font-size: 0.78rem; font-weight: 600;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+#sd4 .spark { width: 100%; margin-top: 1.2rem; }
+#sd4 .spark svg { display: block; width: 100%; height: auto; overflow: visible; }
+#sd4 .spark svg.up { color: var(--success); }
+#sd4 .spark svg.down { color: var(--warn); }
+#sd4 .spark-cap { font-size: 0.7rem; color: var(--muted); margin: 0.55rem 0 0.1rem; }
+#sd4 .spark-years {
+    position: relative; height: 1rem; margin-top: 0.35rem;
+    font-size: 0.66rem; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+#sd4 .spark-years span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+#sd4 details { margin-top: 0.9rem; }
+#sd4 summary { cursor: pointer; color: var(--muted); font-size: 0.86rem; }
+#sd4 summary:hover { color: var(--text); }
+#sd4 details p { font-size: 0.86rem; color: var(--muted); line-height: 1.55; }
+
+/* ---- outlook ---- */
+#sd4 .split { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; }
+@media (max-width: 760px) { #sd4 .split { grid-template-columns: minmax(0,1fr); } }
+#sd4 .look .mvalue { white-space: normal; line-height: 1.2; }
+#sd4 .look .mctx { white-space: normal; }
+#sd4 .look .mvalue.up { color: var(--success); }
+#sd4 .look .mvalue.down { color: var(--warn); }
+
+/* ---- footer / diagnostics ---- */
+#sd4 .built { margin-top: 1.5rem; font-size: 0.72rem; color: var(--muted); text-align: right; }
+#sd4 .timing {
+    margin-top: 1rem; padding: 0.75rem 1rem; font-size: 0.75rem;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+#sd4 .timing b { color: var(--success); }
+
+/* Shown when the precomputed cache is older than the results it was built from.
+   Amber rather than red: the page is still useful, it is just not guaranteed
+   current. */
+#sd4 .stale {
+    border: 1px solid var(--warn); border-radius: 8px;
+    background: rgba(240, 198, 116, 0.10); color: var(--warn);
+    padding: 0.6rem 0.9rem; margin-bottom: 1rem; font-size: 0.85rem;
+}
+
+/* ---- qualifier view toggle ---- */
+/* Both sides of the regional cut named in one heading. The live one carries the
+   heading's weight; the other stays muted until clicked, so two equally loud
+   labels never read as one long title. */
+#sd4 .vtabs { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.6rem; }
+#sd4 .vtab {
+    appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
+    font: inherit; font-size: 0.95rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--muted); opacity: 0.6;
+}
+#sd4 .vtab[aria-pressed="true"] { color: var(--text); opacity: 1; font-weight: 600; cursor: default; }
+#sd4 .vtab[aria-pressed="false"]:hover {
+    color: var(--accent); opacity: 1; text-decoration: underline; text-underline-offset: 0.2rem;
+}
+#sd4 .vtab:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+#sd4 .vsep { color: var(--border); }
+
+/* ---- a rank that opens the list it came from ---- */
+#sd4 .ranklink {
+    appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
+    font: inherit; color: inherit; text-decoration: underline;
+    text-decoration-color: var(--border); text-underline-offset: 0.2em;
+}
+#sd4 .ranklink:hover { color: var(--accent); text-decoration-color: var(--accent); }
+/* The rank itself is a <b> with its own colour, which would otherwise keep its
+   own on hover and leave only the denominator changing. */
+#sd4 .ranklink:hover b { color: var(--accent); }
+#sd4 .ranklink:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#sd4 .rank-big.ranklink { text-decoration-thickness: 2px; text-decoration-color: var(--accent); }
+
+/* ---- the ranked-list popup ---- */
+#sd4 .rankbox {
+    position: fixed; inset: 0; z-index: 10000; background: rgba(0, 0, 0, 0.66);
+    display: flex; align-items: flex-start; justify-content: center; padding: 4rem 1rem 2rem;
+}
+#sd4 .rankbox[hidden] { display: none; }
+#sd4 .rankbox-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    width: min(880px, 100%); max-height: 84vh; display: flex; flex-direction: column;
+    padding: 1.1rem 1.25rem;
+}
+#sd4 .rankbox-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 1rem; margin-bottom: 0.6rem;
+}
+#sd4 .rankbox-head h2 {
+    margin: 0; font-family: Oswald, system-ui, sans-serif; font-style: italic;
+    font-size: 1.45rem; font-weight: 600;
+}
+#sd4 .rankbox-close, #sd4 .jump {
+    appearance: none; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.35rem 0.9rem;
+    font: inherit; font-size: 0.85rem; cursor: pointer;
+}
+#sd4 .rankbox-close:hover, #sd4 .jump:hover { border-color: var(--accent); color: var(--accent); }
+#sd4 .rankbox-actions { margin-bottom: 0.7rem; }
+#sd4 .rankbox-body { overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; }
+#sd4 .rankbox-body table { font-size: 0.88rem; }
+#sd4 .rankbox-body th {
+    position: sticky; top: 0; background: var(--surface-2); z-index: 1;
+}
+/* The reader's own school, so "where are we in this" is answerable without
+   reading 394 rows. */
+#sd4 .rankbox-body tr.us { background: var(--accent-soft); }
+#sd4 .rankbox-body tr.us td { font-weight: 600; }
+#sd4 .flash { animation: sd4-flash 1.4s ease-out 1; }
+@keyframes sd4-flash { 0%, 40% { background: var(--accent-soft); } 100% { background: transparent; } }
+
+/* ---- popup controls ---- */
+#sd4 .rankbox-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+#sd4 .rankbox-actions .spacer { flex: 1 1 auto; }
+#sd4 .rankbox-actions select,
+#sd4 .rankbox-actions input {
+    appearance: none; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.35rem 0.7rem; font: inherit; font-size: 0.85rem;
+}
+#sd4 .rankbox-actions input { width: 9rem; }
+#sd4 .rankbox-actions select:focus-visible,
+#sd4 .rankbox-actions input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* The platform paints the open dropdown and only honours these two. */
+#sd4 .rankbox-actions option { background: var(--surface-2); color: var(--text); }
+/* The statewide rank stays visible when a filter is on, so a reader can see both
+   "12th in this band" and "the 160th school in the state" at once. */
+#sd4 .rankbox-body td.of { color: var(--muted); }
+#sd4 .rankbox-note { padding: 0.9rem 1rem; color: var(--muted); font-size: 0.86rem; }
+
+/* Icon buttons: square, so the three read as one control group rather than
+   three differently-sized words. */
+#sd4 .jump.icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; padding: 0;
+}
+#sd4 .jump.icon svg {
+    width: 15px; height: 15px; fill: none; stroke: currentColor;
+    stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+/* When the school has more than one entry in the list, the jump cycles through
+   them and the count says how many there are to cycle through. */
+#sd4 .jump.icon .count {
+    font-size: 0.62rem; font-weight: 700; margin-left: 0.15rem;
+    font-variant-numeric: tabular-nums;
+}
+#sd4 .jump.icon[data-many] { width: auto; padding: 0 0.45rem; }

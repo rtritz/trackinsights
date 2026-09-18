@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if school_name %}{{ school_name }} - {% endif %}School Dashboard - Track Insights{% endblock %}
+{% block meta_description %}{% if school_name %}Explore track and field data for {{ school_name }}{% if school_city %} in {{ school_city }}{% endif %} — event results and school comparisons.{% else %}View Indiana high school track and field school data and event results.{% endif %}{% endblock %}
+{% block og_title %}{% if school_name %}{{ school_name }} - School Dashboard{% else %}School Dashboard{% endif %} - Track Insights{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-white pt-20 sm:pt-24 pb-24 sm:pb-32 px-2 sm:px-4">
+
+    <!-- Loading State -->
+    <div id="loading-state" class="flex flex-col items-center justify-center min-h-[60vh]">
+        <div class="loading loading-spinner loading-lg text-primary"></div>
+        <p class="mt-4 text-lg text-gray-600">Loading school data...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error-state" class="hidden">
+        <div class="flex flex-col items-center justify-center min-h-[60vh]">
+            <div class="text-center">
+                <h2 class="font-impact italic text-primary text-4xl md:text-5xl font-bold mb-4">
+                    School Not Found
+                </h2>
+                <p class="text-lg text-gray-600 mb-6">We couldn't find the school you're looking for.</p>
+                <a href="/" class="btn btn-primary rounded-full">Return Home</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div id="dashboard-content" class="hidden max-w-6xl mx-auto" data-school-id="{{ school_id }}">
+        <!-- Header Section -->
+        <div class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 mb-6 sm:mb-8 shadow-lg">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+                <div class="w-full">
+                    <h1 id="school-name"
+                        class="font-impact italic text-primary text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2 break-words">
+                        Loading...
+                    </h1>
+                    <div class="flex flex-wrap gap-2 sm:gap-3 items-center">
+                        <span id="school-city" class="text-base sm:text-lg md:text-xl text-gray-700 font-semibold break-words"></span>
+                        <span id="school-type-badge" class="badge badge-md sm:badge-lg badge-outline"></span>
+                        <span id="school-enrollment-badge" class="badge badge-md sm:badge-lg badge-outline"></span>
+                    </div>
+                </div>
+                <!-- School Logo -->
+                <div id="school-logo-container" class="hidden flex-shrink-0">
+                    <img id="school-logo" src="" alt="School logo"
+                        class="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 object-contain rounded-xl bg-white p-1 shadow-md" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Gender Toggle -->
+        <div class="mb-6 sm:mb-8 flex items-center justify-start">
+            <div id="global-gender-toggle" class="relative inline-flex items-center"></div>
+        </div>
+
+        <!-- Data Scope -->
+        <div class="mb-6 sm:mb-8 rounded-xl border border-base-300 bg-base-100 px-4 py-3 text-sm text-base-content/80">
+            <span class="font-semibold text-base-content">Data scope:</span>
+            Sectional, Regional, and State meets from 2023 to present.
+        </div>
+
+        <!-- Team Stats Section -->
+        <div class="mb-6 sm:mb-8">
+            <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
+                Team Stats
+                <span id="team-stats-gender-label" class="align-middle ml-2 badge badge-outline badge-sm sm:badge-md font-sans not-italic text-xs sm:text-sm">Boys</span>
+            </h2>
+            <div id="team-stats-container" class="space-y-6">
+            </div>
+        </div>
+
+        <!-- Relay Results Section -->
+        <div class="mb-6 sm:mb-8">
+            <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
+                Relay Results
+                <span id="relay-results-gender-label" class="align-middle ml-2 badge badge-outline badge-sm sm:badge-md font-sans not-italic text-xs sm:text-sm">Boys</span>
+            </h2>
+
+            <div class="space-y-4">
+                <div id="relay-summary-cards" class="grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
+
+                <div class="rounded-2xl border border-base-300 bg-base-200/60 p-2 sm:p-2.5">
+                    <div class="flex flex-col gap-3 sm:grid sm:grid-cols-3 sm:gap-4 pb-1">
+                        <div class="flex items-center gap-2 rounded-xl border border-base-300/70 bg-base-100 px-3 py-2.5 min-w-0 shadow-sm">
+                            <span class="inline-flex text-[10px] sm:text-xs uppercase tracking-wide font-bold text-black">Year:</span>
+                            <div class="flex items-center gap-2">
+                                <button type="button" id="relay-year-all"
+                                    class="btn btn-sm rounded-full border border-base-300 px-3 py-1.5 text-xs sm:text-sm">All</button>
+                                <div id="relay-year-stepper" tabindex="0" role="group" aria-label="Relay year selector"
+                                    class="inline-flex items-center gap-1 rounded-full border border-base-300 bg-base-100 px-1 py-1">
+                                    <button type="button" id="relay-year-prev"
+                                        class="btn btn-ghost btn-xs rounded-full px-2" aria-label="Previous year"><span class="inline-block h-0 w-0 border-y-[5px] border-y-transparent border-r-[8px] border-r-white" style="filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.95));" aria-hidden="true"></span></button>
+                                    <button type="button" id="relay-year-label"
+                                        class="min-w-[3.2rem] text-center text-xs sm:text-sm font-semibold tabular-nums text-base-content bg-transparent border-0 px-1"
+                                        aria-label="Selected year">-</button>
+                                    <button type="button" id="relay-year-next"
+                                        class="btn btn-ghost btn-xs rounded-full px-2" aria-label="Next year"><span class="inline-block h-0 w-0 border-y-[5px] border-y-transparent border-l-[8px] border-l-white" style="filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.95));" aria-hidden="true"></span></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 rounded-xl border border-base-300/70 bg-base-100 px-3 py-2.5 min-w-0 shadow-sm">
+                            <span class="inline-flex text-[10px] sm:text-xs uppercase tracking-wide font-bold text-black">Meet:</span>
+                            <div id="relay-meet-toggle" class="flex flex-nowrap gap-1.5"></div>
+                        </div>
+
+                        <div class="flex items-center gap-2 rounded-xl border border-base-300/70 bg-base-100 px-3 py-2.5 min-w-0 shadow-sm">
+                            <span class="inline-flex text-[10px] sm:text-xs uppercase tracking-wide font-bold text-black">Event:</span>
+                            <div id="relay-event-toggle" class="flex flex-nowrap gap-1.5"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="relay-results-container" class="overflow-x-auto"></div>
+            </div>
+        </div>
+
+        <!-- School Percentiles Section (includes records) -->
+        <div class="mb-6 sm:mb-8">
+            <div class="flex flex-wrap items-center justify-between gap-2 sm:gap-3 mb-2 sm:mb-3">
+                <div class="flex flex-wrap items-baseline gap-2 sm:gap-3">
+                    <div class="flex flex-wrap items-baseline gap-3">
+                        <button type="button" data-metric="best"
+                            class="perc-metric-tab font-impact italic text-2xl sm:text-3xl md:text-4xl font-bold transition-colors cursor-pointer">
+                            Best Marks
+                        </button>
+                        <span class="text-base-content/30 font-impact italic text-2xl sm:text-3xl md:text-4xl">·</span>
+                        <button type="button" data-metric="avg"
+                            class="perc-metric-tab font-impact italic text-2xl sm:text-3xl md:text-4xl font-bold transition-colors cursor-pointer">
+                            Avg Marks
+                        </button>
+                    </div>
+                    <span id="percentiles-gender-label" class="badge badge-outline badge-sm sm:badge-md font-sans font-semibold text-xs sm:text-sm">Boys</span>
+                </div>
+            </div>
+
+            <details class="mb-3 rounded-xl border border-base-300 bg-base-100 px-3 py-2 text-xs sm:text-sm text-base-content/80">
+                <summary class="cursor-pointer select-none font-semibold text-base-content">How this is calculated</summary>
+                <div class="mt-2">
+                    <p class="mt-1"><span class="font-semibold">Best Marks:</span> Shows the best playoff marks for a school in each event.</p>
+                    <p class="mt-1"><span class="font-semibold">Avg Marks (individual events only):</span> Shows the average mark for a school in each event where they have at least two athletes with playoff marks. Each athlete's best playoff mark in a season is used in the calculation. For All-Time, each school's all-time best average is ranked against other schools' all-time best averages.</p>
+                    <p class="mt-1"><span class="font-semibold">Year / All-Time:</span> Year shows a single season. All-Time combines all seasons.</p>
+                </div>
+            </details>
+
+            <!-- Year Toggle -->
+            <div class="flex flex-wrap items-center gap-2 mb-3">
+                <div id="percentiles-year-toggle" class="flex flex-wrap gap-2"></div>
+            </div>
+            <div class="mb-2">
+                <label for="percentiles-compare-mode-toggle" class="inline-flex items-center gap-2 text-xs sm:text-sm text-base-content/80">
+                    <input type="checkbox" id="percentiles-compare-mode-toggle" class="checkbox checkbox-sm rounded-none" />
+                    <span id="percentiles-compare-mode-label">enable multi-year compare (select multiple years)</span>
+                </label>
+            </div>
+
+            <div id="school-percentiles-container" class="overflow-x-auto">
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/school-dashboard.js') }}?v={{ asset_version('js/school-dashboard.js') }}" defer></script>
+{% endblock %}
