@@ -6,6 +6,12 @@
 
 /* npx shadcn@latest add https://reactbits.dev/r/SplitText-JS-TW */
 
+/* This file IS the Tailwind configuration. Tailwind v4 is configured in CSS,
+   not in a tailwind.config.js -- the old v3-style config file was removed after
+   a build with and without it produced byte-identical output.
+
+   Build with:
+     cd web && npx @tailwindcss/cli -i ./frontend/static/css/input.css                                     -o ./frontend/static/css/output.css --minify */
 @import "tailwindcss";
 /* ./tailwindcss-windows-x64.exe -i ./frontend/static/css/input.css -o ./frontend/static/css/output.css --watch */
 /* The empty include:/exclude:/prefix: lines that used to sit here made daisyUI

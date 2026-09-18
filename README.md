@@ -7,7 +7,9 @@ An Indiana high school track & field data analysis app: athlete/school dashboard
 - **`common/`** -- the shared library (database access, unit conversion, constants) used by both the web app and the standalone programs. See `CLAUDE.md` for details.
 - **`web/`** -- the Flask web application.
 - **`standalone/`** -- data-pipeline and maintenance programs that are *not* part of the web app: scraping notebooks, one-off scripts, generated reports.
-- **`docs/`** -- project documentation.
+- **`docs/`** -- project documentation. **New to the project? Start with
+  [`docs/PROJECT_GUIDE.md`](docs/PROJECT_GUIDE.md)** -- it explains the layout,
+  where to make each kind of change, and the data workflow.
 
 ## Setup
 

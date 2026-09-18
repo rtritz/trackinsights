@@ -15,7 +15,6 @@ dependencies = [
 web = [
     "Flask",
     "Flask-SQLAlchemy",
-    "Flask-Migrate",
 ]
 standalone = [
     "requests",
