@@ -32,6 +32,7 @@ standalone = [
 ]
 dev = [
     "pytest",
+    "markdown",  # docs/make_pdf.py -- turns a guide into a PDF to hand out
 ]
 
 [tool.setuptools]
