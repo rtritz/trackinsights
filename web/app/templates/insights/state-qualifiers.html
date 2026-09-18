@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title|default('Unofficial State Qualifiers - Track Insights') }}{% endblock %}
+{% block meta_description %}{{ page_description|default('Unofficial state qualifier lists.') }}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-white pt-20 sm:pt-24 pb-10 px-3 sm:px-6">
+  <div class="relative max-w-6xl mx-auto">
+    <div class="absolute inset-0 -z-10 mx-0 sm:mx-[-40px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none"></div>
+
+    <div class="relative space-y-6">
+      <header class="text-center space-y-2">
+        <h1 class="font-impact italic text-4xl sm:text-5xl text-primary">{{ page_heading|default('Unofficial State Qualifiers') }}</h1>
+        <p class="text-sm sm:text-base text-base-content/70 max-w-2xl mx-auto">{{ page_subtitle|default('These lists are unofficial and do not reflect any scratches that may have been made at the regional level.') }}</p>
+      </header>
+
+      <div class="rounded-[24px] bg-white border border-base-200 p-4 sm:p-6 shadow-lg">
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-2" id="gender-group"></div>
+          <label for="year-select" class="text-xs sm:text-sm text-base-content/70">Year</label>
+          <select id="year-select" class="select select-sm select-bordered w-24">
+            <option value="2026">2026</option>
+          </select>
+          <button id="top-list-btn" type="button"
+            class="ml-auto btn btn-sm btn-outline border-primary text-primary hover:bg-primary hover:text-primary-content gap-2"
+            title="Combined Regional Results" aria-label="Combined Regional Results">
+            <span id="top-list-btn-icon" aria-hidden="true" class="inline-flex"></span>
+            <span id="top-list-btn-label" class="hidden sm:inline">Combined Regional Results</span>
+          </button>
+        </div>
+      </div>
+
+      <section id="event-jump-wrap" class="hidden bg-base-100/90 backdrop-blur-sm border-y border-x border-base-300/70 px-2 py-2 sm:px-3 sm:py-3" style="border-left-width: 1.5px; border-right-width: 1.5px;">
+        <div id="event-jump-bar" class="flex flex-wrap justify-center gap-2"></div>
+      </section>
+
+
+      <section id="results-outer" class="hidden rounded-[24px] bg-white border border-base-200 p-4 sm:p-6 shadow-lg space-y-4">
+        <div id="status-line" class="text-sm text-base-content/60 px-1 hidden"></div>
+        <div id="detail-loading" class="hidden py-8 text-center">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+        </div>
+        <div id="detail-content" class="hidden space-y-6"></div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+{# Settings for this page, as data rather than code, so the
+   JavaScript can live in its own file. #}
+<script id="page-config" type="application/json">{{ {
+    "apiStatusUrl": api_status_url|default('/api/state-qualifiers/status'),
+    "apiDetailUrl": api_detail_url|default('/api/state-qualifiers'),
+    "loadErrorMessage": load_error|default('Unable to load state qualifiers.'),
+    "statusErrorMessage": status_error|default('Unable to load state status.'),
+    "pendingText": pending_text|default('State qualifiers are pending.'),
+} | tojson }}</script>
+{# The shared jump-to-event chip strip. Deferred scripts run in document
+   order, so this one is ready before the page script asks for it. #}
+<script src="{{ url_for('static', filename='js/event-jump.js') }}?v={{ asset_version('js/event-jump.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/state-qualifiers.js') }}?v={{ asset_version('js/state-qualifiers.js') }}" defer></script>
+{% endblock %}

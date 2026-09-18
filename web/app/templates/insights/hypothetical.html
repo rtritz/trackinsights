@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+
+{% block title %}Hypothetical Athlete - Track Insights{% endblock %}
+{% block meta_description %}Enter a hypothetical track and field performance and see how it would rank across Indiana high school sectionals, regionals, and state meets.{% endblock %}
+
+{% block content %}
+<div class="h-screen bg-white pt-20 sm:pt-24 pb-4 px-3 sm:px-6 flex flex-col">
+  <div class="relative max-w-3xl mx-auto w-full flex flex-col min-h-0 flex-1">
+    <div
+      class="absolute inset-0 -z-10 mx-0 sm:mx-[-40px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none">
+    </div>
+    <div class="relative flex flex-col min-h-0 flex-1">
+      <header class="text-center space-y-1 shrink-0 pb-3">
+        <h1 class="font-impact italic text-3xl sm:text-4xl text-primary">
+          Hypothetical Athlete
+        </h1>
+        <p class="text-base-content/70 max-w-2xl mx-auto text-sm">
+          Enter a performance for any event and see how it would rank against real competition.
+        </p>
+      </header>
+
+      <div class="rounded-[32px] bg-white/90 ring-1 ring-base-200 shadow-[0_25px_70px_rgba(15,23,42,0.08)] flex flex-col min-h-0 flex-1 overflow-hidden">
+        <div id="loading-options" class="flex flex-col items-center justify-center py-16">
+          <div class="loading loading-spinner loading-lg text-primary"></div>
+          <p class="mt-4 text-gray-600">Loading options...</p>
+        </div>
+
+        <form id="hypothetical-form" class="hidden flex flex-col min-h-0 flex-1" autocomplete="off">
+          <!-- Scrollable form content -->
+          <div class="flex-1 min-h-0 overflow-y-auto px-5 sm:px-7 pt-5 pb-3 space-y-4">
+            <!-- Gender -->
+            <fieldset class="space-y-1.5">
+              <legend class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Gender</legend>
+              <div id="gender-group" class="flex flex-wrap gap-1.5"></div>
+            </fieldset>
+
+            <hr class="border-base-200" />
+
+            <!-- Event -->
+            <fieldset class="space-y-1.5">
+              <legend class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Event</legend>
+              <div id="event-group" class="grid grid-cols-2 sm:grid-cols-3 gap-1.5"></div>
+            </fieldset>
+
+            <hr class="border-base-200" />
+
+            <!-- Season -->
+            <fieldset class="space-y-1.5">
+              <legend class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Season</legend>
+              <div id="year-group" class="flex flex-wrap gap-1.5"></div>
+            </fieldset>
+
+            <!-- Meet Type -->
+            <fieldset class="space-y-1.5">
+              <legend class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Meet Type</legend>
+              <div id="meet-type-group" class="flex flex-wrap gap-1.5"></div>
+            </fieldset>
+
+            <hr class="border-base-200" />
+
+            <!-- Performance Input -->
+            <fieldset class="space-y-1.5">
+              <legend class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Performance</legend>
+              <p id="performance-hint" class="text-xs text-gray-500">Select an event first</p>
+              <input type="text" id="performance-input" placeholder="e.g. 11.24"
+                class="input input-bordered input-sm w-full max-w-xs" disabled />
+            </fieldset>
+
+            <hr class="border-base-200" />
+
+            <!-- Grade Level (optional) -->
+            <fieldset class="space-y-1.5">
+              <legend class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Grade Level <span class="text-[10px] font-normal normal-case tracking-normal text-gray-400">(optional)</span></legend>
+              <div id="grade-group" class="flex flex-wrap gap-1.5"></div>
+            </fieldset>
+
+            <!-- Enrollment (optional) -->
+            <fieldset class="space-y-1.5">
+              <legend class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Enrollment <span class="text-[10px] font-normal normal-case tracking-normal text-gray-400">(optional)</span></legend>
+              <input type="number" id="enrollment-input" placeholder="e.g. 1200" min="1"
+                class="input input-bordered input-sm w-full max-w-xs" />
+            </fieldset>
+          </div>
+
+          <!-- Sticky submit bar at bottom of bubble -->
+          <div class="shrink-0 px-5 sm:px-7 py-3 border-t border-base-200 bg-white/95 rounded-b-[32px]">
+            <div id="form-error" class="hidden alert alert-error text-sm mb-2"></div>
+            <button type="submit" id="submit-btn"
+              class="btn btn-primary rounded-full px-8 shadow-lg shadow-primary/30 transition-all disabled:opacity-50 w-full sm:w-auto"
+              disabled>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              See Where You Rank
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/hypothetical.js') }}?v={{ asset_version('js/hypothetical.js') }}" defer></script>
+{% endblock %}

@@ -11,9 +11,9 @@ WEB_ROOT = REPO_ROOT / "web"
 if str(WEB_ROOT) not in sys.path:
     sys.path.insert(0, str(WEB_ROOT))
 
-from backend import create_app, db  # noqa: E402
-from backend import queries  # noqa: E402
-from backend.models import Athlete, AthleteResult, Event, Meet, RelayResult, School, SchoolEnrollment  # noqa: E402
+from app import create_app, db  # noqa: E402
+from app import queries  # noqa: E402
+from app.models import Athlete, AthleteResult, Event, Meet, RelayResult, School, SchoolEnrollment  # noqa: E402
 from common.const import CONST  # noqa: E402
 
 

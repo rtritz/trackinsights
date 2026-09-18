@@ -25,7 +25,7 @@ pip install -e ".[web,standalone,dev]"
 
 ```bash
 cd web
-python app.py
+python wsgi.py
 # Visit http://localhost:5000
 ```
 
