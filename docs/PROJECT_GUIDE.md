@@ -6,6 +6,8 @@ want to change something.
 
 Read this once before your first change. It is short on purpose.
 
+Want it on paper? `python docs/make_pdf.py` writes `docs/PROJECT_GUIDE.pdf`.
+
 ---
 
 ## 1. What this is
