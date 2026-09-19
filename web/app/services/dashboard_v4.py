@@ -20,11 +20,10 @@ near-miss selection, head-to-head, returning athletes, and the season summary.
 A request does exactly one indexed SELECT, one json.loads, and renders. No
 analysis of any kind happens while a visitor waits.
 
-ON REUSING THE V3 QUERY LAYER
------------------------------
-build_payload() calls the existing query functions in queries.py. That is
-deliberate. What made V3 slow was running that analysis *per request*, not the
-analysis itself -- and those functions encode the scoring rules, advancement
+ON REUSING THE QUERY LAYER
+--------------------------
+build_payload() calls the existing query functions. That is deliberate. What
+made V3 slow was running that analysis *per request*, not the analysis itself -- and those functions encode the scoring rules, advancement
 rules and ranking methodology, which are the parts that must not change. Rewriting
 them from scratch would risk quietly altering published results to no benefit,
 since this code now runs offline where its speed barely matters. The request path
@@ -392,12 +391,15 @@ def _results_rows(rows, stages_present):
 
 # -------------------------------------------------------------------- building
 
-def build_payload(school_id, gender, season, queries):
+def build_payload(school_id, gender, season):
     """Assemble everything the V4 page renders for one school/gender/season.
 
-    `queries` is passed in rather than imported at module scope so this file can
-    be imported by the route without dragging the whole query layer in with it.
+    Only the precompute job calls this. The query layer is imported here rather
+    than at module scope so that a route importing this module for load_payload()
+    -- the only thing a request needs -- does not pay for the whole query layer.
     """
+    from .. import queries
+
     core = queries.get_school_season_core(school_id, gender=gender, season=season)
     if not core:
         return None
@@ -526,13 +528,20 @@ def build_payload(school_id, gender, season, queries):
     return payload
 
 
-def build_rankings(gender, season, queries):
+def build_rankings(gender, season):
     """Every ranked list for one gender/season, as (event, payload) pairs.
 
     Trimmed to what the popup prints. The underlying rows carry meet ids, event
     types and lineups that no reader sees, and keeping them would multiply the
     size of the one artifact that has to stay small enough to commit.
     """
+    from sqlalchemy.orm import joinedload
+
+    from ..models import School
+    from ..queries.rankings import _build_statewide_program_rankings
+    from ..queries.scorecard import _event_ranked_rows, _relay_ranked_rows
+    from ..queries.shared import _resolve_school_enrollment_for_year
+
     if str(season) == 'all-time':
         return []
     year = int(season)
@@ -541,12 +550,11 @@ def build_rankings(gender, season, queries):
     # Enrollment for every school, resolved once. The popup filters on it, and
     # looking it up per row would be 394 lookups for the program table alone.
     enrollments = {}
-    for school in queries.School.query.options(
-            queries.joinedload(queries.School.enrollments)).all():
-        meta = queries._resolve_school_enrollment_for_year(school, year)
+    for school in School.query.options(joinedload(School.enrollments)).all():
+        meta = _resolve_school_enrollment_for_year(school, year)
         enrollments[school.school_id] = meta.get('value')
 
-    table = queries._build_statewide_program_rankings(gender, year)
+    table = _build_statewide_program_rankings(gender, year)
     out.append(('', {
         'kind': 'program',
         'title': 'Statewide Program Rankings',
@@ -566,8 +574,8 @@ def build_rankings(gender, season, queries):
         ],
     }))
 
-    for source, is_relay in ((queries._event_ranked_rows, False),
-                             (queries._relay_ranked_rows, True)):
+    for source, is_relay in ((_event_ranked_rows, False),
+                             (_relay_ranked_rows, True)):
         for event, rows in (source(gender, year) or {}).items():
             out.append((event, {
                 'kind': 'event',
