@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import json
 import os
 import time
 
@@ -78,27 +79,42 @@ def hypothetical_query_page():
 
 
 # Register the 2026 regional predictions report route
+# The precomputed JSON the report pages read. Resolved from this file rather
+# than from current_app.root_path: the deploy flattens web/ into the app root,
+# so anything walking up from the package finds a directory that is not there.
+# That exact mistake once sent both qualifier pages back to live computation.
+def _static_data_path(subdir, filename):
+    return os.path.join(os.path.dirname(__file__), '..', 'static', 'data', subdir, filename)
+
+
+def _load_json(path, default):
+    """Whatever is on disk, or `default` if the build has not produced it yet.
+
+    A report page missing its data is a page that says so, not a 500 -- the
+    precompute job runs between seasons and the site has to stand up in
+    between.
+    """
+    try:
+        with open(path, encoding='utf-8') as handle:
+            return json.load(handle)
+    except Exception:
+        return default
+
+
+def _updated_label():
+    return '%s %d, %d' % (datetime.now().strftime('%B'), datetime.now().day,
+                          datetime.now().year)
+
+
 @main_bp.route('/insights/reports/2026-regional-predictions')
 def regional_predictions_2026_report_page():
-    import os, json
-    from datetime import datetime
     year = 2026
     top_n = 10
-    static_dir = os.path.join(os.path.dirname(__file__), '../static/data/regional_predictions')
-    girls_path = os.path.join(static_dir, f'regional_predictions_{year}_girls.json')
-    boys_path = os.path.join(static_dir, f'regional_predictions_{year}_boys.json')
-    try:
-        with open(girls_path, encoding='utf-8') as f:
-            predictions_girls = json.load(f)
-    except Exception:
-        predictions_girls = []
-    try:
-        with open(boys_path, encoding='utf-8') as f:
-            predictions_boys = json.load(f)
-    except Exception:
-        predictions_boys = []
-    now = datetime.now()
-    updated_label = f"{now.strftime('%B')} {now.day}, {now.year}"
+    predictions_girls = _load_json(_static_data_path(
+        'regional_predictions', f'regional_predictions_{year}_girls.json'), [])
+    predictions_boys = _load_json(_static_data_path(
+        'regional_predictions', f'regional_predictions_{year}_boys.json'), [])
+    updated_label = _updated_label()
 
     girls_unavailable = not any(r.get('rows') for r in predictions_girls)
     boys_unavailable = not any(r.get('rows') for r in predictions_boys)
@@ -117,24 +133,13 @@ def regional_predictions_2026_report_page():
 
 @main_bp.route('/insights/reports/2026-state-predictions')
 def state_predictions_2026_report_page():
-    import os, json
-    from datetime import datetime
     year = 2026
-    static_dir = os.path.join(os.path.dirname(__file__), '../static/data/state_predictions')
-    girls_path = os.path.join(static_dir, f'state_predictions_{year}_girls.json')
-    boys_path = os.path.join(static_dir, f'state_predictions_{year}_boys.json')
-
-    def _load(path):
-        try:
-            with open(path, encoding='utf-8') as f:
-                return json.load(f)
-        except Exception:
-            return {"ready": False, "rows": [], "missing_regionals": [], "regionals_loaded": 0}
-
-    girls = _load(girls_path)
-    boys = _load(boys_path)
-    now = datetime.now()
-    updated_label = f"{now.strftime('%B')} {now.day}, {now.year}"
+    not_built = {"ready": False, "rows": [], "missing_regionals": [], "regionals_loaded": 0}
+    girls = _load_json(_static_data_path(
+        'state_predictions', f'state_predictions_{year}_girls.json'), dict(not_built))
+    boys = _load_json(_static_data_path(
+        'state_predictions', f'state_predictions_{year}_boys.json'), dict(not_built))
+    updated_label = _updated_label()
 
     girls_unavailable = not girls.get('ready') or not girls.get('rows')
     boys_unavailable = not boys.get('ready') or not boys.get('rows')
