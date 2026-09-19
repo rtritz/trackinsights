@@ -14,7 +14,7 @@ import importlib
 import pkgutil
 
 from app import queries
-from app.queries import shared
+from app.queries import cache
 
 
 def _cached_functions():
@@ -52,7 +52,7 @@ def test_clearing_reaches_every_module(app):
     the test exercises what a request would actually populate.
     """
     with app.app_context():
-        shared._clear_query_caches()
+        cache._clear_query_caches()
 
         # Warm whatever a dashboard build touches -- that spans several modules.
         queries.get_school_season_core(1, gender='Boys', season='2024')
@@ -66,7 +66,7 @@ def test_clearing_reaches_every_module(app):
             'Warm a broader path.' % {mod for mod, _ in warm}
         )
 
-        shared._clear_query_caches()
+        cache._clear_query_caches()
 
         still_full = [(mod, name) for mod, name, fn in _cached_functions()
                       if fn.cache_info().currsize > 0]
@@ -82,10 +82,10 @@ def test_keep_argument_spares_named_caches(app):
         queries.get_school_season_core(1, gender='Boys', season='2024')
         assert queries.get_school_season_core.cache_info().currsize > 0
 
-        shared._clear_query_caches(keep=('get_school_season_core',))
+        cache._clear_query_caches(keep=('get_school_season_core',))
         assert queries.get_school_season_core.cache_info().currsize > 0
 
-        shared._clear_query_caches()
+        cache._clear_query_caches()
         assert queries.get_school_season_core.cache_info().currsize == 0
 
 

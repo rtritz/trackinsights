@@ -20,16 +20,20 @@ from .shared import (  # noqa: F401  -- shared setup and constants
 )
 
 from .shared import (
-    _compute_cohort_ranking,
-    _compute_rank_for_event,
-    _get_field_size,
     _is_lower_better,
-    _normalize_name_text,
-    _normalize_performance_input,
     _school_logo_url,
     _select_best_result_entry,
     _select_preferred_result,
+)
+from .ranking import (
+    _compute_cohort_ranking,
+    _compute_rank_for_event,
+    _get_field_size,
+    _normalize_performance_input,
     estimate_event_rank,
+)
+from .search_scoring import (
+    _normalize_name_text,
 )
 
 from .meets import (

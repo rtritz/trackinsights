@@ -24,10 +24,12 @@ from .shared import (  # noqa: F401  -- shared setup and constants
 
 from .shared import (
     _coerce_sequence,
-    _format_result_display,
     _is_lower_better,
     _tuple_or_none,
     _unique_events,
+)
+from .formatting import (
+    _format_result_display,
 )
 
 from .meets import (

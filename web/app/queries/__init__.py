@@ -31,13 +31,15 @@ when something outside the package genuinely imports it from the package.
 """
 
 from .shared import (  # noqa: F401
-    _clear_query_caches,
     _covered_rank_seasons,
     _get_event_types_map,
     _schools_with_logos,
-    ensure_fresh_queries,
     get_state_standard_display,
     meets_state_standard,
+)
+from .cache import (  # noqa: F401
+    _clear_query_caches,
+    ensure_fresh_queries,
 )
 
 from .qualifiers import (  # noqa: F401
