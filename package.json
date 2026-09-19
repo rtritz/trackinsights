@@ -8,7 +8,9 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build:css": "tailwindcss -i ./web/app/static/css/input.css -o ./web/app/static/css/output.css --minify",
+    "watch:css": "tailwindcss -i ./web/app/static/css/input.css -o ./web/app/static/css/output.css --watch",
+    "test": "python -m pytest tests -q"
   },
   "repository": {
     "type": "git",

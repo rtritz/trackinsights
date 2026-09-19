@@ -4,11 +4,11 @@ Regional Predictions
 Projects regional team scores by combining final-round sectional results
 from the four sectionals that feed each regional.
 
-This mirrors the scoring logic in ``projected_team_scores.py`` (including
-its fractional tie-splitting -- see ``_score_event`` below) but reads
-directly from Track.db without joining on ``school_enrollment``, so it
-produces predictions even before the current-year enrollment rows have
-been loaded.
+Scoring, including the fractional tie-splitting, is ``_score_event`` below.
+It matches the rule used for real results in
+``app/queries/meets.py::_compute_cumulative_points``. Unlike that path this
+one reads Track.db directly and does not join ``school_enrollment``, so it
+produces predictions before the current-year enrollment rows are loaded.
 """
 
 import sqlite3
