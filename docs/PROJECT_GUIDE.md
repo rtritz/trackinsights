@@ -288,25 +288,46 @@ inside `web/` is copied up to the top, so `~/mysite/` holds `app/`, `config.py`,
 `wsgi.py` and `data/` directly, with `common/` beside them.
 
 ```bash
-set -euo pipefail          # a failed cd must not let the rm run somewhere else
+#!/bin/bash
+set -euo pipefail
 
-cd ~/mysite
-rm -rf ./*
-git clone --depth 1 https://github.com/<user>/trackinsights.git ~/trackinsights-temp
-cp -r ~/trackinsights-temp/web/. ~/mysite/
-cp -r ~/trackinsights-temp/common ~/mysite/
-rm -rf ~/trackinsights-temp
+REPO=https://github.com/<user>/trackinsights.git
+TEMP=~/trackinsights-temp
+SITE=~/mysite
+WSGI=/var/www/<your>_wsgi.py
 
-cd ~/mysite
+# Clones the default branch. Add -b <branch> to deploy a feature branch.
+
+# Fetch first, so the live site is untouched until we have a good copy. A
+# network failure or a leftover temp directory would otherwise leave ~/mysite
+# wiped and the deploy half done.
+rm -rf "$TEMP"
+git clone --depth 1 "$REPO" "$TEMP"
+
+test -f "$TEMP/web/wsgi.py"       || { echo "clone has no web/wsgi.py -- aborting"; exit 1; }
+test -f "$TEMP/web/data/Track.db" || { echo "clone has no Track.db -- aborting";    exit 1; }
+
+cd "$SITE"
+# Dotfiles too: a stale .git from an older deploy sat here invisibly and grew
+# to 203MB, because `rm -rf ./*` never matched it. Safe only because nothing
+# in ~/mysite is hand-maintained -- SECRET_KEY comes from the environment.
+find . -mindepth 1 -delete
+
+cp -r "$TEMP/web/." "$SITE/"
+cp -r "$TEMP/common" "$SITE/"
+rm -rf "$TEMP"
+
 set +e
 python -m app.jobs.build_all --check
 case $? in
   0) echo "Precomputed data is current." ;;
-  1) echo "WARNING: data is STALE -- rebuild locally, commit, redeploy." ;;
+  1) echo "WARNING: precomputed data is STALE -- rebuild locally, commit, redeploy." ;;
   2) echo "WARNING: precomputed data was never built." ;;
-  *) echo "ERROR: the check itself failed -- see the output above." ;;
+  *) echo "ERROR: the freshness check itself failed -- see the output above." ;;
 esac
 set -e
+
+touch "$WSGI"   && echo "Deployment complete and web app reloaded."   || echo "Deployed, but the reload failed -- reload from the dashboard."
 ```
 
 Then reload the web app from the PythonAnywhere dashboard.
