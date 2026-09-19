@@ -7,6 +7,33 @@ import pandas as pd
 from .conversion import Conversion
 
 
+# The two whole-table reads the percentile analysis needs. Module constants
+# rather than strings inside the methods, because the web app runs the same
+# SQL through Flask-SQLAlchemy's connection instead of opening a second handle
+# to the same file -- one copy of each query, two ways to execute it.
+ALL_ATHLETE_RESULTS_SQL = """
+select athlete_result.athlete_id, first, last, athlete.gender, event, result_type,
+       grade, result, result2, place, school_name, enrollment, school_type, nickname,
+       host, meet_type, meet_num, meet.year, school.school_id, longitude, latitude
+from athlete_result
+inner join athlete on athlete_result.athlete_id = athlete.athlete_id
+inner join school on athlete.school_id = school.school_id
+inner join meet on meet.meet_id = athlete_result.meet_id
+inner join school_enrollment on athlete.school_id = school_enrollment.school_id
+                            and meet.year = school_enrollment.year
+"""
+
+ALL_RELAY_RESULTS_SQL = """
+select school.school_id, event, result, result2, place, athlete_names, school_name,
+       team_name, school_type, host, meet_type, meet_num, gender, enrollment, meet.year
+from relay_result
+inner join school on relay_result.school_id = school.school_id
+inner join meet on meet.meet_id = relay_result.meet_id
+inner join school_enrollment on relay_result.school_id = school_enrollment.school_id
+                            and meet.year = school_enrollment.year
+"""
+
+
 class Database:
 	def __init__(self, db_path):
 		self.db_path = db_path
@@ -114,15 +141,7 @@ class Database:
 			return None
 
 	def get_all_athlete_results(self):
-		query = "select athlete_result.athlete_id, first, last, athlete.gender, event, result_type, grade, result, result2, place, school_name, enrollment, \
-		school_type, nickname, host, meet_type, meet_num, meet.year, school.school_id, longitude, latitude \
-		from athlete_result \
-		inner join athlete on athlete_result.athlete_id = athlete.athlete_id \
-		inner join school on athlete.school_id = school.school_id \
-		inner join meet on meet.meet_id = athlete_result.meet_id \
-		inner join school_enrollment on athlete.school_id = school_enrollment.school_id and meet.year = school_enrollment.year"
-		df = pd.read_sql_query(query, self.conn)
-		return df
+		return pd.read_sql_query(ALL_ATHLETE_RESULTS_SQL, self.conn)
 
 	def get_athlete_result(self, athlete_id, meet_id, event, result_type):
 		query = "select * from athlete_result where athlete_id = ? and meet_id = ? and event = ? and result_type = ?"
@@ -135,15 +154,7 @@ class Database:
 			return int(df.iloc[0,0])
 
 	def get_all_relay_results(self):
-		query = "select school.school_id, event, result, result2, place, athlete_names, school_name, team_name, \
-		school_type, host, meet_type, meet_num, gender, enrollment, meet.year \
-		from relay_result \
-		inner join school on relay_result.school_id = school.school_id \
-		inner join meet on meet.meet_id = relay_result.meet_id \
-		inner join school_enrollment on relay_result.school_id = school_enrollment.school_id \
-		and meet.year = school_enrollment.year"
-		df = pd.read_sql_query(query, self.conn)
-		return df
+		return pd.read_sql_query(ALL_RELAY_RESULTS_SQL, self.conn)
 
 	def get_relay_result(self, school_id, meet_id, event):
 		query = "select * from relay_result where school_id = ? and meet_id = ? and event = ?"
