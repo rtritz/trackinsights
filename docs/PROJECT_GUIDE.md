@@ -321,9 +321,26 @@ Three things in that script are there for a reason:
 - **The module is `app.jobs.build_all`**, not `backend.jobs.build_all`. The
   deploy copies `web/`'s contents up, so the package sits at `~/mysite/app/`.
 
-**Install only the web extra on the server:** `pip install -e ".[web]"`. The
-`standalone` and `dev` extras pull jupyter, matplotlib and Pillow -- around
-300 MB that never runs on the site, and enough to crowd a 1 GB quota.
+**The server needs three packages and nothing else:**
+
+```bash
+pip install Flask Flask-SQLAlchemy pandas
+```
+
+No `pip install -e .` here -- `pyproject.toml` is at the repo root and the
+deploy does not copy it, so there is no project for pip to install. `common/`
+needs no install either: it lands beside `wsgi.py` in `~/mysite`, which is
+already on `sys.path`.
+
+Those three are the `[web]` extra plus the base dependency in
+`pyproject.toml`; keep them in step by hand, or copy `pyproject.toml` across
+in the deploy and use `pip install ".[web]"` instead.
+
+Do **not** install the `standalone` or `dev` extras there. They pull jupyter,
+matplotlib, Pillow and reportlab -- roughly 300 MB that never runs on the
+site, and enough to crowd a 1 GB quota. Note that installing the lean set
+does not remove them: pip never prunes, so an environment that already has
+them has to be rebuilt to get the space back.
 
 **The WSGI configuration file** (edited on PythonAnywhere, not in this repo)
 needs one line pointing at the entry point:
