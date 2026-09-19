@@ -37,11 +37,11 @@ from .meets import (
     _format_points_value,
     _resolve_postseason_relay_rows,
     _score_h2h_meet,
-    _v4_stage_cells,
+    _stage_cells,
 )
 from .qualifiers import (
     _format_school_qualifier_row,
-    _v4_advancement_from_rows,
+    _advancement_from_rows,
     get_regional_qualifiers,
     get_state_qualifiers,
 )
@@ -50,13 +50,13 @@ from .percentiles import (
 )
 
 from .school_dashboard import (
-    _school_dashboard_v4_available_years,
+    _available_years,
 )
 
 
 
 @lru_cache(maxsize=64)
-def _school_dashboard_v4_grades(gender: str, year: int):
+def _grades_for_season(gender: str, year: int):
     """Class year (FR/SO/JR/SR) for every athlete with a postseason mark that season.
 
     ``athlete_result.grade`` is populated on 100% of rows, so this is the reliable
@@ -93,7 +93,7 @@ def _school_dashboard_v4_grades(gender: str, year: int):
 # Consumers read the rows without mutating them, and the default argument is a
 # frozenset precisely so the signature stays hashable.
 @lru_cache(maxsize=2048)
-def _school_dashboard_v4_season_entries(
+def _season_entries(
     school_id: int, gender: str, year: int, exclude_athlete_ids=frozenset(),
     sectional_only: bool = False,
 ):
@@ -158,7 +158,7 @@ def _school_dashboard_v4_season_entries(
 # Caching the entries below was only half the fix: without this, every request
 # still re-scored the dual meet against each prior season from warm data.
 @lru_cache(maxsize=2048)
-def get_school_dashboard_v4_season_h2h(school_id: int, gender: str, year):
+def get_season_h2h(school_id: int, gender: str, year):
     """This season scored as a dual meet against the one before it.
 
     Only the immediately prior season is scored. Earlier ones were computed to
@@ -172,7 +172,7 @@ def get_school_dashboard_v4_season_h2h(school_id: int, gender: str, year):
         return {"available": False, "seasons": []}
 
     current_year = int(year)
-    available = _school_dashboard_v4_available_years(school_id, gender)
+    available = _available_years(school_id, gender)
     prior_years = sorted((item for item in available if item < current_year), reverse=True)
     if not prior_years:
         return {
@@ -183,11 +183,11 @@ def get_school_dashboard_v4_season_h2h(school_id: int, gender: str, year):
 
     # Both seasons on the sectional, so neither is scored on more attempts than
     # the other simply because it advanced further.
-    current_entries = _school_dashboard_v4_season_entries(
+    current_entries = _season_entries(
         school_id, gender, current_year, sectional_only=True)
     seasons = []
     for prior_year in prior_years[:1]:
-        prior_entries = _school_dashboard_v4_season_entries(
+        prior_entries = _season_entries(
             school_id, gender, prior_year, sectional_only=True)
         scored = _score_h2h_meet(current_entries, prior_entries)
         if scored["points_for"] > scored["points_against"]:
@@ -200,7 +200,7 @@ def get_school_dashboard_v4_season_h2h(school_id: int, gender: str, year):
 
     return {"available": True, "year": current_year, "gender": gender, "seasons": seasons}
 
-def _school_dashboard_v4_returning_points(school_id: int, gender: str, year: int):
+def _returning_points(school_id: int, gender: str, year: int):
     """Sectional points, split by whether the athlete who scored them returns.
 
     Points are the currency a coach actually plans in, so "83% of our scoring is
@@ -216,7 +216,7 @@ def _school_dashboard_v4_returning_points(school_id: int, gender: str, year: int
       class year at all. Counting them would put a number over a denominator that
       silently excludes them; leaving them out and saying so is honest.
     """
-    grades = _school_dashboard_v4_grades(gender, year)
+    grades = _grades_for_season(gender, year)
 
     rows = (
         db.session.query(
@@ -262,7 +262,7 @@ def _school_dashboard_v4_returning_points(school_id: int, gender: str, year: int
         ),
     }
 
-def get_school_dashboard_v4_returning(school_id: int, gender: str, year):
+def get_returning_athletes(school_id: int, gender: str, year):
     """What the program keeps and loses to graduation, and what the core is worth.
 
     The season head-to-head answers "are we better than last year" looking back.
@@ -275,17 +275,17 @@ def get_school_dashboard_v4_returning(school_id: int, gender: str, year):
         return {"available": False, "reason": "Pick a single season to see what returns."}
 
     current_year = int(year)
-    grades = _school_dashboard_v4_grades(gender, current_year)
+    grades = _grades_for_season(gender, current_year)
     # The points below are sectional-only, so the roster they are attributed to is
     # chosen on the same stage. Picking slots from all-rounds bests would count
     # athletes the points figure never saw.
-    entries = _school_dashboard_v4_season_entries(
+    entries = _season_entries(
         school_id, gender, current_year, sectional_only=True)
     if not entries:
         return {"available": False, "reason": "No valid postseason marks in this season."}
 
     # Individual slots only. A relay leg is not attributable to an athlete in
-    # this data (see _school_dashboard_v4_returning_points), so a relay cannot
+    # this data (see _returning_points), so a relay cannot
     # say who graduates.
     #
     # This used to build a per-athlete graduating list -- names, marks and
@@ -313,7 +313,7 @@ def get_school_dashboard_v4_returning(school_id: int, gender: str, year):
     # What share of the season's scoring comes back -- the one number a coach
     # plans against. Replaces the slot and event-best counts, which measured
     # proxies for it.
-    points = _school_dashboard_v4_returning_points(school_id, gender, current_year)
+    points = _returning_points(school_id, gender, current_year)
 
     return {
         "available": True,

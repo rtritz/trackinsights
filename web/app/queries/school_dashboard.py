@@ -42,11 +42,11 @@ from .meets import (
     _format_points_value,
     _resolve_postseason_relay_rows,
     _score_h2h_meet,
-    _v4_stage_cells,
+    _stage_cells,
 )
 from .qualifiers import (
     _format_school_qualifier_row,
-    _v4_advancement_from_rows,
+    _advancement_from_rows,
     get_regional_qualifiers,
     get_state_qualifiers,
 )
@@ -104,7 +104,7 @@ def get_school_dashboard_data(school_id: int):
         "relay_years": relay_years,
     }
 
-def _school_dashboard_v4_event_groups(gender: str) -> List[Tuple[str, List[str]]]:
+def _event_groups(gender: str) -> List[Tuple[str, List[str]]]:
     hurdles = (
         list(getattr(CONST.EVENT, "ALL_GIRLS_HURDLES", []))
         if gender == CONST.GENDER.GIRLS
@@ -119,13 +119,13 @@ def _school_dashboard_v4_event_groups(gender: str) -> List[Tuple[str, List[str]]
         ("Relays", list(getattr(CONST.EVENT, "ALL_RELAY", []))),
     ]
 
-def _school_dashboard_v4_events_for_gender(gender: str) -> List[str]:
+def _events_for_gender(gender: str) -> List[str]:
     events = []
-    for _, group_events in _school_dashboard_v4_event_groups(gender):
+    for _, group_events in _event_groups(gender):
         events.extend(group_events)
     return events
 
-def _school_dashboard_v4_available_years(school_id: int, gender: str) -> List[int]:
+def _available_years(school_id: int, gender: str) -> List[int]:
     individual_years = (
         db.session.query(Meet.year)
         .join(AthleteResult, AthleteResult.meet_id == Meet.meet_id)
@@ -162,7 +162,7 @@ def _school_dashboard_v4_available_years(school_id: int, gender: str) -> List[in
         reverse=True,
     )
 
-def _school_dashboard_v4_covered_years(gender: str) -> List[int]:
+def _covered_years(gender: str) -> List[int]:
     """Every postseason year the database covers for this gender, ascending.
 
     This is the full axis the season picker draws. A school's own available
@@ -183,7 +183,7 @@ def _school_dashboard_v4_covered_years(gender: str) -> List[int]:
     )
     return sorted({int(row.year) for row in rows if getattr(row, "year", None) is not None})
 
-def _default_school_dashboard_v4_season(gender: str, school_years: List[int]) -> Optional[int]:
+def _default_season(gender: str, school_years: List[int]) -> Optional[int]:
     if school_years:
         latest_school_year = max(school_years)
     else:
@@ -205,7 +205,7 @@ def _default_school_dashboard_v4_season(gender: str, school_years: List[int]) ->
         return latest_completed
     return min(latest_completed, latest_school_year)
 
-def _get_school_dashboard_v4_scope(
+def _get_season_scope(
     school_id: int,
     gender: Optional[str] = None,
     season: Optional[str] = None,
@@ -222,12 +222,12 @@ def _get_school_dashboard_v4_scope(
     if clean_gender not in CONST.GENDER.ALL:
         raise ValueError("gender must be Boys or Girls")
 
-    available_years = _school_dashboard_v4_available_years(school_id, clean_gender)
+    available_years = _available_years(school_id, clean_gender)
     if not available_years and season not in (None, "", "all-time"):
         raise ValueError("season must be All-Time or a covered postseason year for this school")
 
     if season in (None, ""):
-        selected_season = _default_school_dashboard_v4_season(clean_gender, available_years)
+        selected_season = _default_season(clean_gender, available_years)
     elif str(season).strip().lower() == "all-time":
         selected_season = "all-time"
     else:
@@ -243,7 +243,7 @@ def _get_school_dashboard_v4_scope(
 
     return school, clean_gender, selected_season, available_years
 
-def get_school_dashboard_v4_stage_summary(school_id: int, gender: str, year: int):
+def get_stage_summary(school_id: int, gender: str, year: int):
     stage_order = {CONST.MEET_TYPE.SECTIONAL: 1, CONST.MEET_TYPE.REGIONAL: 2, CONST.MEET_TYPE.STATE: 3}
     scoring_cutoffs = {
         CONST.MEET_TYPE.SECTIONAL: 8,
@@ -394,7 +394,7 @@ def _build_school_best_history(gender: str):
     return history
 
 @lru_cache(maxsize=128)
-def get_school_dashboard_v4_qualifiers(school_id: int, gender: str, year: int):
+def get_school_qualifiers(school_id: int, gender: str, year: int):
     if year < MIN_RECORDS_YEAR:
         return {
             "year": year,
@@ -456,8 +456,8 @@ def get_school_dashboard_v4_qualifiers(school_id: int, gender: str, year: int):
 # its keep across a build rather than within one request. Callers treat the
 # payload as read-only, so a shared instance is safe to hand out.
 @lru_cache(maxsize=2048)
-def get_school_dashboard_v4_core(school_id: int, gender: Optional[str] = None, season: Optional[str] = None):
-    scope = _get_school_dashboard_v4_scope(school_id, gender=gender, season=season)
+def get_school_season_core(school_id: int, gender: Optional[str] = None, season: Optional[str] = None):
+    scope = _get_season_scope(school_id, gender=gender, season=season)
     if not scope:
         return None
 
@@ -478,13 +478,13 @@ def get_school_dashboard_v4_core(school_id: int, gender: Optional[str] = None, s
         "filters": {
             "selected_gender": clean_gender,
             "selected_season": selected_season,
-            "default_season": _default_school_dashboard_v4_season(clean_gender, available_years),
+            "default_season": _default_season(clean_gender, available_years),
             "genders": list(CONST.GENDER.ALL),
-            "covered_seasons": _school_dashboard_v4_covered_years(clean_gender),
+            "covered_seasons": _covered_years(clean_gender),
             "seasons": available_years + (["all-time"] if available_years else ["all-time"]),
             "season_labels": {**{str(year_value): str(year_value) for year_value in available_years}, "all-time": "All-Time"},
         },
-        "stage_results": None if selected_year is None else get_school_dashboard_v4_stage_summary(school_id, clean_gender, selected_year),
+        "stage_results": None if selected_year is None else get_stage_summary(school_id, clean_gender, selected_year),
         "all_time_intro": (
             "All-Time mode shows covered postseason program bests only. Stage cards and qualifier lists are hidden because combining advancement stages across seasons is misleading."
             if selected_year is None

@@ -45,11 +45,11 @@ from .meets import (
     _format_points_value,
     _resolve_postseason_relay_rows,
     _score_h2h_meet,
-    _v4_stage_cells,
+    _stage_cells,
 )
 from .qualifiers import (
     _format_school_qualifier_row,
-    _v4_advancement_from_rows,
+    _advancement_from_rows,
     get_regional_qualifiers,
     get_state_qualifiers,
 )
@@ -58,8 +58,8 @@ from .percentiles import (
 )
 
 from .school_dashboard import (
-    _school_dashboard_v4_event_groups,
-    _school_dashboard_v4_events_for_gender,
+    _event_groups,
+    _events_for_gender,
 )
 
 
@@ -73,10 +73,10 @@ def _normalize_rank_to_score(rank: Optional[int], total_marks: int) -> float:
 
 @lru_cache(maxsize=32)
 def _build_statewide_program_rankings(gender: str, year: int):
-    events = _school_dashboard_v4_events_for_gender(gender)
+    events = _events_for_gender(gender)
     relay_events = set(CONST.EVENT.ALL_RELAY)
     event_group_map = {}
-    for group_name, group_events in _school_dashboard_v4_event_groups(gender):
+    for group_name, group_events in _event_groups(gender):
         for event_name in group_events:
             event_group_map[event_name] = group_name
 
@@ -300,13 +300,13 @@ def _build_statewide_program_rankings(gender: str, year: int):
         "year": year,
         "gender": gender,
         "events": events,
-        "group_order": [group_name for group_name, _ in _school_dashboard_v4_event_groups(gender)],
+        "group_order": [group_name for group_name, _ in _event_groups(gender)],
         "leaderboard": leaderboard_rows,
         "by_school": leaderboard_by_school,
     }
 
 @lru_cache(maxsize=32)
-def _school_dashboard_v4_rank_baselines(gender: str, year: int):
+def _rank_baselines(gender: str, year: int):
     """Median composite and per-group scores across every ranked school.
 
     A 0-100 strength score means nothing on its own -- "Relays 54.4" is only
@@ -352,7 +352,7 @@ def _school_dashboard_v4_rank_baselines(gender: str, year: int):
     }
 
 @lru_cache(maxsize=64)
-def _school_dashboard_v4_group_ranks(gender: str, year: int):
+def _group_ranks(gender: str, year: int):
     """Rank every school within each event group.
 
     Group *scores* are not comparable across groups -- their medians run from 24.9
@@ -382,7 +382,7 @@ def _school_dashboard_v4_group_ranks(gender: str, year: int):
             ranks[(group_name, school_id)] = (rank, total)
     return ranks
 
-def _school_dashboard_v4_group_standings(school_id: int, gender: str, year: int):
+def _group_standings(school_id: int, gender: str, year: int):
     """One entry per group: rank in the selected season and the events it covers.
 
     Only the selected season is resolved. Walking every season here to draw a trend
@@ -392,9 +392,9 @@ def _school_dashboard_v4_group_standings(school_id: int, gender: str, year: int)
     The events list is what lets the strip act as a filter over the event table
     rather than opening a third level of drill-down.
     """
-    current = _school_dashboard_v4_group_ranks(gender, year)
+    current = _group_ranks(gender, year)
     standings = []
-    for group_name, group_events in _school_dashboard_v4_event_groups(gender):
+    for group_name, group_events in _event_groups(gender):
         here = current.get((group_name, school_id))
         standings.append(
             {
@@ -406,7 +406,7 @@ def _school_dashboard_v4_group_standings(school_id: int, gender: str, year: int)
         )
     return standings
 
-def _school_dashboard_v4_slots_filled(school_id: int, gender: str, year: int):
+def _slots_filled(school_id: int, gender: str, year: int):
     """How many entry slots held a ranked mark, for one school in one season.
 
     Same basis as the figure the Entries box shows, so the two can be subtracted.
@@ -426,7 +426,7 @@ def _school_dashboard_v4_slots_filled(school_id: int, gender: str, year: int):
         if slot.get("statewide_rank")
     )
 
-def get_school_dashboard_v4_program_rank(school_id: int, gender: str, year: int):
+def get_program_rank(school_id: int, gender: str, year: int):
     """Statewide standing for one program.
 
     Deliberately standalone rather than a wrapper around the v2 function. v2 also
@@ -439,7 +439,7 @@ def get_school_dashboard_v4_program_rank(school_id: int, gender: str, year: int)
     strip ranks schools within each group instead, which is comparable.
     """
     state = _build_statewide_program_rankings(gender, year)
-    baselines = _school_dashboard_v4_rank_baselines(gender, year)
+    baselines = _rank_baselines(gender, year)
     school_row = state["by_school"].get(school_id)
 
     info_text = (
@@ -465,7 +465,7 @@ def get_school_dashboard_v4_program_rank(school_id: int, gender: str, year: int)
             "score_distribution": baselines["quartiles"],
             "prior_rank": None,
             "rank_movement": None,
-            "group_standings": _school_dashboard_v4_group_standings(school_id, gender, year),
+            "group_standings": _group_standings(school_id, gender, year),
             "info_text": info_text,
         }
 
@@ -544,7 +544,7 @@ def get_school_dashboard_v4_program_rank(school_id: int, gender: str, year: int)
             # The same count a season earlier, so the box can say which way it
             # moved. None when there is no prior season on record, which is not
             # the same as no change.
-            "prior_filled": _school_dashboard_v4_slots_filled(school_id, gender, year - 1),
+            "prior_filled": _slots_filled(school_id, gender, year - 1),
             "prior_season": year - 1 if year - 1 >= MIN_RECORDS_YEAR else None,
         },
         "state_median_composite": baselines["composite"],
@@ -552,6 +552,6 @@ def get_school_dashboard_v4_program_rank(school_id: int, gender: str, year: int)
         "prior_rank": prior,
         "rank_history": history,
         "rank_movement": prior["rank"] - school_row["rank"] if prior else None,
-        "group_standings": _school_dashboard_v4_group_standings(school_id, gender, year),
+        "group_standings": _group_standings(school_id, gender, year),
         "info_text": info_text,
     }

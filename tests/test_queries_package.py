@@ -55,8 +55,8 @@ def test_clearing_reaches_every_module(app):
         shared._clear_query_caches()
 
         # Warm whatever a dashboard build touches -- that spans several modules.
-        queries.get_school_dashboard_v4_core(1, gender='Boys', season='2024')
-        queries.get_school_dashboard_v4_athlete_scorecard(1, 'Boys', '2024')
+        queries.get_school_season_core(1, gender='Boys', season='2024')
+        queries.get_athlete_scorecard(1, 'Boys', '2024')
 
         warm = [(mod, name) for mod, name, fn in _cached_functions()
                 if fn.cache_info().currsize > 0]
@@ -79,14 +79,14 @@ def test_clearing_reaches_every_module(app):
 def test_keep_argument_spares_named_caches(app):
     """`keep` is how a caller protects a cache it is mid-way through using."""
     with app.app_context():
-        queries.get_school_dashboard_v4_core(1, gender='Boys', season='2024')
-        assert queries.get_school_dashboard_v4_core.cache_info().currsize > 0
+        queries.get_school_season_core(1, gender='Boys', season='2024')
+        assert queries.get_school_season_core.cache_info().currsize > 0
 
-        shared._clear_query_caches(keep=('get_school_dashboard_v4_core',))
-        assert queries.get_school_dashboard_v4_core.cache_info().currsize > 0
+        shared._clear_query_caches(keep=('get_school_season_core',))
+        assert queries.get_school_season_core.cache_info().currsize > 0
 
         shared._clear_query_caches()
-        assert queries.get_school_dashboard_v4_core.cache_info().currsize == 0
+        assert queries.get_school_season_core.cache_info().currsize == 0
 
 
 def test_every_public_name_is_reachable_from_the_package():
@@ -97,11 +97,11 @@ def test_every_public_name_is_reachable_from_the_package():
     production rather than here.
     """
     used_by_the_app = [
-        'get_school_dashboard_v4_core',
-        'get_school_dashboard_v4_athlete_scorecard',
-        'get_school_dashboard_v4_program_rank',
-        'get_school_dashboard_v4_returning',
-        'get_school_dashboard_v4_season_h2h',
+        'get_school_season_core',
+        'get_athlete_scorecard',
+        'get_program_rank',
+        'get_returning_athletes',
+        'get_season_h2h',
         'get_school_dashboard_data',
         'get_athlete_dashboard_data',
         'search_bar',

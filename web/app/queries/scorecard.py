@@ -15,7 +15,7 @@ from .shared import (  # noqa: F401  -- shared setup and constants
     Meet,
     RelayResult,
     Tuple,
-    _V3_STAGE_ORDER,
+    _STAGE_ORDER,
     db,
     lru_cache,
 )
@@ -38,11 +38,11 @@ from .meets import (
     _format_points_value,
     _resolve_postseason_relay_rows,
     _score_h2h_meet,
-    _v4_stage_cells,
+    _stage_cells,
 )
 from .qualifiers import (
     _format_school_qualifier_row,
-    _v4_advancement_from_rows,
+    _advancement_from_rows,
     get_regional_qualifiers,
     get_state_qualifiers,
 )
@@ -51,18 +51,18 @@ from .percentiles import (
 )
 
 from .school_dashboard import (
-    _school_dashboard_v4_event_groups,
-    _school_dashboard_v4_events_for_gender,
+    _event_groups,
+    _events_for_gender,
 )
 
 from .outlook import (
-    _school_dashboard_v4_grades,
+    _grades_for_season,
 )
 
 
 
 @lru_cache(maxsize=16)
-def _school_dashboard_v4_event_ranked_rows(gender: str, year: int):
+def _event_ranked_rows(gender: str, year: int):
     """Every postseason mark in the state, ranked within its event, rows kept.
 
     Athlete rows are ranked against other athletes (roughly 669 marks in the Boys
@@ -72,7 +72,7 @@ def _school_dashboard_v4_event_ranked_rows(gender: str, year: int):
     One best mark per athlete per event, so an athlete who ran the same event at
     sectional, regional and state appears once at their fastest.
 
-    The ranking used to happen inside _school_dashboard_v4_event_mark_ranks, which
+    The ranking used to happen inside _event_mark_ranks, which
     kept only the (rank, total) pair and discarded the ranked rows. The event
     drill-down needs the rows, so the work is done once here and both callers read
     from the same result.
@@ -100,17 +100,17 @@ def _school_dashboard_v4_event_ranked_rows(gender: str, year: int):
     }
 
 @lru_cache(maxsize=32)
-def _school_dashboard_v4_event_mark_ranks(gender: str, year: int):
+def _event_mark_ranks(gender: str, year: int):
     """(athlete, event) -> (rank, total), off the ranked rows above."""
     ranks: Dict[Tuple[int, str], Tuple[int, int]] = {}
-    for event_name, rows in _school_dashboard_v4_event_ranked_rows(gender, year).items():
+    for event_name, rows in _event_ranked_rows(gender, year).items():
         total = len(rows)
         for row in rows:
             ranks[(row["athlete_id"], event_name)] = (row["rank"], total)
     return ranks
 
 @lru_cache(maxsize=16)
-def _school_dashboard_v4_relay_ranked_rows(gender: str, year: int):
+def _relay_ranked_rows(gender: str, year: int):
     """Relay bests ranked within their event, rows kept. One entry per school."""
     best: Dict[Tuple[int, str], Dict[str, Any]] = {}
     for row in _resolve_postseason_relay_rows(gender=gender, year=year):
@@ -131,17 +131,17 @@ def _school_dashboard_v4_relay_ranked_rows(gender: str, year: int):
     }
 
 @lru_cache(maxsize=32)
-def _school_dashboard_v4_relay_mark_ranks(gender: str, year: int):
+def _relay_mark_ranks(gender: str, year: int):
     """(school, event) -> (rank, total), off the ranked relay rows above."""
     ranks: Dict[Tuple[int, str], Tuple[int, int]] = {}
-    for event_name, rows in _school_dashboard_v4_relay_ranked_rows(gender, year).items():
+    for event_name, rows in _relay_ranked_rows(gender, year).items():
         total = len(rows)
         for row in rows:
             ranks[(row["school_id"], event_name)] = (row["rank"], total)
     return ranks
 
 @lru_cache(maxsize=64)
-def _school_dashboard_v4_advancement(gender: str, year: int):
+def _individual_advancement(gender: str, year: int):
     """Per (athlete, event): where the season ended, and the mark needed to go on."""
     rows = []
     query = (
@@ -181,13 +181,13 @@ def _school_dashboard_v4_advancement(gender: str, year: int):
         })
 
     next_stage_pairs = {}
-    for stage in _V3_STAGE_ORDER[1:]:
+    for stage in _STAGE_ORDER[1:]:
         next_stage_pairs[stage] = {
             (item["athlete_id"], item["event"])
             for item in rows if item["meet_type"] == stage
         }
 
-    return _v4_advancement_from_rows(
+    return _advancement_from_rows(
         rows,
         next_stage_pairs,
         pair_of=lambda item: (item["athlete_id"], item["event"]),
@@ -195,7 +195,7 @@ def _school_dashboard_v4_advancement(gender: str, year: int):
     )
 
 @lru_cache(maxsize=64)
-def _school_dashboard_v4_relay_advancement(gender: str, year: int):
+def _relay_advancement(gender: str, year: int):
     """The same, keyed by school and relay -- relays live in relay_result."""
     rows = []
     query = (
@@ -233,20 +233,20 @@ def _school_dashboard_v4_relay_advancement(gender: str, year: int):
         })
 
     next_stage_pairs = {}
-    for stage in _V3_STAGE_ORDER[1:]:
+    for stage in _STAGE_ORDER[1:]:
         next_stage_pairs[stage] = {
             (item["school_id"], item["event"])
             for item in rows if item["meet_type"] == stage
         }
 
-    return _v4_advancement_from_rows(
+    return _advancement_from_rows(
         rows,
         next_stage_pairs,
         pair_of=lambda item: (item["school_id"], item["event"]),
         lower_is_better_of=lambda _item: True,
     )
 
-def get_school_dashboard_v4_athlete_scorecard(school_id: int, gender: str, season):
+def get_athlete_scorecard(school_id: int, gender: str, season):
     """One row per athlete who competed in the postseason, plus their best mark.
 
     Rows are per athlete rather than per event because a coach reads this to see
@@ -259,17 +259,17 @@ def get_school_dashboard_v4_athlete_scorecard(school_id: int, gender: str, seaso
     else:
         year = int(season)
 
-    events = _school_dashboard_v4_events_for_gender(gender)
+    events = _events_for_gender(gender)
     event_group_map = {}
-    for group_name, group_events in _school_dashboard_v4_event_groups(gender):
+    for group_name, group_events in _event_groups(gender):
         for event_name in group_events:
             event_group_map[event_name] = group_name
 
-    mark_ranks = _school_dashboard_v4_event_mark_ranks(gender, year) if year else {}
-    relay_ranks = _school_dashboard_v4_relay_mark_ranks(gender, year) if year else {}
-    grades = _school_dashboard_v4_grades(gender, year) if year else {}
-    advancement = _school_dashboard_v4_advancement(gender, year) if year else {}
-    relay_advancement = _school_dashboard_v4_relay_advancement(gender, year) if year else {}
+    mark_ranks = _event_mark_ranks(gender, year) if year else {}
+    relay_ranks = _relay_mark_ranks(gender, year) if year else {}
+    grades = _grades_for_season(gender, year) if year else {}
+    advancement = _individual_advancement(gender, year) if year else {}
+    relay_advancement = _relay_advancement(gender, year) if year else {}
 
     # All-Time is a records board, not a season card: there is no statewide rank to
     # sort by, so order by the mark itself and keep the top three per event. Seven
@@ -288,7 +288,7 @@ def get_school_dashboard_v4_athlete_scorecard(school_id: int, gender: str, seaso
     for (athlete_id, event_name), athlete_rows in grouped.items():
         event_type = athlete_rows[0]["event_type"]
         lower_is_better = _is_lower_better(event_type)
-        cells, best_stage, best_value = _v4_stage_cells(athlete_rows, lower_is_better, event_type)
+        cells, best_stage, best_value = _stage_cells(athlete_rows, lower_is_better, event_type)
         if not cells:
             continue
         rank = mark_ranks.get((athlete_id, event_name))
@@ -343,7 +343,7 @@ def get_school_dashboard_v4_athlete_scorecard(school_id: int, gender: str, seaso
             groups = [relay_rows]
 
         for group_rows in groups:
-            cells, best_stage, best_value = _v4_stage_cells(
+            cells, best_stage, best_value = _stage_cells(
                 group_rows, True, CONST.EVENT_TYPE.TRACK
             )
             if not cells:
@@ -438,7 +438,7 @@ def get_school_dashboard_v4_athlete_scorecard(school_id: int, gender: str, seaso
     # Only offer a stage column the school actually reached. A State column is dead
     # space for 58% of schools, and its presence is itself worth something.
     stages_present = [
-        stage for stage in _V3_STAGE_ORDER
+        stage for stage in _STAGE_ORDER
         if any(stage in (row.get("stages") or {}) for row in rows)
     ]
 

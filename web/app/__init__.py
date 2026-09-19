@@ -35,20 +35,30 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
 
     db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+    auto_create = app.config.get('AUTO_CREATE_SCHEMA', False)
+
     if db_uri.startswith('sqlite:///'):
         db_path = db_uri.replace('sqlite:///', '', 1)
-        db_dir = os.path.dirname(db_path)
-        if db_dir and not os.path.exists(db_dir):
-            os.makedirs(db_dir, exist_ok=True)
-        if db_path and not os.path.exists(db_path):
-            open(db_path, 'a').close()
+        if auto_create:
+            db_dir = os.path.dirname(db_path)
+            if db_dir and not os.path.exists(db_dir):
+                os.makedirs(db_dir, exist_ok=True)
+            if db_path and not os.path.exists(db_path):
+                open(db_path, 'a').close()
+        elif db_path and not os.path.exists(db_path):
+            # Loudly, rather than serving a site with nothing on it. Creating
+            # the file here would turn "the deploy did not copy Track.db" into
+            # a working site whose every page is empty -- which looks like a
+            # data problem and is really a deployment one.
+            raise RuntimeError(
+                'Track database not found at %s. On a deployed site this means '
+                'the deploy did not copy web/data/Track.db.' % db_path)
 
-    # Initialize database
     db.init_app(app)
 
-    # Auto-create tables for fresh or empty SQLite databases so new environments
-    # don't crash when queries run before migrations are applied.
-    if db_uri.startswith('sqlite:///'):
+    # Only where something is expected to build its own schema -- the test
+    # fixtures. A deployed site reads a database that already exists.
+    if auto_create and db_uri.startswith('sqlite:///'):
         with app.app_context():
             db.create_all()
 
@@ -113,9 +123,11 @@ def create_app(config_class=Config):
         except Exception:
             app.logger.exception('database freshness check failed')
 
-    #*************RTRA
-    from .flask_server_timing import init_timing
-    init_timing(app, db=db)
-    #*************RTRA
+    # Per-request timing and a slow-query log. Diagnostic instrumentation --
+    # it listens to every query -- so it is registered only when asked for,
+    # with SERVER_TIMING=1. It is what identified the 153-query page.
+    if app.config.get('SERVER_TIMING'):
+        from .flask_server_timing import init_timing
+        init_timing(app, db=db)
 
     return app
