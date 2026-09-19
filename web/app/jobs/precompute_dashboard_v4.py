@@ -60,7 +60,7 @@ def main(limit=None):
                 built = 0
                 for school_id in school_ids:
                     try:
-                        payload = svc.build_payload(school_id, gender, season, queries)
+                        payload = svc.build_payload(school_id, gender, season)
                     except ValueError:
                         # Not a season this school competed in.
                         continue
@@ -74,7 +74,7 @@ def main(limit=None):
                 # The lists behind the rank figures: one set per gender/season,
                 # not per school. Built here because the statewide tables are
                 # already warm from the payloads above.
-                for event, payload in svc.build_rankings(gender, season, queries):
+                for event, payload in svc.build_rankings(gender, season):
                     ranking_rows.append((gender, season, event, svc._encode(payload)))
                 print('  %-5s %-8s %4d payloads  %5.0fs'
                       % (gender, season, built, time.perf_counter() - t0))

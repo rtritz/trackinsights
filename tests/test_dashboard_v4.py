@@ -9,7 +9,6 @@ import sqlite3
 
 import pytest
 
-from app import queries
 from app.services import dashboard_v4 as svc
 
 
@@ -17,7 +16,7 @@ from app.services import dashboard_v4 as svc
 
 def test_build_payload_has_every_section(app):
     with app.app_context():
-        payload = svc.build_payload(1, "Boys", "2024", queries)
+        payload = svc.build_payload(1, "Boys", "2024")
 
     assert payload is not None
     for key in ("school", "filters", "overview", "regional", "state", "rank",
@@ -30,7 +29,7 @@ def test_build_payload_has_every_section(app):
 def test_payload_marks_whether_state_and_regional_have_anything(app):
     """The tab strip is built from these, so an empty tab never appears."""
     with app.app_context():
-        payload = svc.build_payload(1, "Boys", "2024", queries)
+        payload = svc.build_payload(1, "Boys", "2024")
     assert isinstance(payload["has_state"], bool)
     assert isinstance(payload["has_regional"], bool)
     assert payload["has_state"] == bool(payload["state"]["qualifiers"])
@@ -39,7 +38,7 @@ def test_payload_marks_whether_state_and_regional_have_anything(app):
 def test_all_time_has_no_season_only_sections(app):
     """All-time is a records board: qualifying and next season mean nothing."""
     with app.app_context():
-        payload = svc.build_payload(1, "Boys", "all-time", queries)
+        payload = svc.build_payload(1, "Boys", "all-time")
     assert payload["rank"] is None
     assert payload["regional"]["qualifiers"] == []
     assert payload["state"]["qualifiers"] == []
