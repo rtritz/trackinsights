@@ -152,14 +152,14 @@ _H2H_RELAY_POINTS = (5,)
 # A complete postseason: 32 sectionals, 8 regionals and one state final per gender.
 # Every covered season (2023-2026) matches this, so the check is a no-op today and
 # exists to keep a season that is still being run out of the dashboard.
-_V3_EXPECTED_MEETS = {
+_EXPECTED_MEETS = {
     CONST.MEET_TYPE.SECTIONAL: 32,
     CONST.MEET_TYPE.REGIONAL: 8,
     CONST.MEET_TYPE.STATE: 1,
 }
 
 # Sectional -> Regional -> State.
-_V3_STAGE_ORDER = (
+_STAGE_ORDER = (
     CONST.MEET_TYPE.SECTIONAL,
     CONST.MEET_TYPE.REGIONAL,
     CONST.MEET_TYPE.STATE,
@@ -175,14 +175,14 @@ _V3_STAGE_ORDER = (
 # modal state field. Participation confirms the selection is strictly by mark --
 # the top four non-auto marks in a regional group compete 82-96% of the time
 # (the same rate as auto qualifiers) while the fifth-best drops to 18-35%.
-_V3_AUTO_DEPTH = 3
+_AUTO_DEPTH = 3
 
-_V3_CALLBACK_SLOTS = {
+_CALLBACK_SLOTS = {
     CONST.MEET_TYPE.SECTIONAL: 4,
     CONST.MEET_TYPE.REGIONAL: 6,
 }
 
-_V3_SECTIONALS_PER_REGIONAL = 4
+_SECTIONALS_PER_REGIONAL = 4
 
 
 
@@ -1572,24 +1572,24 @@ def _display_sectional_host(host: Optional[str], meet_num: Optional[int], year: 
         return f"Sectional {meet_num}"
     return ""
 
-def _v4_callback_group(stage, meet_num, event):
+def _callback_group(stage, meet_num, event):
     """Which pool an entry competes in for a callback slot.
 
     Out of a sectional the pool is the four sectionals feeding one regional; out of
     a regional it is the whole state, so the group is the event alone.
     """
     if stage == CONST.MEET_TYPE.SECTIONAL and meet_num:
-        regional_num = (meet_num - 1) // _V3_SECTIONALS_PER_REGIONAL + 1
+        regional_num = (meet_num - 1) // _SECTIONALS_PER_REGIONAL + 1
         return (regional_num, event)
     return (None, event)
 
-def _v4_is_better(value, other, lower_is_better):
+def _is_better(value, other, lower_is_better):
     return value < other if lower_is_better else value > other
 
-def _v4_easier(first, second, lower_is_better):
+def _easier(first, second, lower_is_better):
     """Of two qualifying marks, the one that is easier to achieve."""
     if first is None:
         return second
     if second is None:
         return first
-    return second if _v4_is_better(first, second, lower_is_better) else first
+    return second if _is_better(first, second, lower_is_better) else first

@@ -20,9 +20,9 @@ from .shared import (  # noqa: F401  -- shared setup and constants
     Request,
     School,
     Tuple,
-    _V3_AUTO_DEPTH,
-    _V3_CALLBACK_SLOTS,
-    _V3_STAGE_ORDER,
+    _AUTO_DEPTH,
+    _CALLBACK_SLOTS,
+    _STAGE_ORDER,
     db,
     func,
     get_configured_regional_hosts,
@@ -44,14 +44,14 @@ from .shared import (
     _get_event_types_map,
     _is_valid_postseason_mark,
     _state_target_field_size,
-    _v4_callback_group,
-    _v4_easier,
-    _v4_is_better,
+    _callback_group,
+    _easier,
+    _is_better,
 )
 
 from .meets import (
     _missing_auto_slots_by_meet,
-    _v4_stage_index,
+    _stage_index,
 )
 
 
@@ -768,7 +768,7 @@ def get_state_qualifiers(gender: str, year: int = CURRENT_QUALIFIER_YEAR):
 
     return response
 
-def _v4_advancement_from_rows(rows, next_stage_pairs, pair_of, lower_is_better_of):
+def _advancement_from_rows(rows, next_stage_pairs, pair_of, lower_is_better_of):
     """Where each entry's season ended, and the mark it needed to go further.
 
     The bar is the easier of two real, observed marks:
@@ -791,7 +791,7 @@ def _v4_advancement_from_rows(rows, next_stage_pairs, pair_of, lower_is_better_o
     """
     by_stage: Dict[str, List[Dict[str, Any]]] = {}
     for row in rows:
-        if _v4_stage_index(row["meet_type"]) < 0:
+        if _stage_index(row["meet_type"]) < 0:
             continue
         by_stage.setdefault(row["meet_type"], []).append(row)
 
@@ -800,8 +800,8 @@ def _v4_advancement_from_rows(rows, next_stage_pairs, pair_of, lower_is_better_o
     callback_lines: Dict[Tuple[str, Tuple[Any, str]], float] = {}
 
     for stage, stage_rows in by_stage.items():
-        stage_index = _v4_stage_index(stage)
-        if stage_index >= len(_V3_STAGE_ORDER) - 1:
+        stage_index = _stage_index(stage)
+        if stage_index >= len(_STAGE_ORDER) - 1:
             continue
 
         finals = [
@@ -814,22 +814,22 @@ def _v4_advancement_from_rows(rows, next_stage_pairs, pair_of, lower_is_better_o
 
         # Auto line: the mark of the last automatic qualifying place at that meet.
         for row in finals:
-            if row["place"] > _V3_AUTO_DEPTH:
+            if row["place"] > _AUTO_DEPTH:
                 continue
             key = (row["meet_id"], row["event"])
             current = auto_lines.get(key)
             lower_is_better = lower_is_better_of(row)
             # The poorest of the automatic places is the bar to reach them.
-            if current is None or _v4_is_better(current, row["result_value"], lower_is_better):
+            if current is None or _is_better(current, row["result_value"], lower_is_better):
                 auto_lines[key] = row["result_value"]
 
         # Callback line: the Nth best mark among those outside the automatic places.
-        slots = _V3_CALLBACK_SLOTS.get(stage)
+        slots = _CALLBACK_SLOTS.get(stage)
         pools: Dict[Tuple[Any, str], List[Dict[str, Any]]] = {}
         for row in finals:
-            if row["place"] <= _V3_AUTO_DEPTH:
+            if row["place"] <= _AUTO_DEPTH:
                 continue
-            group = _v4_callback_group(stage, row.get("meet_num"), row["event"])
+            group = _callback_group(stage, row.get("meet_num"), row["event"])
             pools.setdefault(group, []).append(row)
         for group, pool in pools.items():
             lower_is_better = lower_is_better_of(pool[0])
@@ -844,7 +844,7 @@ def _v4_advancement_from_rows(rows, next_stage_pairs, pair_of, lower_is_better_o
     # ---- furthest stage reached per entry -----------------------------------
     furthest: Dict[Any, Dict[str, Any]] = {}
     for row in rows:
-        stage_index = _v4_stage_index(row["meet_type"])
+        stage_index = _stage_index(row["meet_type"])
         if stage_index < 0:
             continue
         pair = pair_of(row)
@@ -852,7 +852,7 @@ def _v4_advancement_from_rows(rows, next_stage_pairs, pair_of, lower_is_better_o
         if current is None:
             furthest[pair] = row
             continue
-        current_index = _v4_stage_index(current["meet_type"])
+        current_index = _stage_index(current["meet_type"])
         if stage_index > current_index:
             furthest[pair] = row
         elif stage_index == current_index:
@@ -864,7 +864,7 @@ def _v4_advancement_from_rows(rows, next_stage_pairs, pair_of, lower_is_better_o
     result: Dict[Any, Dict[str, Any]] = {}
     for pair, row in furthest.items():
         stage = row["meet_type"]
-        stage_index = _v4_stage_index(stage)
+        stage_index = _stage_index(stage)
         is_final = row["result_type"] == CONST.RESULT_TYPE.FINAL
         place = row.get("place")
         entry = {
@@ -886,14 +886,14 @@ def _v4_advancement_from_rows(rows, next_stage_pairs, pair_of, lower_is_better_o
             "tied_cutoff": False,
         }
 
-        can_advance = stage_index < len(_V3_STAGE_ORDER) - 1
+        can_advance = stage_index < len(_STAGE_ORDER) - 1
         valid = _is_valid_postseason_mark(row["result_value"], row["event_type"])
         if can_advance and is_final and valid:
             lower_is_better = lower_is_better_of(row)
             auto = auto_lines.get((row["meet_id"], row["event"]))
-            group = _v4_callback_group(stage, row.get("meet_num"), row["event"])
+            group = _callback_group(stage, row.get("meet_num"), row["event"])
             callback = callback_lines.get((stage, group))
-            bar = _v4_easier(auto, callback, lower_is_better)
+            bar = _easier(auto, callback, lower_is_better)
 
             if bar is not None:
                 entry["cutoff_display"] = _format_result_display(bar, row["event_type"])
@@ -914,7 +914,7 @@ def _v4_advancement_from_rows(rows, next_stage_pairs, pair_of, lower_is_better_o
                 # 5, 7 and 8 -- and which of them advanced was settled by misses,
                 # which the results do not record. Those rows get the bar with no
                 # gap and no claim either way.
-                if _v4_is_better(row["result_value"], bar, lower_is_better):
+                if _is_better(row["result_value"], bar, lower_is_better):
                     entry["qualified_did_not_compete"] = True
                 elif row["result_value"] == bar:
                     entry["tied_cutoff"] = True

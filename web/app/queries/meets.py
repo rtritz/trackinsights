@@ -23,7 +23,7 @@ from .shared import (  # noqa: F401  -- shared setup and constants
     _PLACE_POINTS,
     _RELAY_NAME_DELIMITER,
     _STATE_PLACE_POINTS,
-    _V3_STAGE_ORDER,
+    _STAGE_ORDER,
     db,
     func,
     lru_cache,
@@ -43,7 +43,7 @@ from .shared import (
     _ordinal,
     _project_place,
     _safe_int,
-    _v4_is_better,
+    _is_better,
 )
 
 
@@ -886,13 +886,13 @@ def _score_h2h_meet(current_entries, prior_entries):
         "uncontested_points": round(uncontested_points, 1),
     }
 
-def _v4_stage_index(meet_type):
+def _stage_index(meet_type):
     try:
-        return _V3_STAGE_ORDER.index(meet_type)
+        return _STAGE_ORDER.index(meet_type)
     except ValueError:
         return -1
 
-def _v4_stage_cells(rows, lower_is_better, event_type):
+def _stage_cells(rows, lower_is_better, event_type):
     """The one mark to show per stage, plus which stage holds the best of them.
 
     Every stage runs its own rounds, so a sprinter has a prelim and a final at each
@@ -905,7 +905,7 @@ def _v4_stage_cells(rows, lower_is_better, event_type):
     per_stage: Dict[str, Dict[str, Any]] = {}
     for row in rows:
         stage = row.get("meet_type")
-        if _v4_stage_index(stage) < 0:
+        if _stage_index(stage) < 0:
             continue
         current = per_stage.get(stage)
         if current is None:
@@ -924,7 +924,7 @@ def _v4_stage_cells(rows, lower_is_better, event_type):
         was_final = current.get("result_type") == CONST.RESULT_TYPE.FINAL
         if is_final and not was_final:
             per_stage[stage] = row
-        elif is_final == was_final and row_valid and _v4_is_better(
+        elif is_final == was_final and row_valid and _is_better(
             row["result_value"], current["result_value"], lower_is_better
         ):
             per_stage[stage] = row
@@ -947,7 +947,7 @@ def _v4_stage_cells(rows, lower_is_better, event_type):
         }
         if has_mark and (
             best_value is None
-            or _v4_is_better(row["result_value"], best_value, lower_is_better)
+            or _is_better(row["result_value"], best_value, lower_is_better)
         ):
             best_value = row["result_value"]
             best_stage = stage

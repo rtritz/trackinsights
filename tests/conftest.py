@@ -23,15 +23,16 @@ class TestConfig:
     SECRET_KEY = "test-secret"
     SQLALCHEMY_DATABASE_URI = ""
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    # The fixture seeds one meet per round; the real gate wants 32 sectionals.
-    V3_REQUIRE_COMPLETE_SEASON = False
+    # The fixture builds its own database from the models, so unlike a deployed
+    # site it does want the file created and the schema laid down at start-up.
+    AUTO_CREATE_SCHEMA = True
 
 
 def _clear_query_caches():
     for func in (
         queries._get_event_types_map,
         queries._build_statewide_program_rankings,
-        queries.get_school_dashboard_v4_qualifiers,
+        queries.get_school_qualifiers,
         queries.get_regional_qualifiers,
         queries._schools_with_logos,
     ):

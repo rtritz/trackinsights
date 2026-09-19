@@ -398,7 +398,7 @@ def build_payload(school_id, gender, season, queries):
     `queries` is passed in rather than imported at module scope so this file can
     be imported by the route without dragging the whole query layer in with it.
     """
-    core = queries.get_school_dashboard_v4_core(school_id, gender=gender, season=season)
+    core = queries.get_school_season_core(school_id, gender=gender, season=season)
     if not core:
         return None
 
@@ -453,7 +453,7 @@ def build_payload(school_id, gender, season, queries):
         payload['overview']['year'] = stage_results.get('year')
 
     # The per-entry table drives three of the five tabs, so it is fetched once.
-    scorecard = queries.get_school_dashboard_v4_athlete_scorecard(
+    scorecard = queries.get_athlete_scorecard(
         school_id, gender, str(selected))
     rows = (scorecard or {}).get('rows') or []
     stages_present = (scorecard or {}).get('stages_present') or []
@@ -471,7 +471,7 @@ def build_payload(school_id, gender, season, queries):
         payload['regional']['just_missed'] = _just_missed(entered)
 
         year = int(selected)
-        rank = queries.get_school_dashboard_v4_program_rank(school_id, gender, year)
+        rank = queries.get_program_rank(school_id, gender, year)
         if rank:
             history = rank.get('rank_history') or []
             prior = rank.get('prior_rank') or None
@@ -491,7 +491,7 @@ def build_payload(school_id, gender, season, queries):
                 'spark': _spark(history),
             }
 
-        h2h = queries.get_school_dashboard_v4_season_h2h(school_id, gender, str(selected))
+        h2h = queries.get_season_h2h(school_id, gender, str(selected))
         if h2h and h2h.get('available') and h2h.get('seasons'):
             latest = h2h['seasons'][0]
             payload['outlook']['h2h'] = {
@@ -505,7 +505,7 @@ def build_payload(school_id, gender, season, queries):
         elif h2h:
             payload['outlook']['h2h'] = {'reason': h2h.get('reason')}
 
-        ret = queries.get_school_dashboard_v4_returning(school_id, gender, str(selected))
+        ret = queries.get_returning_athletes(school_id, gender, str(selected))
         if ret and ret.get('available'):
             points = ret.get('points') or {}
             payload['outlook']['returning'] = {
@@ -566,8 +566,8 @@ def build_rankings(gender, season, queries):
         ],
     }))
 
-    for source, is_relay in ((queries._school_dashboard_v4_event_ranked_rows, False),
-                             (queries._school_dashboard_v4_relay_ranked_rows, True)):
+    for source, is_relay in ((queries._event_ranked_rows, False),
+                             (queries._relay_ranked_rows, True)):
         for event, rows in (source(gender, year) or {}).items():
             out.append((event, {
                 'kind': 'event',
