@@ -1,6 +1,7 @@
 import pandas as pd
-from common.db import Database
+
 from common.const import CONST
+from common.db import ALL_ATHLETE_RESULTS_SQL, ALL_RELAY_RESULTS_SQL
 
 
 def convert_back(event_type, event_result):
@@ -47,10 +48,17 @@ def get_percentiles(
     Returns:
         DataFrame or tuple[DataFrame, DataFrame]: Single DataFrame if one gender specified, otherwise tuple of (Girls DataFrame, Boys DataFrame).
     """
-    # Initialize database connection and load data
-    db = Database(CONST.DB_PATH)
-    df = db.get_all_athlete_results()
-    df_relay = db.get_all_relay_results()
+    # Read through the app's own connection rather than opening a second
+    # handle to the same file. common.db.Database is for the notebooks and
+    # standalone scripts, which have no Flask app to borrow one from; using it
+    # here meant a connection the app did not manage and a read that the
+    # per-request freshness check could not account for. The SQL is shared, so
+    # both paths still run exactly the same query.
+    from .. import db as _sqlalchemy
+
+    connection = _sqlalchemy.session.connection()
+    df = pd.read_sql_query(ALL_ATHLETE_RESULTS_SQL, connection)
+    df_relay = pd.read_sql_query(ALL_RELAY_RESULTS_SQL, connection)
 
     # Default values
     if genders is None:
