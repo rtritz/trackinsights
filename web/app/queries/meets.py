@@ -33,17 +33,23 @@ from .shared import (  # noqa: F401  -- shared setup and constants
 from .shared import (
     _choose_result_entry,
     _count_result_types,
+    _is_better,
+    _is_lower_better,
+    _is_valid_postseason_mark,
+)
+from .formatting import (
     _format_place_label,
     _format_result_display,
     _format_sectional_name,
-    _is_lower_better,
-    _is_valid_postseason_mark,
-    _normalize_name_text,
-    _normalize_performance_input,
     _ordinal,
-    _project_place,
     _safe_int,
-    _is_better,
+)
+from .ranking import (
+    _normalize_performance_input,
+    _project_place,
+)
+from .search_scoring import (
+    _normalize_name_text,
 )
 
 

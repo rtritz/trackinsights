@@ -13,12 +13,16 @@ from .shared import (  # noqa: F401  -- shared setup and constants
 )
 
 from .shared import (
-    _compute_all_event_difficulties_from_data,
-    _format_sectional_result,
     _get_all_sectional_events_list,
     _get_event_types_map,
     _get_sectional_events,
     _get_sectional_years,
+)
+from .formatting import (
+    _format_sectional_result,
+)
+from .ranking import (
+    _compute_all_event_difficulties_from_data,
 )
 
 

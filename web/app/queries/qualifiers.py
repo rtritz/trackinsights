@@ -38,15 +38,17 @@ from .shared import (  # noqa: F401  -- shared setup and constants
 )
 
 from .shared import (
+    _callback_group,
     _display_sectional_host,
-    _format_gap_display,
-    _format_result_display,
+    _easier,
     _get_event_types_map,
+    _is_better,
     _is_valid_postseason_mark,
     _state_target_field_size,
-    _callback_group,
-    _easier,
-    _is_better,
+)
+from .formatting import (
+    _format_gap_display,
+    _format_result_display,
 )
 
 from .meets import (

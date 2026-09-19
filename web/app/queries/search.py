@@ -10,7 +10,7 @@ from .shared import (  # noqa: F401  -- shared setup and constants
     or_,
 )
 
-from .shared import (
+from .search_scoring import (
     _calculate_combined_score,
     _calculate_score,
 )

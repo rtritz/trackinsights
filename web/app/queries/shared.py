@@ -6,7 +6,6 @@ resolution, formatting and the constants the rest of the package shares.
 
 import os
 
-import json
 
 import re
 
@@ -38,7 +37,6 @@ from pathlib import Path
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from urllib.parse import urljoin
 
 from urllib.request import Request, urlopen
 
@@ -67,6 +65,12 @@ from common.standards import meets_state_standard, get_state_standard_display
 from common.const import CONST
 
 from ..analytics.percentiles import get_percentiles as _script_get_percentiles
+
+# Display helpers. These are the bottom of this package's import
+# order: everything may call them, they call nothing here.
+from .formatting import (  # noqa: F401
+    _format_result_display,
+)
 
 CONVERSION = Conversion()
 
@@ -105,7 +109,6 @@ _STATE_PLACE_POINTS = {1: 10, 2: 8, 3: 7, 4: 6, 5: 5, 6: 4, 7: 3, 8: 2, 9: 1}
 
 MIN_RECORDS_YEAR = 2023
 
-_LAST_SEEN_DB = {'fingerprint': None}
 
 _SCHOOL_LOGO_DIR = os.path.join(CONST.WEB_DIR, "app", "static", CONST.SCHOOL_LOGO_STATIC_SUBDIR)
 
@@ -185,8 +188,6 @@ _CALLBACK_SLOTS = {
 _SECTIONALS_PER_REGIONAL = 4
 
 
-
-
 def _unique_events():
     event_groups = (
         getattr(CONST.EVENT, "ALL_TRACK", []),
@@ -220,123 +221,6 @@ def _tuple_or_none(seq):
         return None
     return tuple(seq)
 
-def _calculate_score(text: str, query_words: list) -> float:
-    """
-    Calculate score for a text based on query words.
-    Algorithm:
-    - +2 for each exact word match (bonus for exact match)
-    - +1 for word that starts with query word (prefix match)
-    - +0.5 bonus for matches at the beginning of text (position bonus)
-    - -999 for each query word that doesn't match
-    - Final score divided by length of text
-    """
-
-    text_lower = text.lower()
-    text_words = text_lower.split()
-    
-    if not text_words:
-        return -999
-    
-    score = 0
-    for query_word in query_words:
-        matched = False
-        # Check for exact match or prefix match
-        for idx, text_word in enumerate(text_words):
-            if text_word == query_word:
-                score += 2  # Exact match gets bonus
-                # Position bonus: first word gets extra boost
-                if idx == 0:
-                    score += 0.5
-                matched = True
-                break
-            elif text_word.startswith(query_word):
-                score += 1  # Prefix match gets standard score
-                # Position bonus: first word gets extra boost
-                if idx == 0:
-                    score += 0.5
-                matched = True
-                break
-        
-        if not matched:
-            score -= 999
-    
-    # Divide by length of text (use length of words to normalize)
-    text_length = len(text_words)
-    return score / text_length
-
-def _calculate_combined_score(name: str, school: str, query_words: list) -> float:
-    """
-    Calculate score for an athlete by checking if query words match across name and school.
-    Allows queries like "owen park" to match "Owen Zhang" from "Park Tudor".
-    
-    Algorithm:
-    - Check each query word against both name and school
-    - +3 for exact match in name (with position bonus)
-    - +2 for exact match in name
-    - +1 for exact match in school
-    - Prefix matches worth less
-    - -999 if query word matches neither
-    - Heavily favor all-name matches over name+school matches
-    """
-    name_lower = name.lower()
-    school_lower = school.lower()
-    name_words = name_lower.split()
-    school_words = school_lower.split()
-    
-    if not name_words and not school_words:
-        return -999
-    
-    score = 0
-    name_matches = 0
-    school_matches = 0
-    
-    for query_word in query_words:
-        matched_in_name = False
-        matched_in_school = False
-        
-        # Check name first (higher priority)
-        for idx, name_word in enumerate(name_words):
-            if name_word == query_word:
-                score += 3 if idx == 0 else 2  # Bonus for first position
-                matched_in_name = True
-                name_matches += 1
-                break
-            elif name_word.startswith(query_word):
-                score += 1.5 if idx == 0 else 1
-                matched_in_name = True
-                name_matches += 1
-                break
-        
-        # If not matched in name, check school
-        if not matched_in_name:
-            for school_word in school_words:
-                if school_word == query_word:
-                    score += 1  # School matches worth less
-                    matched_in_school = True
-                    school_matches += 1
-                    break
-                elif school_word.startswith(query_word):
-                    score += 0.5
-                    matched_in_school = True
-                    school_matches += 1
-                    break
-        
-        if not matched_in_name and not matched_in_school:
-            score -= 999
-    
-    # Bonus: if ALL query words matched in name, add big bonus
-    if name_matches == len(query_words):
-        score += 5  # Big bonus for complete name match
-    
-    # Normalize by number of query words (not total text length)
-    # This keeps scores comparable regardless of school name length
-    return score / len(query_words)
-
-def _normalize_name_text(value: str) -> str:
-    if not value:
-        return ""
-    cleaned = re.sub(r"[^a-zA-Z\s]", " ", value)
-    return " ".join(cleaned.lower().split())
 
 def _select_preferred_result(existing, candidate):
     if existing is None:
@@ -360,25 +244,6 @@ def _select_preferred_result(existing, candidate):
 
     return existing
 
-@lru_cache(maxsize=None)
-def _get_field_size(meet_id, event, result_type):
-    return (
-        db.session.query(func.max(AthleteResult.place))
-        .filter(
-            AthleteResult.meet_id == meet_id,
-            AthleteResult.event == event,
-            AthleteResult.result_type == result_type,
-            AthleteResult.place.isnot(None),
-        )
-        .scalar()
-    )
-
-def _ordinal(value: int) -> str:
-    if 10 <= value % 100 <= 20:
-        suffix = "th"
-    else:
-        suffix = {1: "st", 2: "nd", 3: "rd"}.get(value % 10, "th")
-    return f"{value}{suffix}"
 
 def _select_best_result_entry(items, event_type):
     if not items:
@@ -392,293 +257,6 @@ def _select_best_result_entry(items, event_type):
     key_func = lambda pair: pair[0].result2
     return min(valid, key=key_func) if lower_is_better else max(valid, key=key_func)
 
-def _compute_rank_for_event(event_name, event_type, athlete_id, min_year, school_id=None, gender=None):
-    aggregator = func.min if _is_lower_better(event_type) else func.max
-
-    query = (
-        db.session.query(
-            AthleteResult.athlete_id,
-            aggregator(AthleteResult.result2).label("best_value"),
-        )
-        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
-        .join(Event, AthleteResult.event == Event.event)
-        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
-        .filter(
-            AthleteResult.result2.isnot(None),
-            #AthleteResult.result_type == "Final",
-            Event.event == event_name,
-            Event.event_type != "Relay",
-            Meet.year.isnot(None),
-            Meet.year >= min_year,
-        )
-    )
-
-    if school_id is not None:
-        query = query.filter(Athlete.school_id == school_id)
-
-    if gender is not None:
-        query = query.filter(Athlete.gender == gender)
-
-    rows = query.group_by(AthleteResult.athlete_id).all()
-    if not rows:
-        return None
-
-    lower_is_better = _is_lower_better(event_type)
-    leaderboard = [
-        (row.athlete_id, row.best_value)
-        for row in rows
-        if row.best_value is not None
-    ]
-
-    if not leaderboard:
-        return None
-
-    leaderboard.sort(key=lambda item: item[1], reverse=not lower_is_better)
-
-    rank = None
-    for index, (ath_id, _value) in enumerate(leaderboard, start=1):
-        if ath_id == athlete_id:
-            rank = index
-            break
-
-    if rank is None:
-        return None
-
-    return {
-        "rank": rank,
-        "total": len(leaderboard),
-        "since_year": min_year,
-    }
-
-def _compute_cohort_ranking(entries, target_key, lower_is_better, filter_fn=None, limit=10):
-    filter_fn = filter_fn or (lambda _item: True)
-    filtered = [item for item in entries if filter_fn(item)]
-    if not filtered:
-        return None
-
-    sorted_entries = sorted(
-        filtered,
-        key=lambda item: (
-            item["result_value"],
-            item["athlete_id"],
-            item["meet_id"],
-        ),
-        reverse=not lower_is_better,
-    )
-
-    ranked_entries = []
-    target_rank = None
-    previous_value = None
-    current_rank = 0
-
-    for index, entry in enumerate(sorted_entries, start=1):
-        value = entry["result_value"]
-        if previous_value is None or value != previous_value:
-            current_rank = index
-            previous_value = value
-
-        enriched = dict(entry)
-        enriched["rank"] = current_rank
-        enriched["is_target"] = (
-            entry["athlete_id"] == target_key["athlete_id"]
-            and entry["meet_id"] == target_key["meet_id"]
-        )
-        ranked_entries.append(enriched)
-
-        if enriched["is_target"]:
-            target_rank = current_rank
-
-    if target_rank is None:
-        return None
-
-    return {
-        "rank": target_rank,
-        "total": len(ranked_entries),
-        "top_results": _summarize_leaderboard(ranked_entries, limit=limit),
-    }
-
-def _summarize_leaderboard(entries, limit=10):
-    summary = []
-    seen = set()
-    for entry in entries:
-        key = (entry["athlete_id"], entry["meet_id"])
-        if key in seen:
-            continue
-        seen.add(key)
-        summary.append(
-            {
-                "athlete_id": entry["athlete_id"],
-                "name": entry["full_name"],
-                "school": entry["school_name"],
-                "result": entry["result"],
-                "result_value": entry["result_value"],
-                "grade": entry["grade"],
-                "rank": entry["rank"],
-                "is_target": entry.get("is_target", False),
-                "meet_id": entry["meet_id"],
-                "meet_host": entry["meet_host"],
-                "place": entry["place"],
-            }
-        )
-
-    return summary
-
-def estimate_event_rank(
-    event_name: str,
-    performance_value,
-    *,
-    gender: str,
-    year: int,
-    meet_type: str = "Sectional",
-):
-    """Project how a performance would place at every sectional in scope.
-
-    Finals are always preferred for athletes who advanced; prelim marks are
-    used for everyone else so the projection mirrors the legacy
-    ``WhereDoIRank`` script.
-
-    Both prelim and final performances are considered automatically with
-    finals taking precedence when available.
-    """
-
-    event = Event.query.filter_by(event=event_name).one_or_none()
-    if not event or not event.event_type:
-        return None
-
-    event_type = event.event_type
-    normalized_value = _normalize_performance_input(performance_value, event_type)
-
-    gender_filter = func.lower(Meet.gender) == (gender or "").strip().lower()
-    raw_results = (
-        db.session.query(
-            AthleteResult.athlete_id.label("athlete_id"),
-            AthleteResult.meet_id.label("meet_id"),
-            AthleteResult.result2.label("result_value"),
-            AthleteResult.result.label("result_text"),
-            AthleteResult.result_type.label("result_type"),
-            AthleteResult.place.label("place"),
-            Meet.host.label("meet_host"),
-            Meet.meet_num.label("meet_num"),
-        )
-        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
-        .filter(
-            AthleteResult.event == event_name,
-            AthleteResult.result2.isnot(None),
-            Meet.meet_type == meet_type,
-            gender_filter,
-            Meet.year == year,
-        )
-    ).all()
-
-    if not raw_results:
-        return None
-
-    lower_is_better = _is_lower_better(event_type)
-    per_meet = {}
-    for row in raw_results:
-        meet_entry = per_meet.setdefault(
-            row.meet_id,
-            {
-                "meet_id": row.meet_id,
-                "host": row.meet_host,
-                "meet_num": row.meet_num,
-                "results": {},
-            },
-        )
-        athlete_bucket = meet_entry["results"]
-        candidate = {
-            "athlete_id": row.athlete_id,
-            "result_value": row.result_value,
-            "result_text": row.result_text,
-            "result_type": row.result_type,
-            "place": row.place,
-        }
-        athlete_bucket[row.athlete_id] = _choose_result_entry(
-            athlete_bucket.get(row.athlete_id), candidate, lower_is_better
-        )
-
-    sectional_results = []
-    all_result_values = []
-    for meet_data in per_meet.values():
-        entries = list(meet_data["results"].values())
-        if not entries:
-            continue
-        values = sorted(
-            (entry["result_value"] for entry in entries),
-            reverse=not lower_is_better,
-        )
-        all_result_values.extend(values)
-        raw_place = _project_place(values, normalized_value, event_type, event_name)
-        numeric_place = _safe_int(raw_place)
-        sectional_results.append(
-            {
-                "meet_id": meet_data["meet_id"],
-                "meet_num": meet_data["meet_num"],
-                "sectional_name": _format_sectional_name(meet_data["host"], meet_data["meet_num"]),
-                "projected_place": numeric_place,
-                "projected_place_label": _format_place_label(raw_place),
-                "field_size": len(values),
-                "result_type_counts": _count_result_types(entries),
-            }
-        )
-
-    if not sectional_results:
-        return None
-
-    sectional_results.sort(
-        key=lambda item: (
-            item["meet_num"] if item.get("meet_num") is not None else float("inf"),
-            item.get("sectional_name") or "",
-        )
-    )
-
-    all_values_sorted = sorted(all_result_values, reverse=not lower_is_better)
-    raw_overall_place = _project_place(all_values_sorted, normalized_value, event_type, event_name)
-
-    return {
-        "event": event_name,
-        "event_type": event_type,
-        "gender": gender,
-        "year": year,
-        "meet_type": meet_type,
-        "comparison_count": len(all_values_sorted),
-        "projected_place": raw_overall_place,
-        "projected_place_label": _format_place_label(raw_overall_place),
-        "input_value": normalized_value,
-        "sectional_results": sectional_results,
-    }
-
-def _normalize_performance_input(value, event_type: str) -> float:
-    if value is None:
-        raise ValueError("performance_value is required")
-
-    if isinstance(value, (int, float)):
-        return float(value)
-
-    if not isinstance(value, str):
-        raise TypeError("performance_value must be a string or number")
-
-    cleaned = value.strip()
-    if not cleaned:
-        raise ValueError("performance_value cannot be empty")
-
-    if _is_lower_better(event_type):
-        return float(CONVERSION.time_to_seconds(cleaned))
-    return float(CONVERSION.distance_to_inches(cleaned))
-
-def _project_place(result_values, candidate_value, event_type: str, event_name: str) -> str:
-    comparator = (lambda existing: existing < candidate_value) if _is_lower_better(event_type) else (
-        lambda existing: existing > candidate_value
-    )
-
-    for index, existing in enumerate(result_values, start=1):
-        if not comparator(existing):
-            return str(index)
-
-    if event_name in SPRINT_DNQ_EVENTS:
-        return "DNQ for Finals"
-
-    return str(len(result_values) + 1)
 
 def _is_lower_better(event_type: str) -> bool:
     return event_type != "Field"
@@ -700,26 +278,6 @@ def _choose_result_entry(existing, candidate, lower_is_better: bool):
         return candidate if candidate["result_value"] < existing["result_value"] else existing
     return candidate if candidate["result_value"] > existing["result_value"] else existing
 
-def _format_sectional_name(host, meet_num):
-    if host and meet_num:
-        return f"{host} (Meet {meet_num})"
-    if host:
-        return host
-    if meet_num:
-        return f"Meet {meet_num}"
-    return "Unknown Sectional"
-
-def _safe_int(value):
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
-
-def _format_place_label(value):
-    numeric = _safe_int(value)
-    if numeric is None:
-        return value
-    return _ordinal(numeric)
 
 def _count_result_types(entries):
     counts = {}
@@ -797,171 +355,6 @@ def _get_all_sectional_events_list(gender: str):
 
     return all_events
 
-def _compute_all_event_difficulties_from_data(
-    year_event_results: dict,
-    all_events: list,
-    event_types_map: dict,
-    years: list,
-):
-    """
-    Compute difficulty rankings for all events in each season using pre-fetched data.
-    
-    Difficulty = |Cutoff - Median| / Median * 100
-    
-    Returns a dict mapping year -> list of events sorted by difficulty (descending).
-    
-    This version uses data already fetched in a single query, avoiding N+1 queries.
-    """
-    difficulty_rankings = {}
-
-    for year in years:
-        event_difficulties = []
-
-        for event_name in all_events:
-            all_values = year_event_results.get(year, {}).get(event_name, [])
-
-            if len(all_values) < 8:
-                continue
-
-            # Get event type from cached map
-            event_type = event_types_map.get(event_name, "Track")
-            lower_is_better = event_type != "Field"
-
-            # Calculate median
-            sorted_values = sorted(all_values, reverse=not lower_is_better)
-            n = len(sorted_values)
-            if n % 2 == 1:
-                median = sorted_values[n // 2]
-            else:
-                median = (sorted_values[n // 2 - 1] + sorted_values[n // 2]) / 2
-
-            # Calculate cutoff (8th place)
-            ascending_values = sorted(all_values) if lower_is_better else sorted(all_values, reverse=True)
-            cutoff = ascending_values[min(7, len(ascending_values) - 1)]
-
-            # Calculate relative difficulty
-            if median and median != 0:
-                difficulty = abs(cutoff - median) / abs(median) * 100
-            else:
-                difficulty = 0
-
-            event_difficulties.append({
-                "event": event_name,
-                "difficulty": round(difficulty, 2),
-                "median": _format_sectional_result(median, event_type),
-                "cutoff": _format_sectional_result(cutoff, event_type),
-            })
-
-        # Sort by difficulty descending (higher difficulty = harder to qualify)
-        event_difficulties.sort(key=lambda x: x["difficulty"], reverse=True)
-        difficulty_rankings[year] = event_difficulties
-
-    return difficulty_rankings
-
-def _compute_all_event_difficulties(gender: str, years: list):
-    """
-    Compute difficulty rankings for all events in each season.
-    
-    Difficulty = |Cutoff - Median| / Median * 100
-    
-    Returns a dict mapping year -> list of events sorted by difficulty (descending).
-    
-    NOTE: This function is kept for backwards compatibility but the optimized
-    version _compute_all_event_difficulties_from_data should be preferred.
-    """
-    all_events = _get_all_sectional_events_list(gender)
-    event_types_map = _get_event_types_map()
-
-    # Fetch all data in one query instead of per-event queries
-    results_query = (
-        db.session.query(
-            Meet.year,
-            AthleteResult.event,
-            AthleteResult.result2,
-        )
-        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
-        .filter(
-            Meet.meet_type == "Sectional",
-            Meet.gender == gender,
-            Meet.year.in_(years),
-            AthleteResult.event.in_(all_events),
-            AthleteResult.result_type == "Final",
-            AthleteResult.result2.isnot(None),
-        )
-        .all()
-    )
-
-    # Group results by (year, event)
-    from collections import defaultdict
-    year_event_results = defaultdict(lambda: defaultdict(list))
-    for year, evt, result2 in results_query:
-        if year is not None and result2 is not None:
-            year_event_results[year][evt].append(result2)
-
-    return _compute_all_event_difficulties_from_data(
-        year_event_results, all_events, event_types_map, years
-    )
-
-def _format_sectional_result(value, event_type: str) -> str:
-    """Format a result value for display."""
-    if value is None:
-        return ""
-    
-    if event_type == "Field":
-        # Convert inches to feet-inches format
-        feet = int(value // 12)
-        inches = value % 12
-        if inches == int(inches):
-            return f"{feet}'{int(inches)}\""
-        return f"{feet}'{inches:.2f}\""
-    else:
-        # Convert seconds to time format
-        if value >= 60:
-            minutes = int(value // 60)
-            seconds = value % 60
-            return f"{minutes}:{seconds:05.2f}"
-        return f"{value:.2f}"
-
-def _active_db_path():
-    """The database this app is actually reading.
-
-    Not necessarily CONST.DB_PATH: Flask takes its URI from config.py, and the
-    test suite points it at a fixture. Fingerprinting CONST.DB_PATH while the app
-    served a different database meant the precomputed payloads looked valid for
-    data they were never built from -- which is how a test fixture got answered
-    with production rows.
-    """
-    try:
-        from flask import current_app
-        uri = current_app.config.get('SQLALCHEMY_DATABASE_URI') or ''
-    except Exception:
-        uri = ''
-    if uri.startswith('sqlite:///'):
-        return uri[len('sqlite:///'):]
-    return CONST.DB_PATH
-
-def _db_fingerprint():
-    """A cheap stamp of the database's current state.
-
-    Size only, deliberately -- NOT modification time.
-
-    mtime is not portable between machines, and this fingerprint has to be: the
-    precomputed payloads are built here and read on the server. A deploy clones
-    the repository fresh, and git stamps every checked-out file with the time of
-    the clone, so an mtime recorded at build time can never match the one the
-    server sees. That silently invalidated every precomputed payload on every
-    request, which is the opposite of what these files are for.
-
-    Size travels with the bytes, so it means the same thing in both places. It is
-    a weaker signal -- a change that leaves the file exactly as large goes
-    unnoticed -- but SQLite moves the page count for anything substantial, and a
-    missed change costs a stale cache rather than a wrong one, since the payloads
-    are regenerated by hand anyway.
-    """
-    try:
-        return str(os.stat(_active_db_path()).st_size)
-    except OSError:
-        return ''
 
 def _covered_rank_seasons():
     """Every season the rankings span, oldest first."""
@@ -974,53 +367,6 @@ def _covered_rank_seasons():
     )
     return [int(row[0]) for row in rows]
 
-def _clear_query_caches(*, keep=()):
-    """Empty every lru_cache in the queries package.
-
-    Used when the database has changed underneath a running process: the caches
-    are keyed on query arguments, not on the state of the data, so nothing else
-    would ever evict them.
-
-    Walks every module in the package rather than this module's globals. When
-    queries was one file those were the same thing; now they are not, and
-    checking only here would silently leave most caches full.
-    """
-    import importlib
-    import pkgutil
-
-    package = importlib.import_module(__package__)
-    modules = [package] + [
-        importlib.import_module('%s.%s' % (__package__, info.name))
-        for info in pkgutil.iter_modules(package.__path__)
-    ]
-    for module in modules:
-        for name, value in list(vars(module).items()):
-            if name in keep:
-                continue
-            clear = getattr(value, 'cache_clear', None)
-            if callable(clear):
-                clear()
-
-def ensure_fresh_queries():
-    """Drop every cached query result if the database has changed.
-
-    The caches in this module are keyed on query arguments, so nothing evicts
-    them when the underlying data moves -- a long-running worker would keep
-    serving the rankings it computed at start-up until it was restarted. That is
-    why updating results meant remembering to reload the web app.
-
-    Called once per request. The check is a single os.stat, and on the ordinary
-    request -- where nothing has changed -- it does nothing else.
-    """
-    current = _db_fingerprint()
-    previous = _LAST_SEEN_DB['fingerprint']
-    _LAST_SEEN_DB['fingerprint'] = current
-    if previous is not None and previous != current:
-        logger.info('database changed (%s -> %s); clearing query caches',
-                    previous, current)
-        _clear_query_caches()
-        return True
-    return False
 
 @lru_cache(maxsize=1)
 def _schools_with_logos() -> frozenset:
@@ -1076,47 +422,6 @@ def _build_school_roster(school_id: int):
     roster.sort(key=lambda r: (-(r["graduation_year"] or 0), r["name"]))
     return roster
 
-def _format_result_display(raw_value, event_type):
-    """Format a raw numeric result for display."""
-    if raw_value is None:
-        return "—"
-    if event_type == "Field":
-        total_inches = raw_value
-        feet = int(total_inches // 12)
-        inches = total_inches % 12
-        if inches == int(inches):
-            return f"{feet}'{int(inches)}\""
-        return f"{feet}'{inches:.2f}\""
-    else:
-        seconds = raw_value
-        if seconds >= 60:
-            minutes = int(seconds // 60)
-            remaining = seconds % 60
-            return f"{minutes}:{remaining:05.2f}"
-        return f"{seconds:.2f}"
-
-def _format_gap_display(raw_value, event_type):
-    """Format a *difference* between two marks.
-
-    A field gap under a foot comes back from _format_result_display as 0'4",
-    which reads badly for a delta -- inches alone are what a coach thinks in at
-    that range.
-    """
-    if raw_value is None:
-        return None
-    if event_type == CONST.EVENT_TYPE.FIELD and raw_value < 12:
-        if raw_value == int(raw_value):
-            return f'{int(raw_value)}"'
-        return f'{raw_value:.2f}"'.replace('.00"', '"')
-    display = _format_result_display(raw_value, event_type)
-    # A running gap is a number of seconds and has to say so -- "0.29" on its own
-    # reads as a placing or a wind reading. A gap long enough to be formatted with
-    # a colon is already minutes and seconds, so it carries its own units; so does
-    # a field gap of a foot or more, which comes back as 2'5.25" and must not be
-    # handed a trailing s.
-    if display and event_type != CONST.EVENT_TYPE.FIELD and ":" not in display:
-        return f"{display}s"
-    return display
 
 def _compute_school_records(school_id: int):
     """Unofficial school records: best mark per event+gender from 2023 onwards."""
@@ -1343,29 +648,6 @@ def _is_valid_postseason_mark(result_value, event_type: str) -> bool:
         return result_value > 0
     return 0 < result_value < 9999
 
-def _competition_rank_rows(rows: List[Dict[str, Any]], lower_is_better: bool, value_key: str = "result_value"):
-    if not rows:
-        return []
-
-    default_value = float("inf") if lower_is_better else float("-inf")
-    sorted_rows = sorted(
-        rows,
-        key=lambda item: item.get(value_key, default_value),
-        reverse=not lower_is_better,
-    )
-
-    ranked = []
-    last_value = object()
-    current_rank = 0
-    for index, row in enumerate(sorted_rows, start=1):
-        value = row.get(value_key)
-        if index == 1 or value != last_value:
-            current_rank = index
-            last_value = value
-        ranked_row = dict(row)
-        ranked_row["rank"] = current_rank
-        ranked.append(ranked_row)
-    return ranked
 
 # Cached: one cold dashboard calls this eight times over with repeating
 # arguments -- once per season for the rank history, again per school for the

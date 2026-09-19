@@ -20,15 +20,19 @@ from .shared import (  # noqa: F401  -- shared setup and constants
 )
 from .shared import (
     _build_school_roster,
-    _competition_rank_rows,
-    _format_result_display,
     _get_event_types_map,
     _is_lower_better,
     _is_valid_postseason_mark,
-    _ordinal,
     _resolve_postseason_individual_rows,
     _resolve_school_enrollment_for_year,
     _school_logo_url,
+)
+from .formatting import (
+    _format_result_display,
+    _ordinal,
+)
+from .ranking import (
+    _competition_rank_rows,
 )
 from .meets import (
     _compute_cumulative_points,
