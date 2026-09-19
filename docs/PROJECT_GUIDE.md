@@ -288,15 +288,42 @@ inside `web/` is copied up to the top, so `~/mysite/` holds `app/`, `config.py`,
 `wsgi.py` and `data/` directly, with `common/` beside them.
 
 ```bash
+set -euo pipefail          # a failed cd must not let the rm run somewhere else
+
 cd ~/mysite
 rm -rf ./*
-git clone https://github.com/<user>/trackinsights.git ~/trackinsights-temp
+git clone --depth 1 https://github.com/<user>/trackinsights.git ~/trackinsights-temp
 cp -r ~/trackinsights-temp/web/. ~/mysite/
 cp -r ~/trackinsights-temp/common ~/mysite/
 rm -rf ~/trackinsights-temp
+
+cd ~/mysite
+set +e
+python -m app.jobs.build_all --check
+case $? in
+  0) echo "Precomputed data is current." ;;
+  1) echo "WARNING: data is STALE -- rebuild locally, commit, redeploy." ;;
+  2) echo "WARNING: precomputed data was never built." ;;
+  *) echo "ERROR: the check itself failed -- see the output above." ;;
+esac
+set -e
 ```
 
 Then reload the web app from the PythonAnywhere dashboard.
+
+Three things in that script are there for a reason:
+
+- **`--depth 1`.** A full clone pulls the whole history, which is mostly old
+  binaries; the deploy only ever needs the tip.
+- **The `case`, not `|| echo "stale"`.** `--check` returns 0 current, 1 stale,
+  2 never built, and anything else means the check itself broke. Collapsing
+  those into one message once reported a `ModuleNotFoundError` as stale data.
+- **The module is `app.jobs.build_all`**, not `backend.jobs.build_all`. The
+  deploy copies `web/`'s contents up, so the package sits at `~/mysite/app/`.
+
+**Install only the web extra on the server:** `pip install -e ".[web]"`. The
+`standalone` and `dev` extras pull jupyter, matplotlib and Pillow -- around
+300 MB that never runs on the site, and enough to crowd a 1 GB quota.
 
 **The WSGI configuration file** (edited on PythonAnywhere, not in this repo)
 needs one line pointing at the entry point:
