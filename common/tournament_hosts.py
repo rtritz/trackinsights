@@ -149,7 +149,10 @@ def save_all(mapping: Dict[str, Dict[int, str]]) -> str:
         key: {str(number): host for number, host in sorted(hosts.items())}
         for key, hosts in sorted(mapping.items())
     }
-    with open(TOURNAMENT_HOSTS_PATH, "w", encoding="utf-8") as handle:
+    # newline="" so the bytes are exactly what was serialised. Without it Python
+    # rewrites every \n as \r\n on Windows, so the file differs between machines
+    # for no reason -- the same fix app/jobs/artifacts.py carries.
+    with open(TOURNAMENT_HOSTS_PATH, "w", encoding="utf-8", newline="") as handle:
         json.dump(serialisable, handle, indent=2, sort_keys=True)
         handle.write("\n")
     return TOURNAMENT_HOSTS_PATH

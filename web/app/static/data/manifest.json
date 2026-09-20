@@ -2,7 +2,7 @@
   "artifacts": {
     "regional_predictions/combined_rankings_2026_boys.json": {
       "bytes": 650357,
-      "generated_at": "2026-09-20T13:54:08+00:00",
+      "generated_at": "2026-09-20T16:05:23+00:00",
       "scope": {
         "gender": "Boys",
         "year": 2026
@@ -11,7 +11,7 @@
     },
     "regional_predictions/combined_rankings_2026_girls.json": {
       "bytes": 654438,
-      "generated_at": "2026-09-20T13:54:09+00:00",
+      "generated_at": "2026-09-20T16:05:25+00:00",
       "scope": {
         "gender": "Girls",
         "year": 2026
@@ -20,7 +20,7 @@
     },
     "regional_predictions/combined_results_2026_boys.json": {
       "bytes": 394066,
-      "generated_at": "2026-09-20T13:54:11+00:00",
+      "generated_at": "2026-09-20T16:05:26+00:00",
       "scope": {
         "gender": "Boys",
         "year": 2026
@@ -29,7 +29,7 @@
     },
     "regional_predictions/combined_results_2026_girls.json": {
       "bytes": 400664,
-      "generated_at": "2026-09-20T13:54:11+00:00",
+      "generated_at": "2026-09-20T16:05:26+00:00",
       "scope": {
         "gender": "Girls",
         "year": 2026
@@ -38,7 +38,7 @@
     },
     "regional_predictions/regional_predictions_2026_boys.json": {
       "bytes": 12124,
-      "generated_at": "2026-09-20T13:54:15+00:00",
+      "generated_at": "2026-09-20T16:05:27+00:00",
       "scope": {
         "gender": "Boys",
         "year": 2026
@@ -47,7 +47,7 @@
     },
     "regional_predictions/regional_predictions_2026_girls.json": {
       "bytes": 11274,
-      "generated_at": "2026-09-20T13:54:16+00:00",
+      "generated_at": "2026-09-20T16:05:27+00:00",
       "scope": {
         "gender": "Girls",
         "year": 2026
@@ -56,7 +56,7 @@
     },
     "state_predictions/state_predictions_2026_boys.json": {
       "bytes": 3879,
-      "generated_at": "2026-09-20T13:54:17+00:00",
+      "generated_at": "2026-09-20T16:05:27+00:00",
       "scope": {
         "gender": "Boys",
         "year": 2026
@@ -65,7 +65,7 @@
     },
     "state_predictions/state_predictions_2026_girls.json": {
       "bytes": 3321,
-      "generated_at": "2026-09-20T13:54:17+00:00",
+      "generated_at": "2026-09-20T16:05:27+00:00",
       "scope": {
         "gender": "Girls",
         "year": 2026
@@ -74,7 +74,7 @@
     },
     "state_predictions/state_qualifiers_2026_boys.json": {
       "bytes": 149993,
-      "generated_at": "2026-09-20T13:54:14+00:00",
+      "generated_at": "2026-09-20T16:05:28+00:00",
       "scope": {
         "gender": "Boys",
         "year": 2026
@@ -83,7 +83,7 @@
     },
     "state_predictions/state_qualifiers_2026_girls.json": {
       "bytes": 145661,
-      "generated_at": "2026-09-20T13:54:14+00:00",
+      "generated_at": "2026-09-20T16:05:28+00:00",
       "scope": {
         "gender": "Girls",
         "year": 2026
