@@ -49,6 +49,31 @@ if [ ! -f "$CACHE" ]; then
   exit 0
 fi
 
+# Is the precomputed data actually in step with Track.db? This catches the one
+# mistake the rest of the hook cannot: committing a results change and pushing it
+# without running build_all. The cache on disk is then unchanged, so the hash
+# check below skips, nothing is published, and the first sign of trouble is the
+# deploy aborting -- at the server, after a trip that has to be made twice.
+#
+# A warning rather than a refusal. The deploy gate is what actually stops a bad
+# release, and blocking a template fix because the data is mid-rebuild would be
+# out of proportion. This only makes sure it is said while it is still cheap to
+# act on.
+if ! ( cd web && python -m app.jobs.build_all --check >/dev/null 2>&1 ); then
+  echo
+  echo "pre-push: WARNING -- the precomputed data does not match web/data/Track.db."
+  echo "  You have probably committed a results change without rebuilding."
+  echo
+  # `|| true` because --check exits non-zero by design here, and the script runs
+  # under `set -e` with pipefail -- without it this warning would kill the hook
+  # and block the push, which is the opposite of what it is for.
+  ( cd web && python -m app.jobs.build_all --check 2>&1 | sed 's/^/    /' ) || true
+  echo
+  echo "  Fix before deploying:  cd web && python -m app.jobs.build_all"
+  echo "  then commit and push again. Deploying now would abort on this."
+  echo
+fi
+
 # Has the cache moved since it was last published? Without this every push --
 # a typo in a template, a docs edit -- would re-upload 12MB for no reason.
 current="$(sha256sum "$CACHE" | cut -d' ' -f1)"
