@@ -48,6 +48,16 @@
    visitor rather than an operator -- they cannot fix it, but they should not be
    told stale figures are current either. The instruction is in the title, where
    whoever can fix it will look. #}
+{# Computed for this request rather than read from the cache. Only ever true in
+   development -- but say so, because a live page and a cached one look
+   identical and the difference matters when judging speed. #}
+{% if built_live %}
+    <div class="stale" title="Built by dashboard_v4.build_payload for this request">
+        Computed live for this request -- no cache present. The deployed site
+        always reads a prepared payload; this is development only.
+    </div>
+{% endif %}
+
 {% if status and status.stale %}
     <div class="stale" title="Regenerate with: python -m app.jobs.precompute_dashboard_v4">
         Results have changed since this page's data was prepared{% if status.generated_at %}

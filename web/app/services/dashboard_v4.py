@@ -181,6 +181,60 @@ def season_choices(school_id, gender):
     return [r[0] for r in rows]
 
 
+# ------------------------------------------------------------------ live build
+
+def live_seasons(school_id, gender):
+    """Seasons a reader could pick, from the database rather than the cache.
+
+    season_choices() answers from the cache, so it returns nothing when there is
+    no cache -- which is exactly when this is needed. Mirrors the job's own
+    seasons_for(): every ranked season newest first, then all-time.
+    """
+    from .. import queries
+    years = sorted(queries._covered_rank_seasons(), reverse=True)
+    return [str(y) for y in years] + ['all-time']
+
+
+def live_payload(school_id, gender, season=None):
+    """Build a payload now instead of reading one, or None if there is nothing.
+
+    For development only -- see allow_live_build(). Roughly 2s for the first
+    school in a process (it builds the statewide ranking tables, which are then
+    cached) and about 0.2s for each one after.
+
+    With no season, tries the newest first and takes the first that produces
+    anything, since a school need not have competed in every season.
+    """
+    seasons = [season] if season else live_seasons(school_id, gender)
+    for candidate in seasons:
+        try:
+            payload = build_payload(school_id, gender, candidate)
+        except Exception:  # noqa: BLE001
+            # One unbuildable season should not stop the page finding another.
+            continue
+        if payload:
+            return payload
+    return None
+
+
+def allow_live_build(app):
+    """Whether this process may compute a dashboard instead of reading one.
+
+    Never on the deployed site. The whole reason the cache exists is that this
+    analysis took seconds per page, and PythonAnywhere measured 15-25x slower
+    than a development machine -- so a fallback that quietly turned itself on in
+    production would restore the exact problem V4 was built to remove, and it
+    would do it silently, under load, one worker at a time.
+
+    So: debug mode, or an explicit opt-in. Same shape as the timings flag above
+    it, and for the same reason.
+    """
+    import os
+    if os.environ.get('TI_LIVE_DASHBOARD') == '1':
+        return True
+    return bool(app.debug)
+
+
 # --------------------------------------------------------------------- shaping
 
 ROMAN_SUFFIX = re.compile(r'^(?:II|III|IV|VI{0,3}|IX|XI{0,3})$')

@@ -282,6 +282,17 @@ def school_dashboard_v4(school_id, gender=None, season=None):
             payload = step('cache lookup',
                            lambda: dashboard_v4.load_payload(school_id, gender, season))
 
+    # Nothing cached. In development, build it now rather than showing the
+    # "not built yet" page: a fresh clone has no cache (it ships as a release
+    # asset, not in git), and a teammate changing query code needs to see their
+    # change rather than a payload that predates it. Never on the deployed site
+    # -- see dashboard_v4.allow_live_build.
+    built_live = False
+    if payload is None and dashboard_v4.allow_live_build(current_app):
+        payload = step('live build',
+                       lambda: dashboard_v4.live_payload(school_id, gender, season))
+        built_live = payload is not None
+
     if payload is None:
         school = School.query.get(school_id)
         return render_template(
@@ -293,6 +304,7 @@ def school_dashboard_v4(school_id, gender=None, season=None):
             meta=dashboard_v4.cache_meta(),
             timings=timings,
             show_timings=_v4_show_timings(),
+            built_live=False,
         ), (200 if school else 404)
 
     return render_template(
@@ -300,10 +312,14 @@ def school_dashboard_v4(school_id, gender=None, season=None):
         payload=payload,
         school_id=school_id,
         school_name=(payload.get('school') or {}).get('name'),
-        status=dashboard_v4.cache_status(),
+        # A live build is current by definition, so it must not inherit the
+        # cache's staleness banner -- that banner would be describing a cache
+        # this page did not read.
+        status=None if built_live else dashboard_v4.cache_status(),
         meta=dashboard_v4.cache_meta(),
         timings=timings,
         show_timings=_v4_show_timings(),
+        built_live=built_live,
     )
 
 
