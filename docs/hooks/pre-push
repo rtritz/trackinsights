@@ -1,5 +1,5 @@
 #!/bin/bash
-# Publish the dashboard cache when main is pushed and the cache has changed.
+# Publish the dashboard cache when a branch is pushed and the cache has changed.
 #
 # dashboard_cache.db is generated, ~12MB, and not in git -- it travels as a
 # GitHub Release asset (see docs/publish.sh). Without this hook, publishing is a
@@ -25,21 +25,39 @@ set -euo pipefail
 CACHE=web/data/dashboard_cache.db
 STATE="$(git rev-parse --git-dir)/last-published-cache"
 
-# Only for the branch the server deploys. There is a single cache-latest asset,
-# so publishing from a feature branch would overwrite the cache main's deploy
-# reads, and the next deploy of main would fail its freshness check with data
-# nobody meant to ship.
-DEPLOY_BRANCH=refs/heads/main
+# Any branch, not just main.
+#
+# This used to fire only on a push of refs/heads/main, which was wrong for how
+# this repository is actually worked: changes go up on a branch and reach main
+# through a pull request merged on GitHub. main is therefore never pushed from a
+# machine, so the hook never ran -- the work shipped and the cache did not.
+#
+# Publishing from a feature branch is the right behaviour here anyway. The cache
+# belongs to a Track.db, not to a branch, and the branch you push is the one
+# about to become main. The single cache-latest asset simply holds whatever was
+# pushed last.
+#
+# The one way that misleads: push a branch whose Track.db never gets merged, and
+# the release holds a cache for results that are not on main. The deploy catches
+# it -- build_all --check compares the cache against the Track.db in the clone
+# and aborts -- so the cost is a re-publish, not a bad deploy.
 
 # git feeds the hook one line per ref being pushed:
 #   <local ref> <local sha> <remote ref> <remote sha>
 # Read it all now: publish.sh must not inherit a half-consumed stdin.
-pushing_deploy_branch=no
-while read -r _local_ref _local_sha remote_ref _remote_sha; do
-  [ "$remote_ref" = "$DEPLOY_BRANCH" ] && pushing_deploy_branch=yes
+pushing_a_branch=no
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/*) ;;
+    *) continue ;;            # tags and anything else are not our business
+  esac
+  # An all-zero local sha is a branch deletion -- nothing was built for it.
+  case "$local_sha" in
+    *[!0]*) pushing_a_branch=yes ;;
+  esac
 done
 
-if [ "$pushing_deploy_branch" != yes ]; then
+if [ "$pushing_a_branch" != yes ]; then
   exit 0
 fi
 
@@ -72,6 +90,19 @@ if ! ( cd web && python -m app.jobs.build_all --check >/dev/null 2>&1 ); then
   echo "  Fix before deploying:  cd web && python -m app.jobs.build_all"
   echo "  then commit and push again. Deploying now would abort on this."
   echo
+  echo "  Nothing was published, so the release still holds the last cache that"
+  echo "  matched its results. The push itself is allowed."
+  echo
+  # Stop here rather than attempting a publish. publish.sh runs this same check
+  # and would refuse, and the hook would then report a refusal as a failure and
+  # block the push -- which made the outcome depend on whether anything had ever
+  # been published: with a recorded hash the push went through with a warning,
+  # without one it was blocked. Same situation, two behaviours, for no reason.
+  #
+  # Exit 0: the warning is the point, and the deploy is what actually stops a
+  # bad release. Blocking a template fix because the data is mid-rebuild would
+  # be out of proportion.
+  exit 0
 fi
 
 # Has the cache moved since it was last published? Without this every push --

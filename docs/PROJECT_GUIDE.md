@@ -356,9 +356,12 @@ repository's releases, so for a teammate it could only fail, and a failed publis
 stops the push.
 
 Then a data update is just rebuild, commit, push. The hook publishes nothing
-when the cache has not moved, so ordinary pushes are unaffected, and it ignores
-branches other than `main` -- there is a single `cache-latest` asset, and
-publishing from a feature branch would overwrite the one `main`'s deploy reads.
+when the cache has not moved, so ordinary pushes are unaffected.
+
+It fires on **any** branch, not only `main`. Work here reaches `main` through a
+pull request merged on GitHub, so `main` is never pushed from a machine -- a hook
+that waited for one would never run. The cache belongs to a `Track.db` rather
+than to a branch, and the branch you push is the one about to become `main`.
 
 If publishing fails it stops the push, because pushing new results next to an
 old cache is the state the whole arrangement exists to prevent. `git push
