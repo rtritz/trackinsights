@@ -1,0 +1,22 @@
+# Line endings, decided here rather than by whatever core.autocrlf each machine
+# happens to have. Development is on Windows; the site runs on Linux.
+
+# Shell scripts MUST be LF. A Bash script checked out with CRLF fails on Linux
+# with "bad interpreter: /bin/bash^M" -- and docs/deploy.sh is run on the server.
+*.sh text eol=lf
+
+# Databases are binary. Git detects this on its own today, but a misconfigured
+# core.autocrlf rewriting bytes inside Track.db would corrupt it silently, and
+# that file is the source of everything the site serves.
+*.db binary
+
+# The precomputed artifacts are written compact -- single-line, no newlines to
+# convert -- but marking them keeps that true if one is ever pretty-printed, and
+# keeps their bytes identical on both platforms. The routes send these files
+# verbatim, so their bytes are the response.
+*.json text eol=lf
+
+# Images and fonts.
+*.webp binary
+*.png binary
+*.pdf binary
