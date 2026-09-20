@@ -16,15 +16,29 @@
 # Creating the release is a one-time thing, so this does it only if it is
 # missing. Uploading happens every time the cache changes. You do not have to
 # remember which case you are in.
+#
+# docs/hooks/pre-push calls this automatically when you push main. Running it by
+# hand does exactly the same thing.
+#
+#     ./docs/publish.sh            # prompts if the working tree is dirty
+#     ./docs/publish.sh --yes      # never prompts; for hooks and scripts
 set -euo pipefail
 
 TAG=cache-latest
 CACHE=web/data/dashboard_cache.db
 
+ASSUME_YES=no
+[ "${1:-}" = "--yes" ] && ASSUME_YES=yes
+
 command -v gh >/dev/null || {
   echo "gh (the GitHub CLI) is not installed -- see https://cli.github.com"; exit 1; }
 test -f "$CACHE" || {
   echo "$CACHE not found. Run: cd web && python -m app.jobs.build_all"; exit 1; }
+
+# Where we remember what was last published. Inside .git, so it is per-clone and
+# never committed -- it describes this machine's relationship to the release,
+# not the project.
+STATE="$(git rev-parse --git-dir)/last-published-cache"
 
 # ---- do not publish a cache that does not match the results ----
 # The cache and Track.db have to land on the server together. Publishing a cache
@@ -37,14 +51,25 @@ test -f "$CACHE" || {
   echo "  Rebuild first: cd web && python -m app.jobs.build_all"
   exit 1; }
 
-# ---- is Track.db committed and pushed? ----
+# ---- is Track.db committed? ----
 # The server reads Track.db from git and the cache from the release. Uploading
 # the cache while Track.db sits uncommitted means the two arrive out of step.
 if ! git diff --quiet HEAD -- web/data/Track.db web/app/static/data; then
   echo "WARNING: Track.db or static/data has uncommitted changes."
-  echo "  Commit and push them, or the server gets this cache with older results."
-  read -r -p "  Publish anyway? [y/N] " reply
-  [ "$reply" = "y" ] || { echo "  stopped."; exit 1; }
+  echo "  Commit them, or the server gets this cache with older results."
+  if [ "$ASSUME_YES" = yes ] || [ ! -t 0 ]; then
+    # No terminal to ask at -- a pre-push hook has git's ref list on stdin, and
+    # `read` there would consume that rather than wait for a person. Refusing is
+    # the safe default; --yes is how you say you meant it.
+    if [ "$ASSUME_YES" != yes ]; then
+      echo "  Not running interactively, so stopping. Re-run with --yes to publish anyway."
+      exit 1
+    fi
+    echo "  --yes given; publishing anyway."
+  else
+    read -r -p "  Publish anyway? [y/N] " reply
+    [ "$reply" = "y" ] || { echo "  stopped."; exit 1; }
+  fi
 fi
 
 # ---- create the release, but only if it is not already there ----
@@ -60,6 +85,11 @@ fi
 
 # --clobber replaces the existing asset rather than failing on the name.
 gh release upload "$TAG" "$CACHE" --clobber
+
+# Record what we just published, so the pre-push hook can tell whether the cache
+# has moved since. Written only after a successful upload -- if the upload fails,
+# the next push must try again.
+sha256sum "$CACHE" | cut -d' ' -f1 > "$STATE"
 
 echo
 echo "Published $(du -h "$CACHE" | cut -f1) to the $TAG release."

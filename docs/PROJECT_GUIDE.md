@@ -311,6 +311,22 @@ Both run on your machine. The server only consumes: `docs/deploy.sh` clones the
 repo and downloads that asset. Creating the release is not a step you have to
 remember -- `publish.sh` does it the first time and skips it thereafter.
 
+**Or let the push do it.** `docs/hooks/pre-push` runs `publish.sh` for you when
+you push `main` and the cache has changed, which makes step 2 disappear:
+
+```bash
+git config core.hooksPath docs/hooks   # once per clone -- hooks are not cloned
+```
+
+Then a data update is just rebuild, commit, push. The hook publishes nothing
+when the cache has not moved, so ordinary pushes are unaffected, and it ignores
+branches other than `main` -- there is a single `cache-latest` asset, and
+publishing from a feature branch would overwrite the one `main`'s deploy reads.
+
+If publishing fails it stops the push, because pushing new results next to an
+old cache is the state the whole arrangement exists to prevent. `git push
+--no-verify` skips it deliberately.
+
 The script lives at [`docs/deploy.sh`](deploy.sh) -- copy it into a Bash
 console on PythonAnywhere and run it there. Keeping one copy rather than
 two means the guide cannot drift from what you actually run.

@@ -1,0 +1,67 @@
+#!/bin/bash
+# Publish the dashboard cache when main is pushed and the cache has changed.
+#
+# dashboard_cache.db is generated, ~12MB, and not in git -- it travels as a
+# GitHub Release asset (see docs/publish.sh). Without this hook, publishing is a
+# separate command you have to remember after every data update, and forgetting
+# it means the server clones new results next to an old cache.
+#
+# INSTALL (once per clone -- hooks are not cloned with the repository):
+#
+#     git config core.hooksPath docs/hooks
+#
+# Keeping the hook in the repo rather than in .git/hooks is what lets it be
+# reviewed, fixed and shared. `git push --no-verify` skips it.
+#
+# It does the deciding; docs/publish.sh does the work, so there is one
+# implementation and running it by hand behaves identically.
+set -euo pipefail
+
+CACHE=web/data/dashboard_cache.db
+STATE="$(git rev-parse --git-dir)/last-published-cache"
+
+# Only for the branch the server deploys. There is a single cache-latest asset,
+# so publishing from a feature branch would overwrite the cache main's deploy
+# reads, and the next deploy of main would fail its freshness check with data
+# nobody meant to ship.
+DEPLOY_BRANCH=refs/heads/main
+
+# git feeds the hook one line per ref being pushed:
+#   <local ref> <local sha> <remote ref> <remote sha>
+# Read it all now: publish.sh must not inherit a half-consumed stdin.
+pushing_deploy_branch=no
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  [ "$remote_ref" = "$DEPLOY_BRANCH" ] && pushing_deploy_branch=yes
+done
+
+if [ "$pushing_deploy_branch" != yes ]; then
+  exit 0
+fi
+
+if [ ! -f "$CACHE" ]; then
+  echo "pre-push: $CACHE is missing; nothing to publish."
+  echo "  If you meant to ship a data change, run: cd web && python -m app.jobs.build_all"
+  exit 0
+fi
+
+# Has the cache moved since it was last published? Without this every push --
+# a typo in a template, a docs edit -- would re-upload 12MB for no reason.
+current="$(sha256sum "$CACHE" | cut -d' ' -f1)"
+if [ -f "$STATE" ] && [ "$current" = "$(cat "$STATE")" ]; then
+  exit 0
+fi
+
+echo "pre-push: the dashboard cache has changed; publishing it to the release."
+
+# stdin is redirected because git's ref list has already been consumed above and
+# publish.sh must not read from it; --yes because there is no terminal to prompt
+# at. publish.sh still refuses to publish a cache that does not match Track.db.
+if ! ./docs/publish.sh --yes < /dev/null; then
+  echo
+  echo "pre-push: publishing the cache FAILED, so the push is stopped."
+  echo "  Pushing now would put new results on GitHub beside an old cache, and"
+  echo "  the next deploy would abort on the mismatch."
+  echo
+  echo "  Fix it and push again, or skip this check with:  git push --no-verify"
+  exit 1
+fi
