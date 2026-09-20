@@ -805,7 +805,12 @@
   <div id="ti-footer-lightbulb-slot"
     class="footer footer-horizontal fixed bottom-0 left-0 w-full justify-start bg-transparent pl-4 pb-4 pr-0 pt-0 overflow-visible pointer-events-none z-[84]"></div>
 
-  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {# Cache-busted like every other script here. Without the ?v= this was served
+     with Cache-Control: max-age=14400, so a change to the site-wide search took
+     up to four hours to reach anyone who had already loaded a page -- and the
+     symptom is "search is broken for me but works for you", which is a long way
+     from its cause. #}
+  <script src="{{ url_for('static', filename='js/main.js') }}?v={{ asset_version('js/main.js') }}"></script>
 </body>
 
 </html>
