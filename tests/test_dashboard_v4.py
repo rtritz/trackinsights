@@ -141,3 +141,81 @@ def test_cache_notices_the_results_changing(tmp_path, monkeypatch):
     conn.commit()
     conn.close()
     assert svc.cache_status()["stale"] is True
+
+
+# ------------------------------------------------- the development-only fallback
+
+def test_production_never_builds_a_dashboard_live(app, client):
+    """A missing cache must stay a missing cache on the deployed site.
+
+    The cache exists because this analysis took seconds per page, and the deploy
+    host measured 15-25x slower than a development machine. A fallback that
+    switched itself on in production would restore that, silently, under load.
+    """
+    assert not app.debug, 'the fixture app must look like production here'
+    assert not svc.allow_live_build(app)
+
+    response = client.get('/school-dashboard-v4/1')
+    assert response.status_code == 200
+    assert b'Computed live for this request' not in response.data
+
+
+def test_debug_mode_allows_a_live_build(app):
+    app.debug = True
+    try:
+        assert svc.allow_live_build(app)
+    finally:
+        app.debug = False
+
+
+def test_an_explicit_opt_in_allows_a_live_build(app, monkeypatch):
+    """For running a production-shaped config locally without debug on."""
+    assert not svc.allow_live_build(app)
+    monkeypatch.setenv('TI_LIVE_DASHBOARD', '1')
+    assert svc.allow_live_build(app)
+
+
+def test_a_live_build_produces_the_same_shape_as_the_cache(app):
+    """Whatever the page renders, it is the same payload either way.
+
+    live_payload calls build_payload -- the function the precompute job uses --
+    so a locally built dashboard cannot drift from a deployed one in content,
+    only in how long it took to produce.
+    """
+    with app.app_context():
+        live = svc.live_payload(1, 'Boys', '2024')
+        direct = svc.build_payload(1, 'Boys', '2024')
+    assert live is not None
+    assert set(live) == set(direct)
+    assert live['school'] == direct['school']
+
+
+def test_live_payload_finds_a_season_without_consulting_the_cache(app):
+    """The season list has to come from the database.
+
+    season_choices() answers from dashboard_cache.db, so it returns nothing on a
+    fresh clone -- precisely when the fallback is needed. live_seasons() reads
+    the same source the precompute job does instead.
+    """
+    with app.app_context():
+        seasons = svc.live_seasons(1, 'Boys')
+        assert seasons, 'no seasons found in the database'
+        assert seasons[-1] == 'all-time'
+        assert seasons[:-1] == sorted(seasons[:-1], reverse=True), 'newest first'
+        assert svc.live_payload(1, 'Boys') is not None
+
+
+def test_live_payload_does_not_read_the_cache_at_all(app, monkeypatch):
+    """Independent of the cache, not merely tolerant of it."""
+    def boom(*args, **kwargs):
+        raise AssertionError('live_payload must not read the cache')
+
+    monkeypatch.setattr(svc, 'load_payload', boom)
+    monkeypatch.setattr(svc, 'season_choices', boom)
+    with app.app_context():
+        assert svc.live_payload(1, 'Boys', '2024') is not None
+
+
+def test_live_payload_returns_none_for_a_school_with_nothing(app):
+    with app.app_context():
+        assert svc.live_payload(99999, 'Boys', '2024') is None

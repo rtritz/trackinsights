@@ -5,6 +5,10 @@
 # with "bad interpreter: /bin/bash^M" -- and docs/deploy.sh is run on the server.
 *.sh text eol=lf
 
+# Git hooks have no extension, so *.sh misses them. Same requirement: a hook
+# checked out with CRLF fails the moment anyone runs it on Linux or macOS.
+docs/hooks/* text eol=lf
+
 # Databases are binary. Git detects this on its own today, but a misconfigured
 # core.autocrlf rewriting bytes inside Track.db would corrupt it silently, and
 # that file is the source of everything the site serves.

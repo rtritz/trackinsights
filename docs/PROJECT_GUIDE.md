@@ -280,6 +280,36 @@ notebook. Absence of an import is not proof it is dead.
 
 ---
 
+## 9a. Working on this without the cache
+
+`dashboard_cache.db` is not in git -- it ships as a release asset -- so a fresh
+clone does not have one. That is fine: **in development the dashboard builds
+itself.** Clone, run, and the pages work.
+
+    first school in a process   ~2s   (it builds the statewide ranking tables)
+    every school after that     ~0.2s (those tables are cached)
+
+The page says so, with a banner, because a live page and a cached one look
+identical and the difference matters when you are judging speed.
+
+This never happens on the deployed site. The cache exists because this analysis
+took seconds per page and PythonAnywhere measured 15-25x slower than a
+development machine, so a fallback that switched itself on in production would
+restore exactly the problem V4 removed -- silently, under load, one worker at a
+time. It is gated on debug mode, or `TI_LIVE_DASHBOARD=1` for running a
+production-shaped config locally. `tests/test_dashboard_v4.py` holds that line.
+
+If you would rather have the real thing locally -- to see what a visitor sees,
+at the speed they see it -- download the published cache:
+
+    curl -fsSL -o web/data/dashboard_cache.db       https://github.com/rtritz/trackinsights/releases/download/cache-latest/dashboard_cache.db
+
+You do not need it to develop, run the tests, or change query code. In fact a
+cache actively gets in the way there: it is a payload built before your change,
+so your edits would not show up. The live build is the better default.
+
+---
+
 ## 10. Deploying
 
 The site runs on PythonAnywhere. Deploying replaces the app directory with a
@@ -315,8 +345,15 @@ remember -- `publish.sh` does it the first time and skips it thereafter.
 you push `main` and the cache has changed, which makes step 2 disappear:
 
 ```bash
-git config core.hooksPath docs/hooks   # once per clone -- hooks are not cloned
+git config core.hooksPath docs/hooks   # the data publisher only -- see below
 ```
+
+**Only the person who publishes data should turn this on**, and only on their own
+machine. That setting lives in `.git/config`, which is never committed, so
+cloning does not enable it -- everyone else gets an inert file in `docs/hooks/`,
+which is what you want: publishing needs the built cache and write access to the
+repository's releases, so for a teammate it could only fail, and a failed publish
+stops the push.
 
 Then a data update is just rebuild, commit, push. The hook publishes nothing
 when the cache has not moved, so ordinary pushes are unaffected, and it ignores

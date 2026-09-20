@@ -15,10 +15,10 @@ committed to git is gone the moment you deploy. And the artifacts are derived
 from Track.db, which is itself committed: building them from the same working
 copy that produced Track.db is what keeps the two in step by construction.
 
-Building on the server instead would mean roughly an hour of work on every
-deploy -- this takes ~5 minutes here and PythonAnywhere measured 15-25x slower
-on the same code -- for an artifact that would be identical to the one you could
-have committed.
+Building on the server instead would mean hours of work on every deploy -- this
+takes about 10 minutes here (measured: 10m 20s, of which dashboard_v4 is 10m 12s)
+and PythonAnywhere measured 15-25x slower on the same code -- for an artifact
+identical to the one you could have committed.
 
     python -m app.jobs.build_all            # rebuild everything
     python -m app.jobs.build_all --check    # is anything stale? (exit 1 if so)
@@ -51,6 +51,12 @@ JOBS = [
 ]
 
 
+# Jobs worth warning about before they start. dashboard_v4 builds ~4,000
+# payloads and is essentially the whole run -- measured at 10m 12s of a
+# 10m 20s build -- so without a word it looks hung.
+SLOW = {'dashboard_v4'}
+
+
 def run_one(name, module_path):
     module = importlib.import_module(module_path)
     entry = getattr(module, 'main', None)
@@ -59,25 +65,60 @@ def run_one(name, module_path):
     entry()
 
 
+def _duration(seconds):
+    """A readable length. "4m 52s" beats "292s" when you are watching it."""
+    seconds = int(round(seconds))
+    if seconds < 60:
+        return '%ds' % seconds
+    minutes, rest = divmod(seconds, 60)
+    return '%dm %02ds' % (minutes, rest)
+
+
 def build_all():
-    print('Rebuilding %d precomputed artifacts\n' % len(JOBS))
+    total = len(JOBS)
+    print('Rebuilding %d precomputed artifacts' % total)
+    print('')
+
     started = time.perf_counter()
     failed = []
-    for name, module_path in JOBS:
+    timings = []
+
+    for index, (name, module_path) in enumerate(JOBS, start=1):
         print('-' * 70)
-        print('== %s' % name)
+        heading = '[%d/%d] %s' % (index, total, name)
+        if name in SLOW:
+            heading += '   (~10 minutes; it prints little while it works)'
+        print(heading)
+        # Flushed because the jobs below print as they go and some take minutes;
+        # a buffered heading would appear after the work it introduces.
+        sys.stdout.flush()
+
         t0 = time.perf_counter()
         try:
             run_one(name, module_path)
-            print('   done in %.0fs' % (time.perf_counter() - t0))
+            took = time.perf_counter() - t0
+            timings.append((name, took, True))
+            print('      ok in %s   (%s elapsed, %d of %d done)'
+                  % (_duration(took), _duration(time.perf_counter() - started),
+                     index, total))
         except Exception:  # noqa: BLE001
             # Reported and carried past: one broken job should not leave every
             # other artifact stale as well.
+            took = time.perf_counter() - t0
             failed.append(name)
-            print('   FAILED after %.0fs' % (time.perf_counter() - t0))
+            timings.append((name, took, False))
+            print('      FAILED after %s' % _duration(took))
             traceback.print_exc()
+        sys.stdout.flush()
+
     print('-' * 70)
-    print('\nTotal %.0fs' % (time.perf_counter() - started))
+    print('')
+    print('%-24s %10s' % ('job', 'time'))
+    for name, took, ok in timings:
+        print(('%-24s %10s %s' % (name, _duration(took),
+               '' if ok else 'FAILED')).rstrip())
+    print('%-24s %10s' % ('total', _duration(time.perf_counter() - started)))
+    print('')
     if failed:
         print('FAILED: %s' % ', '.join(failed))
         print('Do not commit a partial rebuild -- fix these and run again.')
