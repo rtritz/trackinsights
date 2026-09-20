@@ -24,22 +24,23 @@ have committed.
     python -m app.jobs.build_all --check    # is anything stale? (exit 1 if so)
     python -m app.jobs.build_all --list     # what would run
 
-Then commit the changed files under web/app/static/data/ and web/data/.
+Then publish: the JSON under web/app/static/data/ and Track.db go in git; the
+dashboard cache goes to a GitHub Release, because it is ~12MB and rebuilt whole
+every time. Both steps are spelled out in docs/PROJECT_GUIDE.md section 10, and
+this script prints them when it finishes.
 """
 import importlib
-import os
 import sys
 import time
 import traceback
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-WEB_DIR = os.path.abspath(os.path.join(HERE, '..', '..'))
-if WEB_DIR not in sys.path:
-    sys.path.insert(0, WEB_DIR)
 
 # Dashboards first: it is by far the longest job, so a failure in one of the
 # quick prediction builds surfaces after the expensive work is already safe.
 JOBS = [
+    # Hosts first, and cheap: the dashboards and qualifier pages label meets with
+    # them, so a stale file here shows up on everything built afterwards.
+    ('tournament_hosts', 'app.jobs.precompute_tournament_hosts'),
     ('dashboard_v4', 'app.jobs.precompute_dashboard_v4'),
     ('combined_rankings', 'app.jobs.precompute_combined_rankings'),
     ('combined_results', 'app.jobs.precompute_combined_results'),
@@ -80,8 +81,13 @@ def build_all():
         print('FAILED: %s' % ', '.join(failed))
         print('Do not commit a partial rebuild -- fix these and run again.')
         return 1
-    print('All artifacts rebuilt. Commit the changes under')
-    print('  web/app/static/data/   and   web/data/dashboard_cache.db')
+    print('All artifacts rebuilt. Two things to publish:')
+    print('  git  -- web/app/static/data/  and  web/data/Track.db')
+    print('  release -- gh release upload cache-latest '
+          'web/data/dashboard_cache.db --clobber')
+    print('')
+    print('dashboard_cache.db is NOT in git (it is ~12MB, rewritten every build).')
+    print('The deploy downloads it from that release -- see docs/PROJECT_GUIDE.md.')
     return 0
 
 

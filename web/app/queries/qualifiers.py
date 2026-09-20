@@ -4,40 +4,25 @@ Who advanced and who did not: regional and state qualifier
 lists and the advancement rules behind them.
 """
 
-from .shared import (  # noqa: F401  -- shared setup and constants
-    Any,
-    Athlete,
-    AthleteResult,
-    CONST,
+from functools import lru_cache
+from typing import Any, Dict, List, Optional, Tuple
+
+from sqlalchemy import func
+
+from .. import db
+from ..models import Athlete, AthleteResult, Meet, RelayResult, School
+
+from common.const import CONST
+from common.regional_hosts import get_configured_regional_hosts
+from common.standards import get_state_standard_display, meets_state_standard
+
+from .shared import (
     CURRENT_QUALIFIER_YEAR,
-    Dict,
-    List,
-    Meet,
-    Optional,
     REGIONAL_SECTIONAL_GROUPS,
     REGIONAL_TARGET_FIELD_SIZE,
-    RelayResult,
-    Request,
-    School,
-    Tuple,
     _AUTO_DEPTH,
     _CALLBACK_SLOTS,
     _STAGE_ORDER,
-    db,
-    func,
-    get_configured_regional_hosts,
-    get_state_standard_display,
-    html_lib,
-    logger,
-    lru_cache,
-    math,
-    meets_state_standard,
-    re,
-    sys,
-    urlopen,
-)
-
-from .shared import (
     _callback_group,
     _display_sectional_host,
     _easier,
@@ -45,6 +30,7 @@ from .shared import (
     _is_better,
     _is_valid_postseason_mark,
     _state_target_field_size,
+    logger,
 )
 from .formatting import (
     _format_gap_display,
@@ -55,6 +41,8 @@ from .meets import (
     _missing_auto_slots_by_meet,
     _stage_index,
 )
+
+from common.tournament_hosts import get_regional_hosts as get_precomputed_regional_hosts
 
 
 
@@ -96,55 +84,16 @@ def _regional_events_for_gender(gender: str):
     events.insert(6, "110 Hurdles" if gender == "Boys" else "100 Hurdles")
     return events
 
-@lru_cache(maxsize=32)
 def _ihsaa_regional_hosts(year: int, gender: str):
-    gender_slug = "boys" if str(gender).strip().lower() == "boys" else "girls"
-    parsed_year = int(year)
-    season_slug = f"{parsed_year - 1}-{parsed_year % 100:02d}"
-    url = f"https://www.ihsaa.org/sports/{gender_slug}/track-field/{season_slug}-tournament?round=regionals"
+    """{regional number: host} for a season, from the precomputed file.
 
-    try:
-        request = Request(
-            url,
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
-        )
-        with urlopen(request, timeout=20) as response:
-            html = response.read().decode("utf-8", errors="ignore")
-    except Exception:
-        return {}
+    Built offline by app.jobs.precompute_tournament_hosts. This used to fetch
+    ihsaa.org here, inside the request -- see common/tournament_hosts.py for why
+    it no longer does. No cache is needed: the read is a dict lookup behind
+    common.tournament_hosts' own cache.
+    """
+    return get_precomputed_regional_hosts(year, gender)
 
-    hosts = {}
-
-    # The tournament page includes sectional and regional rows together.
-    # Regional rows include "Sectional Host:" in their text.
-    paragraphs = re.findall(r"<p[^>]*>.*?</p>", html, flags=re.IGNORECASE | re.DOTALL)
-    for block in paragraphs:
-        lower_block = block.lower()
-        if "in.milesplit.com" not in lower_block or "/results" not in lower_block:
-            continue
-        if "sectional host:" not in lower_block:
-            continue
-
-        text = re.sub(r"<[^>]+>", " ", block)
-        text = html_lib.unescape(re.sub(r"\s+", " ", text)).strip()
-
-        before_tickets = text.split("Tickets", 1)[0].strip()
-        match = re.match(r"^(\d{1,2})\.\s*(.+)$", before_tickets)
-        if not match:
-            continue
-
-        regional_num = int(match.group(1))
-        host = re.sub(
-            r"\s+\d{1,2}(?::\d{2})?\s*[ap]m(?:\s*[A-Z]{2})?$",
-            "",
-            match.group(2).strip(),
-            flags=re.IGNORECASE,
-        ).strip(" -")
-        host = re.sub(r"\s*\(\d+\)\s*$", "", host).strip()
-        if host and regional_num not in hosts:
-            hosts[regional_num] = host
-
-    return hosts
 
 def _regional_hosts_for_year(year: int, gender: str):
     regional_hosts = get_configured_regional_hosts(year, gender)

@@ -6,6 +6,9 @@ ENV/
 env/
 .env
 .pytest_cache/
+# Per-run fixture databases. conftest.py unlinks its own, but a test killed
+# mid-run leaves one behind and they must never be committed.
+tests/*.sqlite
 .mypy_cache/
 .vscode/
 .DS_Store
@@ -20,6 +23,17 @@ build/
 # own history of Track.db already provides point-in-time recovery.
 web/data/Track_backup_*.db
 web/data/Track_archive.db
+
+# dashboard_cache.db is GENERATED from Track.db by app.jobs.build_all, and it is
+# big: ~12MB, rewritten whole on every rebuild. Tracking it put a fresh 12MB blob
+# in history every time results were updated -- 58MB across five commits, for a
+# file that can always be rebuilt from something already in the repo.
+#
+# The deploy gets it from a GitHub Release asset instead. See docs/PROJECT_GUIDE.md
+# section 10: publish it with `gh release upload`, and the deploy curls it down.
+# Releases are not part of the git object graph, so replacing the asset costs
+# nothing in clone size.
+web/data/dashboard_cache.db
 
 node_modules/
 package-lock.json

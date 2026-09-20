@@ -4,13 +4,10 @@ The smaller insight tools: sectional trends and hypothetical
 result rankings.
 """
 
-from .shared import (  # noqa: F401  -- shared setup and constants
-    AthleteResult,
-    CONST,
-    Meet,
-    _FALLBACK_GENDERS,
-    db,
-)
+from .. import db
+from ..models import AthleteResult, Meet
+
+from common.const import CONST
 
 from .shared import (
     _get_all_sectional_events_list,
@@ -21,7 +18,7 @@ from .shared import (
 from .formatting import (
     _format_sectional_result,
 )
-from .ranking import (
+from .event_ranking import (
     _compute_all_event_difficulties_from_data,
 )
 
@@ -30,15 +27,10 @@ from .ranking import (
 def get_sectional_event_trends_options():
     """Return filter options for the sectional event trends page."""
     all_events = _get_sectional_events()
-    
-    try:
-        genders = list(getattr(CONST.GENDER, "ALL", _FALLBACK_GENDERS))
-    except NameError:
-        genders = _FALLBACK_GENDERS
-    
+
     return {
         "events": sorted(all_events),
-        "genders": genders,
+        "genders": list(CONST.GENDER.ALL),
         "years": _get_sectional_years(),
     }
 
@@ -166,15 +158,8 @@ def get_sectional_event_trends(gender: str, event: str):
 def get_hypothetical_ranking_options():
     """Return filter options for the hypothetical athlete query page."""
     all_events = _get_sectional_events()
-    try:
-        genders = list(getattr(CONST.GENDER, "ALL", _FALLBACK_GENDERS))
-    except NameError:
-        genders = _FALLBACK_GENDERS
-
-    try:
-        meet_types = list(getattr(CONST.MEET_TYPE, "ALL", []))
-    except NameError:
-        meet_types = ["Sectional"]
+    genders = list(CONST.GENDER.ALL)
+    meet_types = list(CONST.MEET_TYPE.ALL)
 
     return {
         "events": sorted(all_events),

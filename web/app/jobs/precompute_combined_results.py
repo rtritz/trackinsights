@@ -12,22 +12,18 @@ Run after Regional meets are scraped. From web/:
     python -m app.jobs.precompute_combined_results
 """
 import os
-import sys
 import json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WEB_DIR = os.path.abspath(os.path.join(HERE, '..', '..'))
-if WEB_DIR not in sys.path:
-    sys.path.insert(0, WEB_DIR)
 
 from app import create_app, db  # noqa: E402
 from app.models import Athlete, AthleteResult, Meet, RelayResult, School  # noqa: E402
 from app.queries import (  # noqa: E402
     _get_event_types_map,
     _regional_events_for_gender,
-    get_state_standard_display,
-    meets_state_standard,
 )
+from common.standards import get_state_standard_display, meets_state_standard  # noqa: E402
 
 
 OUTPUT_DIR = os.path.join(WEB_DIR, 'app', 'static', 'data', 'regional_predictions')

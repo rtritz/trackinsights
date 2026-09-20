@@ -4,28 +4,20 @@ The school dashboards themselves: the page payload, the
 round-by-round summary and the qualifier lists.
 """
 
-from .shared import (  # noqa: F401  -- shared setup and constants
-    Any,
-    Athlete,
-    AthleteResult,
-    CONST,
-    Dict,
-    List,
-    MIN_RECORDS_YEAR,
-    Meet,
-    Optional,
-    REGIONAL_SECTIONAL_GROUPS,
-    RelayResult,
-    School,
-    Tuple,
-    db,
-    func,
-    joinedload,
-    lru_cache,
-)
+from functools import lru_cache
+from typing import Any, Dict, List, Optional, Tuple
+
+from sqlalchemy import func
+from sqlalchemy.orm import joinedload
+
+from .. import db
+from ..models import Athlete, AthleteResult, Meet, RelayResult, School
+
+from common.const import CONST
 from .shared import (
+    MIN_RECORDS_YEAR,
+    REGIONAL_SECTIONAL_GROUPS,
     _build_school_roster,
-    _get_event_types_map,
     _is_lower_better,
     _is_valid_postseason_mark,
     _resolve_postseason_individual_rows,
@@ -36,21 +28,15 @@ from .formatting import (
     _format_result_display,
     _ordinal,
 )
-from .ranking import (
-    _competition_rank_rows,
-)
 from .meets import (
     _compute_cumulative_points,
     _compute_school_relay_results,
     _compute_team_scores_for_meet,
     _format_points_value,
     _resolve_postseason_relay_rows,
-    _score_h2h_meet,
-    _stage_cells,
 )
 from .qualifiers import (
     _format_school_qualifier_row,
-    _advancement_from_rows,
     get_regional_qualifiers,
     get_state_qualifiers,
 )

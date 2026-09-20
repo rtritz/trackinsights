@@ -538,7 +538,7 @@ def build_rankings(gender, season):
     from sqlalchemy.orm import joinedload
 
     from ..models import School
-    from ..queries.rankings import _build_statewide_program_rankings
+    from ..queries.program_rankings import _build_statewide_program_rankings
     from ..queries.scorecard import _event_ranked_rows, _relay_ranked_rows
     from ..queries.shared import _resolve_school_enrollment_for_year
 

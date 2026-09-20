@@ -3,21 +3,13 @@
 Athlete dashboards, their result rankings and badges.
 """
 
-from .shared import (  # noqa: F401  -- shared setup and constants
-    Athlete,
-    AthleteResult,
-    Conversion,
-    Event,
-    Meet,
-    Optional,
-    RelayResult,
-    School,
-    SchoolEnrollment,
-    and_,
-    db,
-    func,
-    joinedload,
-)
+from typing import Optional
+
+from sqlalchemy import and_, func
+from sqlalchemy.orm import joinedload
+
+from .. import db
+from ..models import Athlete, AthleteResult, Event, Meet, RelayResult, School, SchoolEnrollment
 
 from .shared import (
     _is_lower_better,
@@ -25,7 +17,7 @@ from .shared import (
     _select_best_result_entry,
     _select_preferred_result,
 )
-from .ranking import (
+from .event_ranking import (
     _compute_cohort_ranking,
     _compute_rank_for_event,
     _get_field_size,

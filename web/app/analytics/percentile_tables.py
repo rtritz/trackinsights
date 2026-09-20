@@ -1,3 +1,17 @@
+"""Percentile tables, computed from every result in the database.
+
+Named percentile_tables rather than percentiles so it is distinct from
+``app.queries.percentiles``, which is the feature layer above it -- that one
+answers the percentile pages, this one does the arithmetic.
+
+Takes the database connection as an argument rather than importing the Flask
+app's ``db`` to fetch one. This package is the bottom of the stack -- queries and
+routes call into it, it calls into nothing above it -- and an import back up to
+``app.db`` made that a cycle, which is why it had to be written inside the
+function to work at all. Handing the connection in keeps the direction of
+dependency one-way, and lets this run against any connection: the app's, a
+notebook's, or a test's.
+"""
 import pandas as pd
 
 from common.const import CONST
@@ -23,6 +37,7 @@ def convert_back(event_type, event_result):
 
 
 def get_percentiles(
+    connection,                 # DBAPI/SQLAlchemy connection to read the results through.
     events=None,                # tuple of events to include in results. None means all events.
     genders=None,               # tuple of genders to include in results. None means both Boys and Girls.
     percentiles=(25, 50, 75),   # tuple of percentiles to include in results.
@@ -34,6 +49,10 @@ def get_percentiles(
     Returns percentile data for track & field events.
 
     Parameters:
+         connection: An open database connection to read through. The web app
+             passes its own (``db.session.connection()``) so the read is inside
+             the request's transaction and the freshness check can account for
+             it; a notebook or script can pass ``common.db.Database``'s.
          events (tuple[str] or None): Events to include in results. None means all events.
          genders (tuple[str] or None): Genders to include in results. None means both Boys and Girls.
          percentiles (tuple[int]): Percentiles to include in results.
@@ -48,15 +67,6 @@ def get_percentiles(
     Returns:
         DataFrame or tuple[DataFrame, DataFrame]: Single DataFrame if one gender specified, otherwise tuple of (Girls DataFrame, Boys DataFrame).
     """
-    # Read through the app's own connection rather than opening a second
-    # handle to the same file. common.db.Database is for the notebooks and
-    # standalone scripts, which have no Flask app to borrow one from; using it
-    # here meant a connection the app did not manage and a read that the
-    # per-request freshness check could not account for. The SQL is shared, so
-    # both paths still run exactly the same query.
-    from .. import db as _sqlalchemy
-
-    connection = _sqlalchemy.session.connection()
     df = pd.read_sql_query(ALL_ATHLETE_RESULTS_SQL, connection)
     df_relay = pd.read_sql_query(ALL_RELAY_RESULTS_SQL, connection)
 

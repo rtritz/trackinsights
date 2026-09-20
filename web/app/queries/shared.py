@@ -1,7 +1,21 @@
 """Shared
 
-Helpers used across every feature: database access, result
-resolution, formatting and the constants the rest of the package shares.
+Helpers and constants this package owns and several features need: result
+resolution, enrollment peers, sectional-host display, and the scoring tables.
+
+WHAT DOES NOT BELONG HERE
+-------------------------
+Anything this module does not itself define. It used to re-export thirty names
+it had merely imported -- the SQLAlchemy models, ``db``, ``func``,
+``joinedload``, even ``typing.Optional`` -- and every feature module opened with
+``from .shared import (Athlete, AthleteResult, db, func, ...)``.
+
+That made the split it was meant to enable half-useless: you could not tell from
+a module's imports which names were the project's and which were SQLAlchemy's,
+the import order became load-bearing, and this file could never shrink because
+everything depended on it for things it did not own. Modules now import models
+from ``..models``, ``db`` from ``..``, and third-party names from the libraries
+they come from. ``tests/test_no_reexport_hub.py`` keeps it that way.
 """
 
 import os
@@ -11,13 +25,10 @@ import re
 
 import sys
 
-import bisect
 
 import logging
 
-import math
 
-import statistics
 
 # Set up module-level logger
 logger = logging.getLogger("trackinsights.queries")
@@ -29,20 +40,14 @@ if not logger.hasHandlers():
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
-import html as html_lib
-
 from functools import lru_cache
 
-from pathlib import Path
 
 from typing import Any, Dict, List, Optional, Tuple
 
 
-from urllib.request import Request, urlopen
+from sqlalchemy import func, text as sqlalchemy_text
 
-from sqlalchemy import or_, func, and_, text as sqlalchemy_text
-
-from sqlalchemy.orm import joinedload
 
 from ..models import (
     Athlete,
@@ -51,20 +56,18 @@ from ..models import (
     RelayResult,
     Meet,
     Event,
-    SchoolEnrollment,
 )
 
 from .. import db
 
 from common.conversion import Conversion
 
-from common.regional_hosts import get_configured_regional_hosts
 
-from common.standards import meets_state_standard, get_state_standard_display
+from common.tournament_hosts import get_sectional_hosts as get_precomputed_sectional_hosts
+
 
 from common.const import CONST
 
-from ..analytics.percentiles import get_percentiles as _script_get_percentiles
 
 # Display helpers. These are the bottom of this package's import
 # order: everything may call them, they call nothing here.
@@ -88,16 +91,6 @@ PERCENTILE_CHOICES = (10, 25, 50, 75, 90, 95)
 GRADE_LEVELS = ("FR", "SO", "JR", "SR")
 
 _RELAY_NAME_DELIMITER = re.compile(r"\band\b|&|/|;|,|\+", re.IGNORECASE)
-
-# Fallback constants in case CONST is not available
-_FALLBACK_EVENTS = {
-    "ALL_TRACK": ["100 Meters", "200 Meters", "400 Meters", "800 Meters", "1600 Meters", "3200 Meters"],
-    "ALL_FIELD": ["High Jump", "Long Jump", "Pole Vault", "Shot Put", "Discus"],
-    "ALL_GIRLS_HURDLES": ["100 Hurdles", "300 Hurdles"],
-    "ALL_BOYS_HURDLES": ["110 Hurdles", "300 Hurdles"],
-}
-
-_FALLBACK_GENDERS = ["Boys", "Girls"]
 
 # Points awarded by place for cumulative scoring
 _PLACE_POINTS = {1: 10, 2: 8, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1}
@@ -287,18 +280,15 @@ def _count_result_types(entries):
     return counts
 
 def _get_sectional_events():
-    """Get all events for sectional trends, with fallback if CONST not available."""
+    """Every event the sectional-trends tool offers, both genders' hurdles included."""
+    groups = [
+        CONST.EVENT.ALL_TRACK,
+        CONST.EVENT.ALL_FIELD,
+        CONST.EVENT.ALL_GIRLS_HURDLES,
+        CONST.EVENT.ALL_BOYS_HURDLES,
+    ]
+
     all_events = []
-    try:
-        groups = [
-            getattr(CONST.EVENT, "ALL_TRACK", _FALLBACK_EVENTS["ALL_TRACK"]),
-            getattr(CONST.EVENT, "ALL_FIELD", _FALLBACK_EVENTS["ALL_FIELD"]),
-            getattr(CONST.EVENT, "ALL_GIRLS_HURDLES", _FALLBACK_EVENTS["ALL_GIRLS_HURDLES"]),
-            getattr(CONST.EVENT, "ALL_BOYS_HURDLES", _FALLBACK_EVENTS["ALL_BOYS_HURDLES"]),
-        ]
-    except NameError:
-        groups = list(_FALLBACK_EVENTS.values())
-    
     for group in groups:
         for name in group:
             if name not in all_events:
@@ -324,35 +314,14 @@ def _get_event_types_map():
     return {e.event: (e.event_type or "Track") for e in events}
 
 def _get_all_sectional_events_list(gender: str):
-    """Get the list of events to analyze for a given gender."""
+    """The events to analyse for one gender -- track, field, and that gender's hurdles."""
+    hurdles = (CONST.EVENT.ALL_GIRLS_HURDLES if gender == CONST.GENDER.GIRLS
+               else CONST.EVENT.ALL_BOYS_HURDLES)
+
     all_events = []
-    try:
-        track_events = getattr(CONST.EVENT, "ALL_TRACK", _FALLBACK_EVENTS["ALL_TRACK"])
-        field_events = getattr(CONST.EVENT, "ALL_FIELD", _FALLBACK_EVENTS["ALL_FIELD"])
-    except NameError:
-        track_events = _FALLBACK_EVENTS["ALL_TRACK"]
-        field_events = _FALLBACK_EVENTS["ALL_FIELD"]
-
-    for name in track_events + field_events:
+    for name in list(CONST.EVENT.ALL_TRACK) + list(CONST.EVENT.ALL_FIELD) + list(hurdles):
         if name not in all_events:
             all_events.append(name)
-
-    # Add gender-specific hurdles
-    try:
-        if gender == "Girls":
-            hurdles = getattr(CONST.EVENT, "ALL_GIRLS_HURDLES", _FALLBACK_EVENTS["ALL_GIRLS_HURDLES"])
-        else:
-            hurdles = getattr(CONST.EVENT, "ALL_BOYS_HURDLES", _FALLBACK_EVENTS["ALL_BOYS_HURDLES"])
-    except NameError:
-        if gender == "Girls":
-            hurdles = _FALLBACK_EVENTS["ALL_GIRLS_HURDLES"]
-        else:
-            hurdles = _FALLBACK_EVENTS["ALL_BOYS_HURDLES"]
-
-    for name in hurdles:
-        if name not in all_events:
-            all_events.append(name)
-
     return all_events
 
 
@@ -790,53 +759,16 @@ def _state_target_field_size(year: int) -> int:
         return 30
     return STATE_TARGET_FIELD_SIZE_BY_YEAR.get(parsed_year, 27)
 
-@lru_cache(maxsize=32)
 def _ihsaa_sectional_hosts(year: int, gender: str):
-    gender_slug = "boys" if str(gender).strip().lower() == "boys" else "girls"
-    parsed_year = int(year)
-    season_slug = f"{parsed_year - 1}-{parsed_year % 100:02d}"
-    url = f"https://www.ihsaa.org/sports/{gender_slug}/track-field/{season_slug}-tournament?round=sectionals"
+    """{sectional number: host} for a season, from the precomputed file.
 
-    try:
-        request = Request(
-            url,
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
-        )
-        with urlopen(request, timeout=20) as response:
-            html = response.read().decode("utf-8", errors="ignore")
-    except Exception:
-        return {}
+    Built offline by app.jobs.precompute_tournament_hosts. This used to fetch
+    ihsaa.org here, inside the request -- see common/tournament_hosts.py for why
+    it no longer does. No cache is needed: the read is a dict lookup behind
+    common.sectional_hosts' own cache.
+    """
+    return get_precomputed_sectional_hosts(year, gender)
 
-    hosts = {}
-    paragraphs = re.findall(r"<p[^>]*>.*?</p>", html, flags=re.IGNORECASE | re.DOTALL)
-    for block in paragraphs:
-        lower_block = block.lower()
-        if "in.milesplit.com" not in lower_block or "/results" not in lower_block:
-            continue
-        if "schools:" not in lower_block:
-            continue
-
-        text = re.sub(r"<[^>]+>", " ", block)
-        text = html_lib.unescape(re.sub(r"\s+", " ", text)).strip()
-
-        before_tickets = text.split("Tickets", 1)[0].strip()
-        match = re.match(r"^(\d{1,2})\.\s*(.+)$", before_tickets)
-        if not match:
-            continue
-
-        sectional_num = int(match.group(1))
-        host = re.sub(
-            r"\s+\d{1,2}(?::\d{2})?\s*[ap]m(?:\s*[A-Z]{2})?$",
-            "",
-            match.group(2).strip(),
-            flags=re.IGNORECASE,
-        ).strip(" -")
-        host = re.sub(r"\s*\(\d+\)\s*$", "", host).strip()
-
-        if 1 <= sectional_num <= 32 and host and sectional_num not in hosts:
-            hosts[sectional_num] = host
-
-    return hosts
 
 def _display_sectional_host(host: Optional[str], meet_num: Optional[int], year: int, gender: str) -> str:
     raw_host = (host or "").strip()

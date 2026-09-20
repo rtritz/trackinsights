@@ -1,64 +1,39 @@
-"""Rankings
+"""Where a whole program sits statewide.
 
-Where a program sits statewide.
+Named program_rankings to keep it apart from event_ranking beside it, which
+ranks a single mark within a field. The two were once `rankings.py` and
+`ranking.py` -- one letter apart, and imported all over the package.
 
 The composite score and the ranking built from it. Expensive -- it reads every
 result in the state -- which is why the dashboards are precomputed rather than
 worked out per request.
 """
 
-from .shared import (  # noqa: F401  -- shared setup and constants
-    Any,
-    Athlete,
-    AthleteResult,
-    CONST,
-    Dict,
-    Event,
-    List,
-    MIN_RECORDS_YEAR,
-    Meet,
-    Optional,
-    RelayResult,
-    School,
-    Tuple,
-    bisect,
-    db,
-    lru_cache,
-    statistics,
-)
+import bisect
+import statistics
+from functools import lru_cache
+from typing import Any, Dict, List, Optional, Tuple
+
+from .. import db
+from ..models import Athlete, AthleteResult, Meet, RelayResult, School
+
+from common.const import CONST
 from .shared import (
-    _build_school_roster,
+    MIN_RECORDS_YEAR,
     _get_event_types_map,
     _is_lower_better,
     _is_valid_postseason_mark,
     _resolve_postseason_individual_rows,
-    _resolve_school_enrollment_for_year,
-    _school_logo_url,
 )
 from .formatting import (
     _format_result_display,
     _ordinal,
 )
-from .ranking import (
+from .event_ranking import (
     _competition_rank_rows,
 )
 from .meets import (
-    _compute_cumulative_points,
-    _compute_school_relay_results,
-    _compute_team_scores_for_meet,
-    _format_points_value,
     _resolve_postseason_relay_rows,
-    _score_h2h_meet,
-    _stage_cells,
-)
-from .qualifiers import (
-    _format_school_qualifier_row,
-    _advancement_from_rows,
-    get_regional_qualifiers,
-    get_state_qualifiers,
-)
-from .percentiles import (
-    _get_school_percentile_years,
 )
 
 from .school_dashboard import (

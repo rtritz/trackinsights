@@ -10,14 +10,11 @@ Run this after sectional results are updated. From web/:
     python -m app.jobs.precompute_combined_rankings
 """
 import os
-import sys
 import json
 
 # Ensure 'app' is importable when running this script directly
 HERE = os.path.dirname(os.path.abspath(__file__))
 WEB_DIR = os.path.abspath(os.path.join(HERE, '..', '..'))
-if WEB_DIR not in sys.path:
-    sys.path.insert(0, WEB_DIR)
 
 from app import create_app  # noqa: E402
 from app.queries import get_regional_qualifiers  # noqa: E402

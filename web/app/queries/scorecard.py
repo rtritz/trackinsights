@@ -4,54 +4,28 @@ One school's entries, round by round: the marks, the places, and
 whether each entry advanced.
 """
 
-from .shared import (  # noqa: F401  -- shared setup and constants
-    Any,
-    Athlete,
-    AthleteResult,
-    CONST,
-    Dict,
-    Event,
-    List,
-    Meet,
-    RelayResult,
-    Tuple,
-    _STAGE_ORDER,
-    db,
-    lru_cache,
-)
+from functools import lru_cache
+from typing import Any, Dict, List, Tuple
+
+from .. import db
+from ..models import AthleteResult, Event, Meet, RelayResult
+
+from common.const import CONST
 from .shared import (
-    _build_school_roster,
-    _get_event_types_map,
+    _STAGE_ORDER,
     _is_lower_better,
     _is_valid_postseason_mark,
     _resolve_postseason_individual_rows,
-    _resolve_school_enrollment_for_year,
-    _school_logo_url,
 )
-from .formatting import (
-    _format_result_display,
-    _ordinal,
-)
-from .ranking import (
+from .event_ranking import (
     _competition_rank_rows,
 )
 from .meets import (
-    _compute_cumulative_points,
-    _compute_school_relay_results,
-    _compute_team_scores_for_meet,
-    _format_points_value,
     _resolve_postseason_relay_rows,
-    _score_h2h_meet,
     _stage_cells,
 )
 from .qualifiers import (
-    _format_school_qualifier_row,
     _advancement_from_rows,
-    get_regional_qualifiers,
-    get_state_qualifiers,
-)
-from .percentiles import (
-    _get_school_percentile_years,
 )
 
 from .school_dashboard import (

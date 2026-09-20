@@ -25,10 +25,6 @@ import os
 import sys
 import time
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-WEB_DIR = os.path.abspath(os.path.join(HERE, '..', '..'))
-if WEB_DIR not in sys.path:
-    sys.path.insert(0, WEB_DIR)
 
 from app import create_app  # noqa: E402
 from app import queries  # noqa: E402

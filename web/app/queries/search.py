@@ -3,12 +3,10 @@
 The site-wide search that matches athletes and schools.
 """
 
-from .shared import (  # noqa: F401  -- shared setup and constants
-    Athlete,
-    School,
-    db,
-    or_,
-)
+from sqlalchemy import or_
+
+from .. import db
+from ..models import Athlete, School
 
 from .search_scoring import (
     _calculate_combined_score,

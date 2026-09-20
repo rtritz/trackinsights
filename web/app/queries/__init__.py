@@ -5,9 +5,14 @@ answer. Every name the package defines is re-exported here, so
 `from app.queries import X` and `queries.X` work exactly as before -- callers
 did not have to change, and new code can import from the specific module instead.
 
-    shared.py            helpers every feature uses
+    shared.py            helpers and constants this package owns
+    formatting.py        turning marks, gaps and places into display strings
+    cache.py             emptying the caches when Track.db is replaced
+    event_ranking.py     where one mark stands in a field
+    search_scoring.py    name matching and relevance for the search box
+
     school_dashboard.py  the dashboards themselves
-    rankings.py          statewide program rankings
+    program_rankings.py  where a whole program sits statewide
     scorecard.py         one school's entries, round by round
     outlook.py           returning athletes and head-to-head
     meets.py             meet results, team scoring, relays
@@ -16,6 +21,8 @@ did not have to change, and new code can import from the specific module instead
     percentiles.py       percentile tables and tools
     insights.py          sectional trends, hypothetical rankings
     search.py            site-wide athlete and school search
+
+The first group is the base every feature draws on; the second is the features.
 
 ADDING A FUNCTION
 -----------------
@@ -34,8 +41,6 @@ from .shared import (  # noqa: F401
     _covered_rank_seasons,
     _get_event_types_map,
     _schools_with_logos,
-    get_state_standard_display,
-    meets_state_standard,
 )
 from .cache import (  # noqa: F401
     _clear_query_caches,
@@ -65,7 +70,7 @@ from .school_dashboard import (  # noqa: F401
     get_school_season_core,
 )
 
-from .rankings import (  # noqa: F401
+from .program_rankings import (  # noqa: F401
     _build_statewide_program_rankings,
     get_program_rank,
 )

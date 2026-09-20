@@ -3,34 +3,25 @@
 Meet results, team scoring, relays and per-stage rows.
 """
 
-from .shared import (  # noqa: F401  -- shared setup and constants
-    Any,
-    Athlete,
-    AthleteResult,
-    CONST,
-    Dict,
-    Event,
-    List,
+from pathlib import Path
+from functools import lru_cache
+from typing import Any, Dict, List, Optional, Tuple
+
+from sqlalchemy import func
+
+from .. import db
+from ..models import Athlete, AthleteResult, Event, Meet, RelayResult, School
+
+from common.const import CONST
+
+from .shared import (
     MIN_RECORDS_YEAR,
-    Meet,
-    Optional,
-    Path,
-    RelayResult,
-    School,
-    Tuple,
     _H2H_INDIVIDUAL_POINTS,
     _H2H_RELAY_POINTS,
     _PLACE_POINTS,
     _RELAY_NAME_DELIMITER,
-    _STATE_PLACE_POINTS,
     _STAGE_ORDER,
-    db,
-    func,
-    lru_cache,
-    re,
-)
-
-from .shared import (
+    _STATE_PLACE_POINTS,
     _choose_result_entry,
     _count_result_types,
     _is_better,
@@ -44,7 +35,7 @@ from .formatting import (
     _ordinal,
     _safe_int,
 )
-from .ranking import (
+from .event_ranking import (
     _normalize_performance_input,
     _project_place,
 )

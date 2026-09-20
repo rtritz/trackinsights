@@ -3,26 +3,21 @@
 Percentile tables and the percentile query tools.
 """
 
-from .shared import (  # noqa: F401  -- shared setup and constants
-    Athlete,
-    AthleteResult,
-    CONST,
-    DEFAULT_PERCENTILES,
-    Event,
-    GRADE_LEVELS,
-    List,
-    Meet,
-    Optional,
-    PERCENTILE_CHOICES,
-    RelayResult,
-    School,
-    _script_get_percentiles,
-    db,
-    func,
-    math,
-)
+import math
+from typing import List, Optional
+
+from sqlalchemy import func
+
+from .. import db
+from ..models import Athlete, AthleteResult, Event, Meet, RelayResult
+from ..analytics.percentile_tables import get_percentiles as _percentile_tables
+
+from common.const import CONST
 
 from .shared import (
+    DEFAULT_PERCENTILES,
+    GRADE_LEVELS,
+    PERCENTILE_CHOICES,
     _coerce_sequence,
     _is_lower_better,
     _tuple_or_none,
@@ -72,7 +67,9 @@ def get_percentiles_report(
         ),
     }
 
-    df = _script_get_percentiles(**kwargs)
+    # The app's own connection, so the read sits inside the request's
+    # transaction rather than opening a second handle to the same file.
+    df = _percentile_tables(db.session.connection(), **kwargs)
     if df is None:
         return {"columns": [], "rows": [], "filters": kwargs}
 

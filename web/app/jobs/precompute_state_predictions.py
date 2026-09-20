@@ -4,13 +4,10 @@ Run this after regional results are updated. From web/:
     python -m app.jobs.precompute_state_predictions
 """
 import os
-import sys
 import json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WEB_DIR = os.path.abspath(os.path.join(HERE, '..', '..'))
-if WEB_DIR not in sys.path:
-    sys.path.insert(0, WEB_DIR)
 
 from app.analytics.state_predictions import get_state_predictions  # noqa: E402
 

@@ -1,4 +1,8 @@
-"""Where a mark stands against everyone else's.
+"""Where one mark stands against everyone else's.
+
+Named event_ranking to keep it apart from program_rankings beside it, which
+ranks whole programs statewide. The two were once `ranking.py` and `rankings.py`
+-- one letter apart, and imported all over the package.
 
 Two related jobs. Ranking a mark within a field -- a school, a sectional, the
 whole state -- with the competition rules that govern ties, and estimating

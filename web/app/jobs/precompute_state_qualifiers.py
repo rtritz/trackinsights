@@ -8,13 +8,10 @@ Run after Regional meets are scraped. From web/:
     python -m app.jobs.precompute_state_qualifiers
 """
 import os
-import sys
 import json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WEB_DIR = os.path.abspath(os.path.join(HERE, '..', '..'))
-if WEB_DIR not in sys.path:
-    sys.path.insert(0, WEB_DIR)
 
 from app import create_app, db  # noqa: E402
 from app.queries import get_state_qualifiers  # noqa: E402
