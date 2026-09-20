@@ -1,4 +1,3 @@
-import json
 import os
 from flask import jsonify, request, current_app
 from . import api_bp
@@ -22,6 +21,33 @@ from ..queries import (
     get_state_qualifiers_status,
     get_state_qualifiers,
 )
+
+
+def _serve_precomputed(path):
+    """Send a precomputed JSON file to the browser verbatim, or None if absent.
+
+    The file IS the response -- these routes return the whole artifact, not a
+    slice of it -- so parsing it into Python and re-serializing produced bytes
+    almost identical to the ones already on disk, at 12ms per request for the
+    largest of them against 0.5ms to read and send. The jobs write these files
+    compact (app/jobs/artifacts.py) so the wire payload is no bigger for it.
+
+    Returning None rather than raising lets the caller fall through to live
+    computation, which is what happened before when the file was missing.
+
+    The parse used to double as a corruption check. That job moved to where it
+    is free: the jobs validate the payload as they serialize it and swap the
+    file into place with os.replace, so a reader sees either the whole previous
+    file or the whole new one -- never half of one.
+    """
+    try:
+        with open(path, 'rb') as handle:
+            data = handle.read()
+    except OSError:
+        return None
+    if not data:
+        return None
+    return current_app.response_class(data, mimetype='application/json')
 
 
 @api_bp.route('/athletes')
@@ -307,14 +333,11 @@ def api_state_qualifiers():
         'static', 'data', 'state_predictions',
         f'state_qualifiers_{year}_{gender.lower()}.json',
     )
-    if os.path.exists(precomputed_path):
-        try:
-            with open(precomputed_path, 'r', encoding='utf-8') as f:
-                return jsonify(json.load(f))
-        except Exception:
-            pass  # Fall through to live computation if file is unreadable
+    served = _serve_precomputed(precomputed_path)
+    if served is not None:
+        return served
 
-    # Fallback to live computation if file missing or unreadable
+    # Fallback to live computation if the file is missing
     try:
         payload = get_state_qualifiers(gender=gender, year=year)
         return jsonify(payload)
@@ -352,13 +375,9 @@ def api_regional_top_list():
         'static', 'data', 'regional_predictions',
         f'{file_prefix}_{year}_{gender.lower()}.json',
     )
-    if os.path.exists(precomputed_path):
-        try:
-            with open(precomputed_path, 'r', encoding='utf-8') as f:
-                return jsonify(json.load(f))
-        except Exception:
-            # Fall through to live computation if the file is unreadable.
-            pass
+    served = _serve_precomputed(precomputed_path)
+    if served is not None:
+        return served
 
     # For source='results' we cannot fall back to the sectional-based live
     # computation (that would return projections, not actual regional results).

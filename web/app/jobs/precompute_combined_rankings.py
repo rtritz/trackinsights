@@ -18,6 +18,7 @@ WEB_DIR = os.path.abspath(os.path.join(HERE, '..', '..'))
 
 from app import create_app  # noqa: E402
 from app.queries import get_regional_qualifiers  # noqa: E402
+from app.jobs.artifacts import write_json_artifact  # noqa: E402
 
 
 OUTPUT_DIR = os.path.join(WEB_DIR, 'app', 'static', 'data', 'regional_predictions')
@@ -106,8 +107,7 @@ def main(output_prefix: str = 'combined_rankings'):
                     OUTPUT_DIR,
                     f"{output_prefix}_{year}_{gender.lower()}.json",
                 )
-                with open(out_path, "w", encoding="utf-8") as f:
-                    json.dump(payload, f, indent=2)
+                write_json_artifact(out_path, payload)
                 print(f"  Saved: {out_path}  (events={len(payload['events'])})")
 
 

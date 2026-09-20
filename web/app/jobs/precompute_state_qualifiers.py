@@ -15,6 +15,7 @@ WEB_DIR = os.path.abspath(os.path.join(HERE, '..', '..'))
 
 from app import create_app, db  # noqa: E402
 from app.queries import get_state_qualifiers  # noqa: E402
+from app.jobs.artifacts import write_json_artifact  # noqa: E402
 
 OUTPUT_DIR = os.path.join(WEB_DIR, 'app', 'static', 'data', 'state_predictions')
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -33,8 +34,7 @@ def main():
                     OUTPUT_DIR,
                     f"state_qualifiers_{year}_{gender.lower()}.json",
                 )
-                with open(out_path, "w", encoding="utf-8") as f:
-                    json.dump(payload, f, indent=2)
+                write_json_artifact(out_path, payload)
                 total = sum(len(e['qualifiers']) for e in payload['events'])
                 print(f"  Saved: {out_path}  (events={len(payload['events'])}, rows={total})")
 
