@@ -345,8 +345,15 @@ remember -- `publish.sh` does it the first time and skips it thereafter.
 you push `main` and the cache has changed, which makes step 2 disappear:
 
 ```bash
-git config core.hooksPath docs/hooks   # once per clone -- hooks are not cloned
+git config core.hooksPath docs/hooks   # the data publisher only -- see below
 ```
+
+**Only the person who publishes data should turn this on**, and only on their own
+machine. That setting lives in `.git/config`, which is never committed, so
+cloning does not enable it -- everyone else gets an inert file in `docs/hooks/`,
+which is what you want: publishing needs the built cache and write access to the
+repository's releases, so for a teammate it could only fail, and a failed publish
+stops the push.
 
 Then a data update is just rebuild, commit, push. The hook publishes nothing
 when the cache has not moved, so ordinary pushes are unaffected, and it ignores

@@ -6,12 +6,17 @@
 # separate command you have to remember after every data update, and forgetting
 # it means the server clones new results next to an old cache.
 #
-# INSTALL (once per clone -- hooks are not cloned with the repository):
+# WHO SHOULD INSTALL THIS: whoever publishes data updates -- one person. It is
+# not for everyone on the team. Publishing needs the built cache and write access
+# to the repository's releases, so for anyone else it can only fail, and a failed
+# publish stops the push.
 #
 #     git config core.hooksPath docs/hooks
 #
-# Keeping the hook in the repo rather than in .git/hooks is what lets it be
-# reviewed, fixed and shared. `git push --no-verify` skips it.
+# That setting lives in .git/config, which is never committed, so cloning this
+# repository does NOT switch the hook on -- teammates get an inert file. Keeping
+# it in the repo rather than in .git/hooks is what lets it be reviewed and
+# fixed. `git push --no-verify` skips it for a run.
 #
 # It does the deciding; docs/publish.sh does the work, so there is one
 # implementation and running it by hand behaves identically.
