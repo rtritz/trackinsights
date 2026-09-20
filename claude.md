@@ -53,7 +53,9 @@ trackinsights/
 │       └── static/
 │           ├── css/              # output.css is BUILT from input.css -- never edit it directly
 │           ├── js/  images/  reports/
-│           └── data/             # GENERATED JSON from the precompute jobs
+│           └── data/             # GENERATED JSON from the precompute jobs, plus
+│                                 # manifest.json: which season's data each was built
+│                                 # from, so `build_all --check` can spot stale ones
 │
 ├── standalone/                   # NOT part of the web app: notebooks, scripts, reports
 └── tests/

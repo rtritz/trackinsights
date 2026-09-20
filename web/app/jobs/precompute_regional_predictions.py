@@ -25,7 +25,7 @@ def main():
             print(f"Computing regional predictions for {year} {gender}...")
             preds = get_regional_predictions(year, gender, top_n=None)
             out_path = os.path.join(OUTPUT_DIR, f"regional_predictions_{year}_{gender.lower()}.json")
-            write_json_artifact(out_path, preds)
+            write_json_artifact(out_path, preds, year=year, gender=gender)
             print(f"Saved: {out_path}")
 
 

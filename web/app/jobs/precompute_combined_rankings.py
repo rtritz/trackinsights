@@ -107,7 +107,7 @@ def main(output_prefix: str = 'combined_rankings'):
                     OUTPUT_DIR,
                     f"{output_prefix}_{year}_{gender.lower()}.json",
                 )
-                write_json_artifact(out_path, payload)
+                write_json_artifact(out_path, payload, year=year, gender=gender)
                 print(f"  Saved: {out_path}  (events={len(payload['events'])})")
 
 

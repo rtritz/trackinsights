@@ -389,22 +389,49 @@ Three things in that script are there for a reason:
 
 ### What `--check` actually verifies
 
-Every precomputed artifact records the SHA-256 of the Track.db it was built
-from -- `dashboard_cache.db` in its `meta` table, the JSON files in
-`static/data/manifest.json`. `--check` re-hashes the Track.db in the clone and
-compares against all of them, naming any that disagree.
+Every precomputed artifact records a fingerprint of the data it was built from,
+and `--check` recomputes that fingerprint and compares. It is the one mechanism
+that answers *did the results change without the precompute being re-run?*
 
-This is the one mechanism that answers "did the results change without the
-precompute being re-run?". It matters most for the two ways that happens:
+**The JSON files are fingerprinted per season, not on the whole database.** Each
+one covers a single year and gender, so its stamp covers only that season's
+meets, results, relays, the athletes and schools appearing in them, and that
+year's enrollments. `static/data/manifest.json` records the scope alongside the
+hash.
 
-- **Running one job instead of `build_all`.** Rebuilding only the dashboards
-  used to leave ten stale JSON files behind while `--check` still said
-  "current", because the cache was the only artifact that recorded its source.
-- **Forgetting `gh release upload`.** Track.db travels in git and the cache
-  travels in a Release, so unlike the JSON they can now arrive out of step.
+That scoping is what makes the check usable during a postseason. A whole-file
+hash of Track.db answers "did anything change?", which during two weeks of
+loading results is *always yes* -- so every artifact of every past season reads
+as stale at once, and the only thing anyone learns is to ignore the warning.
+Scoped, you get the answer worth having:
 
-`tournament_hosts.json` is deliberately exempt: it comes from ihsaa.org, not
-from Track.db, so a Track.db hash would say nothing about it.
+| what you did | what gets flagged |
+|---|---|
+| Loaded 2027 sectional results | the 2027 JSON files. 2026 untouched. |
+| Corrected a 2026 mark | the 2026 JSON files for that gender. 2027 untouched. |
+| Renamed a school that ran in 2026 | the 2026 files. |
+| Added a 2027 athlete at a new school | nothing from 2026. |
+
+So keeping old seasons' files costs nothing in noise. They stay serveable, and
+they only speak up when that season's data genuinely moves -- which is exactly
+when you do want to rebuild them.
+
+**`dashboard_cache.db` is the exception, and deliberately so.** A school
+dashboard shows every season at once and its statewide ranking shifts when any
+season shifts, so a new 2027 result really does make the 2026 view of it stale.
+It keeps a whole-file hash, which means *any* results change asks for a
+dashboard rebuild. That is correct, not noise -- but it is the reason a deploy
+mid-postseason will usually want the dashboards rebuilt too.
+
+`tournament_hosts.json` is exempt entirely: it comes from ihsaa.org, not from
+Track.db.
+
+### When you need to deploy anyway
+
+`--check --warn-only` prints the same report and exits 0. For shipping a
+template or styling fix while the results are mid-rebuild, where blocking the
+deploy would be the wrong answer. It is a deliberate override -- the deploy
+script above uses the gate.
 
 **The server needs three packages and nothing else:**
 

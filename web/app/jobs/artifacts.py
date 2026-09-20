@@ -47,13 +47,39 @@ A stamp per artifact rather than one for the whole directory, and updated in
 place rather than rewritten, because jobs are run individually: rebuilding one
 artifact must not claim the others are fresh too.
 
+SCOPED TO THE SEASON, NOT THE WHOLE DATABASE
+--------------------------------------------
+The stamp is a hash of the rows the artifact was actually built from -- one
+season and gender -- not of Track.db as a whole.
+
+A whole-file hash answers "did Track.db change?", which is the wrong question.
+During a postseason every new result changes it, so every artifact of every past
+season reads as stale at once. Told that its 2026 files are out of date each time
+a 2027 sectional lands, the only thing anyone learns is to ignore the check.
+
+Scoped, the answer is the one worth having: loading 2027 results flags the 2027
+artifacts and leaves 2026 alone; correcting a 2026 mark flags 2026, which is
+exactly when those files do need rebuilding.
+
+The scope covers everything an artifact reads: that season's meets, results and
+relays, the athletes and schools appearing in them, and that year's enrollments.
+Adding a 2027 athlete at a school that never competed in 2026 does not disturb
+2026; renaming a school that did, does.
+
+dashboard_cache.db is deliberately NOT scoped this way -- see
+services/dashboard_v4.py. A school dashboard shows every season at once and its
+statewide ranking moves when any of them move, so a new 2027 result really does
+make the 2026 view of it stale. Its whole-file hash is correct.
+
 The stamp lives in a sidecar, not in the payloads, because the payloads have
 different shapes -- some are objects, some are bare lists -- and because the
 routes forward them to the browser untouched. Nothing the browser receives
 changes because of this.
 """
+import hashlib
 import json
 import os
+import sqlite3
 from datetime import datetime, timezone
 
 from common.const import CONST
@@ -85,15 +111,95 @@ def _relative(path):
 
 
 def source_fingerprint():
-    """SHA-256 of the results database these artifacts are built from.
+    """SHA-256 of the whole results database.
 
-    Delegates to the dashboard cache's implementation rather than repeating it,
-    so the JSON and the cache can never disagree about what "the same Track.db"
-    means. It is cached there on (size, mtime), so building ten artifacts hashes
-    Track.db once.
+    For artifacts with no season scope. Delegates to the dashboard cache's
+    implementation rather than repeating it, so the two can never disagree about
+    what "the same Track.db" means; it is cached there on (size, mtime).
     """
     from app.services.dashboard_v4 import source_hash
     return source_hash()
+
+
+# The rows each (year, gender) artifact is built from. Ordered explicitly --
+# SQLite makes no promise about row order without it, and an unstable order
+# would make the hash differ between runs over identical data.
+_SCOPE_QUERIES = (
+    ("""select meet_id, host, meet_type, meet_num, gender, year
+          from meet where year=:year and gender=:gender
+         order by meet_id""",),
+    ("""select ar.athlete_id, ar.meet_id, ar.event, ar.result_type,
+                ar.result, ar.result2, ar.place, ar.grade
+          from athlete_result ar join meet m on m.meet_id = ar.meet_id
+         where m.year=:year and m.gender=:gender
+         order by ar.athlete_id, ar.meet_id, ar.event, ar.result_type""",),
+    ("""select rr.school_id, rr.meet_id, rr.event, rr.result, rr.result2,
+                rr.place, rr.athlete_names
+          from relay_result rr join meet m on m.meet_id = rr.meet_id
+         where m.year=:year and m.gender=:gender
+         order by rr.school_id, rr.meet_id, rr.event""",),
+    # Only the athletes who appear that season, so next season's intake does not
+    # disturb this season's stamp.
+    ("""select distinct a.athlete_id, a.first, a.last, a.school_id, a.gender,
+                a.grad_year
+          from athlete a
+          join athlete_result ar on ar.athlete_id = a.athlete_id
+          join meet m on m.meet_id = ar.meet_id
+         where m.year=:year and m.gender=:gender
+         order by a.athlete_id""",),
+    # Likewise the schools: those fielding an athlete or a relay that season.
+    ("""select distinct s.school_id, s.school_name, s.team_name, s.city, s.zip
+          from school s
+         where s.school_id in (
+               select a.school_id from athlete a
+                 join athlete_result ar on ar.athlete_id = a.athlete_id
+                 join meet m on m.meet_id = ar.meet_id
+                where m.year=:year and m.gender=:gender
+               union
+               select rr.school_id from relay_result rr
+                 join meet m on m.meet_id = rr.meet_id
+                where m.year=:year and m.gender=:gender)
+         order by s.school_id""",),
+    ("""select school_id, year, enrollment
+          from school_enrollment where year=:year
+         order by school_id""",),
+)
+
+_SCOPE_CACHE = {}
+
+
+def season_fingerprint(year, gender, db_path=None):
+    """SHA-256 of just the rows a (year, gender) artifact is built from.
+
+    About 45ms per season, and memoized per process, so stamping or checking all
+    ten artifacts costs a handful of queries rather than ten full table scans.
+    """
+    path = db_path or CONST.DB_PATH
+    key = (path, int(year), str(gender))
+    if key in _SCOPE_CACHE:
+        return _SCOPE_CACHE[key]
+
+    digest = hashlib.sha256()
+    params = {'year': int(year), 'gender': str(gender)}
+    try:
+        uri = 'file:%s?mode=ro' % path.replace(os.sep, '/')
+        conn = sqlite3.connect(uri, uri=True)
+    except sqlite3.OperationalError:
+        return ''
+    try:
+        for (sql,) in _SCOPE_QUERIES:
+            # A separator between sections, so rows from one query cannot
+            # run into the next and hash the same as a different arrangement.
+            digest.update(b'|section|')
+            for row in conn.execute(sql, params):
+                digest.update(repr(row).encode('utf-8'))
+    except sqlite3.Error:
+        return ''
+    finally:
+        conn.close()
+
+    _SCOPE_CACHE[key] = digest.hexdigest()
+    return _SCOPE_CACHE[key]
 
 
 def _write_atomic(path, text):
@@ -120,25 +226,35 @@ def read_manifest():
     return artifacts if isinstance(artifacts, dict) else {}
 
 
-def _record(key, size):
+def _record(key, size, year, gender):
     """Add this artifact's entry to the manifest, leaving the others alone."""
     artifacts = read_manifest()
-    artifacts[key] = {
-        'source_hash': source_fingerprint(),
-        'source_size': os.path.getsize(CONST.DB_PATH) if os.path.exists(CONST.DB_PATH) else 0,
+    entry = {
         'generated_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
         'bytes': size,
     }
+    if year is None:
+        entry['scope'] = 'all'
+        entry['source_hash'] = source_fingerprint()
+    else:
+        entry['scope'] = {'year': int(year), 'gender': str(gender)}
+        entry['source_hash'] = season_fingerprint(year, gender)
+    artifacts[key] = entry
     _write_atomic(MANIFEST_PATH, json.dumps(
         {'artifacts': dict(sorted(artifacts.items()))},
         indent=2, sort_keys=True) + '\n')
 
 
-def write_json_artifact(path, payload, stamp=True):
+def write_json_artifact(path, payload, year=None, gender=None, stamp=True):
     """Write `payload` to `path` as compact JSON. Returns the path.
 
     Raises ValueError if the payload contains NaN or Infinity, before anything
     is written -- a failed build is the point.
+
+    Pass the `year` and `gender` the payload covers. The artifact is then stamped
+    with a hash of just that season's rows, so next season's results do not make
+    it read as stale. Omit them only for an artifact genuinely derived from the
+    whole database.
 
     Pass stamp=False for an artifact not derived from Track.db. Anything written
     outside static/data/ is never stamped -- the manifest describes that
@@ -151,29 +267,33 @@ def write_json_artifact(path, payload, stamp=True):
 
     key = _relative(path)
     if stamp and key is not None and key not in UNSTAMPED:
-        _record(key, len(text.encode('utf-8')))
+        _record(key, len(text.encode('utf-8')), year, gender)
     return path
 
 
 def check_artifacts():
-    """Are the JSON artifacts built from the Track.db that is here now?
+    """Are the JSON artifacts built from the results that are here now?
 
-    Returns (stale, messages). `stale` is True if any artifact is missing,
-    unstamped, or stamped with a different Track.db.
+    Each artifact is compared against its own scope -- the season and gender it
+    covers -- so loading a new season flags that season's files and leaves every
+    earlier one alone.
+
+    Returns (stale, messages).
     """
-    current = source_fingerprint()
     manifest = read_manifest()
 
     on_disk = set()
     for root, _dirs, files in os.walk(DATA_DIR):
         for name in files:
             if name.endswith('.json') and name != 'manifest.json':
-                on_disk.add(_relative(os.path.join(root, name)))
-
-    problems = []
+                key = _relative(os.path.join(root, name))
+                if key is not None:
+                    on_disk.add(key)
 
     if not manifest:
         return True, ['no manifest.json -- the JSON artifacts have never been stamped']
+
+    problems = []
 
     for key in sorted(on_disk - set(manifest) - UNSTAMPED):
         problems.append('%s is not in the manifest (built by an older job?)' % key)
@@ -182,12 +302,22 @@ def check_artifacts():
         if key not in on_disk:
             problems.append('%s is in the manifest but missing from disk' % key)
             continue
+
         stamped = entry.get('source_hash')
         if not stamped:
             problems.append('%s has no source_hash' % key)
-        elif current and stamped != current:
-            problems.append('%s was built from a different Track.db (%s, %s)'
-                            % (key, entry.get('generated_at', 'unknown date'),
-                               stamped[:12]))
+            continue
+
+        scope = entry.get('scope')
+        if isinstance(scope, dict):
+            current = season_fingerprint(scope.get('year'), scope.get('gender'))
+            label = '%s %s results changed' % (scope.get('year'), scope.get('gender'))
+        else:
+            current = source_fingerprint()
+            label = 'the results changed'
+
+        if current and stamped != current:
+            problems.append('%s -- %s since it was built (%s)'
+                            % (key, label, entry.get('generated_at', 'unknown date')))
 
     return bool(problems), problems

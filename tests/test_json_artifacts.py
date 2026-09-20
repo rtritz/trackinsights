@@ -194,7 +194,7 @@ def test_an_artifact_built_from_another_database_is_stale(isolated_data_dir, mon
     stale, problems = artifacts_module.check_artifacts()
 
     assert stale
-    assert any('a.json' in p and 'different Track.db' in p for p in problems), problems
+    assert any('a.json' in p and 'results changed' in p for p in problems), problems
 
 
 def test_rebuilding_only_one_artifact_flags_the_other(isolated_data_dir, monkeypatch):
@@ -259,3 +259,103 @@ def test_the_committed_artifacts_are_all_stamped_and_current(app):
         'the committed artifacts do not match web/data/Track.db:\n  '
         + '\n  '.join(problems)
         + '\nRun: cd web && python -m app.jobs.build_all')
+
+
+# ----------------------------------------------------- scoped to the season
+
+def test_an_artifact_records_the_season_it_covers(isolated_data_dir, monkeypatch):
+    monkeypatch.setattr(artifacts_module, 'season_fingerprint',
+                        lambda y, g, db_path=None: 'SEASON-%s-%s' % (y, g))
+
+    write_json_artifact(str(isolated_data_dir / 'a.json'), {'x': 1},
+                        year=2026, gender='Boys')
+
+    entry = artifacts_module.read_manifest()['a.json']
+    assert entry['scope'] == {'year': 2026, 'gender': 'Boys'}
+    assert entry['source_hash'] == 'SEASON-2026-Boys'
+
+
+def test_next_seasons_results_do_not_make_this_season_stale(isolated_data_dir, monkeypatch):
+    """The whole point. A 2027 load must leave the 2026 artifacts alone.
+
+    The fingerprints stand in for the database: 2026's is held fixed while
+    2027's moves, which is what loading a new season actually does to them.
+    """
+    hashes = {(2026, 'Boys'): 'H-2026', (2027, 'Boys'): 'H-2027-before'}
+    monkeypatch.setattr(artifacts_module, 'season_fingerprint',
+                        lambda y, g, db_path=None: hashes[(y, g)])
+
+    write_json_artifact(str(isolated_data_dir / 'a_2026.json'), {'x': 1},
+                        year=2026, gender='Boys')
+    write_json_artifact(str(isolated_data_dir / 'a_2027.json'), {'x': 2},
+                        year=2027, gender='Boys')
+
+    assert artifacts_module.check_artifacts() == (False, [])
+
+    # A new 2027 sectional lands. 2026's rows are untouched.
+    hashes[(2027, 'Boys')] = 'H-2027-after'
+
+    stale, problems = artifacts_module.check_artifacts()
+    assert stale
+    assert any('a_2027.json' in p for p in problems), problems
+    assert not any('a_2026.json' in p for p in problems), (
+        'a 2027 load must not flag the 2026 artifacts -- that is the noise that '
+        'teaches people to ignore the check')
+
+
+def test_correcting_an_old_season_does_flag_that_season(isolated_data_dir, monkeypatch):
+    hashes = {(2026, 'Boys'): 'H-2026', (2027, 'Boys'): 'H-2027'}
+    monkeypatch.setattr(artifacts_module, 'season_fingerprint',
+                        lambda y, g, db_path=None: hashes[(y, g)])
+
+    write_json_artifact(str(isolated_data_dir / 'a_2026.json'), {'x': 1},
+                        year=2026, gender='Boys')
+    write_json_artifact(str(isolated_data_dir / 'a_2027.json'), {'x': 2},
+                        year=2027, gender='Boys')
+
+    hashes[(2026, 'Boys')] = 'H-2026-corrected'
+
+    stale, problems = artifacts_module.check_artifacts()
+    assert stale
+    assert any('a_2026.json' in p and '2026 Boys results changed' in p
+               for p in problems), problems
+    assert not any('a_2027.json' in p for p in problems), problems
+
+
+def test_one_gender_does_not_flag_the_other(isolated_data_dir, monkeypatch):
+    hashes = {(2026, 'Boys'): 'B', (2026, 'Girls'): 'G'}
+    monkeypatch.setattr(artifacts_module, 'season_fingerprint',
+                        lambda y, g, db_path=None: hashes[(y, g)])
+
+    write_json_artifact(str(isolated_data_dir / 'boys.json'), {'x': 1},
+                        year=2026, gender='Boys')
+    write_json_artifact(str(isolated_data_dir / 'girls.json'), {'x': 2},
+                        year=2026, gender='Girls')
+
+    hashes[(2026, 'Girls')] = 'G2'
+
+    stale, problems = artifacts_module.check_artifacts()
+    assert stale
+    assert any('girls.json' in p for p in problems), problems
+    assert not any('boys.json' in p for p in problems), problems
+
+
+# ------------------------------------------- the real fingerprint, real data
+
+def test_the_season_fingerprint_is_stable_across_calls():
+    """Unstable row order would make every check report a false change."""
+    from app.jobs.artifacts import season_fingerprint, _SCOPE_CACHE
+    _SCOPE_CACHE.clear()
+    first = season_fingerprint(2026, 'Boys')
+    _SCOPE_CACHE.clear()
+    second = season_fingerprint(2026, 'Boys')
+    assert first and first == second
+
+
+def test_different_seasons_and_genders_hash_differently():
+    from app.jobs.artifacts import season_fingerprint
+    seen = {}
+    for year in (2025, 2026):
+        for gender in ('Boys', 'Girls'):
+            seen[(year, gender)] = season_fingerprint(year, gender)
+    assert len(set(seen.values())) == len(seen), seen

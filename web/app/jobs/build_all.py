@@ -22,6 +22,7 @@ have committed.
 
     python -m app.jobs.build_all            # rebuild everything
     python -m app.jobs.build_all --check    # is anything stale? (exit 1 if so)
+    python -m app.jobs.build_all --check --warn-only   # report, always exit 0
     python -m app.jobs.build_all --list     # what would run
 
 Then publish: the JSON under web/app/static/data/ and Track.db go in git; the
@@ -104,7 +105,10 @@ def check():
     is run on its own. Rebuilding the dashboards alone left ten stale JSON files
     and still reported "current", which is worse than not checking.
 
-    Exit codes: 0 current, 1 stale, 2 never built.
+    Exit codes: 0 current, 1 stale, 2 never built. --warn-only reports exactly
+    the same thing and exits 0 -- for deploying a template or styling fix while
+    the results are mid-rebuild, where blocking would be the wrong answer. It is
+    a deliberate override, not a default: the deploy script uses the gate.
     """
     from app import create_app
     from app.services import dashboard_v4 as svc
@@ -140,5 +144,9 @@ if __name__ == '__main__':
             print('%-24s %s' % (name, module_path))
         sys.exit(0)
     if '--check' in sys.argv:
-        sys.exit(check())
+        code = check()
+        if '--warn-only' in sys.argv and code == 1:
+            print('  (--warn-only: continuing anyway)')
+            code = 0
+        sys.exit(code)
     sys.exit(build_all())

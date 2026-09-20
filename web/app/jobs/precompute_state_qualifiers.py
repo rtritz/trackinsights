@@ -34,7 +34,7 @@ def main():
                     OUTPUT_DIR,
                     f"state_qualifiers_{year}_{gender.lower()}.json",
                 )
-                write_json_artifact(out_path, payload)
+                write_json_artifact(out_path, payload, year=year, gender=gender)
                 total = sum(len(e['qualifiers']) for e in payload['events'])
                 print(f"  Saved: {out_path}  (events={len(payload['events'])}, rows={total})")
 
