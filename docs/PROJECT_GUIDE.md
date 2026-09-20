@@ -342,6 +342,20 @@ curl -fsSL "$CACHE_URL" -o "$TEMP/web/data/dashboard_cache.db"   || { echo "coul
 # before it replaces a working cache.
 head -c 15 "$TEMP/web/data/dashboard_cache.db" | grep -q "SQLite format"   || { echo "downloaded cache is not a SQLite database -- aborting"; exit 1; }
 
+# Is everything precomputed actually built from THIS Track.db? Checked against
+# the clone, before ~/mysite is touched, so a stale build aborts a deploy that
+# has not started rather than being reported once the site is already serving it.
+set +e
+(cd "$TEMP/web" && python -m app.jobs.build_all --check)
+CHECK=$?
+set -e
+case $CHECK in
+  0) echo "Precomputed data is current." ;;
+  1) echo "ABORTING: precomputed data is STALE -- rebuild locally, commit, upload the cache, redeploy."; exit 1 ;;
+  2) echo "ABORTING: precomputed data was never built."; exit 1 ;;
+  *) echo "ABORTING: the freshness check itself failed -- see the output above."; exit 1 ;;
+esac
+
 cd "$SITE"
 # Dotfiles too: a stale .git from an older deploy sat here invisibly and grew
 # to 203MB, because `rm -rf ./*` never matched it. Safe only because nothing
@@ -351,16 +365,6 @@ find . -mindepth 1 -delete
 cp -r "$TEMP/web/." "$SITE/"
 cp -r "$TEMP/common" "$SITE/"
 rm -rf "$TEMP"
-
-set +e
-python -m app.jobs.build_all --check
-case $? in
-  0) echo "Precomputed data is current." ;;
-  1) echo "WARNING: precomputed data is STALE -- rebuild locally, commit, redeploy." ;;
-  2) echo "WARNING: precomputed data was never built." ;;
-  *) echo "ERROR: the freshness check itself failed -- see the output above." ;;
-esac
-set -e
 
 touch "$WSGI"   && echo "Deployment complete and web app reloaded."   || echo "Deployed, but the reload failed -- reload from the dashboard."
 ```
@@ -379,6 +383,28 @@ Three things in that script are there for a reason:
 - **The cache is fetched before `~/mysite` is wiped.** Downloading after the
   wipe would leave the site with no dashboards if GitHub were unreachable; this
   way a failed download aborts a deploy that has not started.
+- **`--check` runs against the clone and aborts.** It used to run after the
+  copy and only print a warning, which meant you learned the data was stale
+  from a site that was already serving it.
+
+### What `--check` actually verifies
+
+Every precomputed artifact records the SHA-256 of the Track.db it was built
+from -- `dashboard_cache.db` in its `meta` table, the JSON files in
+`static/data/manifest.json`. `--check` re-hashes the Track.db in the clone and
+compares against all of them, naming any that disagree.
+
+This is the one mechanism that answers "did the results change without the
+precompute being re-run?". It matters most for the two ways that happens:
+
+- **Running one job instead of `build_all`.** Rebuilding only the dashboards
+  used to leave ten stale JSON files behind while `--check` still said
+  "current", because the cache was the only artifact that recorded its source.
+- **Forgetting `gh release upload`.** Track.db travels in git and the cache
+  travels in a Release, so unlike the JSON they can now arrive out of step.
+
+`tournament_hosts.json` is deliberately exempt: it comes from ihsaa.org, not
+from Track.db, so a Track.db hash would say nothing about it.
 
 **The server needs three packages and nothing else:**
 

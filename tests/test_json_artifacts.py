@@ -14,6 +14,7 @@ import os
 
 import pytest
 
+from app.jobs import artifacts as artifacts_module
 from app.jobs.artifacts import write_json_artifact
 
 DATA_DIR = os.path.join(
@@ -147,3 +148,114 @@ def test_a_missing_file_falls_through_instead_of_erroring(client):
     """The year is not built, so the route must compute rather than 500."""
     response = client.get('/api/state-qualifiers?gender=Boys&year=2019')
     assert response.status_code in (200, 400)
+
+
+# ---------------------------------------------------- the manifest / staleness
+
+@pytest.fixture()
+def isolated_data_dir(tmp_path, monkeypatch):
+    """Point the writer at a scratch directory, not the real static/data."""
+    monkeypatch.setattr(artifacts_module, 'DATA_DIR', str(tmp_path))
+    monkeypatch.setattr(artifacts_module, 'MANIFEST_PATH',
+                        str(tmp_path / 'manifest.json'))
+    monkeypatch.setattr(artifacts_module, 'source_fingerprint', lambda: 'HASH-1')
+    return tmp_path
+
+
+def test_writing_an_artifact_stamps_it(isolated_data_dir):
+    write_json_artifact(str(isolated_data_dir / 'a.json'), {'x': 1})
+
+    manifest = artifacts_module.read_manifest()
+    assert 'a.json' in manifest
+    assert manifest['a.json']['source_hash'] == 'HASH-1'
+    assert manifest['a.json']['bytes'] == len('{"x":1}')
+
+
+def test_stamping_one_artifact_leaves_the_others_alone(isolated_data_dir):
+    """Jobs run individually; rebuilding one must not vouch for the rest."""
+    write_json_artifact(str(isolated_data_dir / 'a.json'), {'x': 1})
+    write_json_artifact(str(isolated_data_dir / 'b.json'), {'x': 2})
+
+    manifest = artifacts_module.read_manifest()
+    assert set(manifest) == {'a.json', 'b.json'}
+
+
+def test_consistent_artifacts_are_not_stale(isolated_data_dir):
+    write_json_artifact(str(isolated_data_dir / 'a.json'), {'x': 1})
+    stale, problems = artifacts_module.check_artifacts()
+    assert not stale, problems
+
+
+def test_an_artifact_built_from_another_database_is_stale(isolated_data_dir, monkeypatch):
+    """The scenario the check exists for: Track.db moved, this file did not."""
+    write_json_artifact(str(isolated_data_dir / 'a.json'), {'x': 1})
+
+    monkeypatch.setattr(artifacts_module, 'source_fingerprint', lambda: 'HASH-2')
+    stale, problems = artifacts_module.check_artifacts()
+
+    assert stale
+    assert any('a.json' in p and 'different Track.db' in p for p in problems), problems
+
+
+def test_rebuilding_only_one_artifact_flags_the_other(isolated_data_dir, monkeypatch):
+    """Exactly what running a single precompute job looks like."""
+    write_json_artifact(str(isolated_data_dir / 'fresh.json'), {'x': 1})
+    write_json_artifact(str(isolated_data_dir / 'stale.json'), {'x': 2})
+
+    # Track.db changes; only one job is re-run.
+    monkeypatch.setattr(artifacts_module, 'source_fingerprint', lambda: 'HASH-2')
+    write_json_artifact(str(isolated_data_dir / 'fresh.json'), {'x': 1})
+
+    stale, problems = artifacts_module.check_artifacts()
+    assert stale
+    assert any('stale.json' in p for p in problems), problems
+    assert not any('fresh.json' in p for p in problems), problems
+
+
+def test_a_deleted_artifact_is_reported(isolated_data_dir):
+    path = isolated_data_dir / 'a.json'
+    write_json_artifact(str(path), {'x': 1})
+    path.unlink()
+
+    stale, problems = artifacts_module.check_artifacts()
+    assert stale
+    assert any('missing from disk' in p for p in problems), problems
+
+
+def test_an_unstamped_artifact_is_reported(isolated_data_dir):
+    write_json_artifact(str(isolated_data_dir / 'a.json'), {'x': 1})
+    (isolated_data_dir / 'stranger.json').write_text('{}', encoding='utf-8')
+
+    stale, problems = artifacts_module.check_artifacts()
+    assert stale
+    assert any('stranger.json' in p for p in problems), problems
+
+
+def test_externally_sourced_artifacts_are_exempt(isolated_data_dir):
+    """tournament_hosts.json comes from ihsaa.org; a Track.db hash says nothing."""
+    write_json_artifact(str(isolated_data_dir / 'a.json'), {'x': 1})
+    hosts = isolated_data_dir / 'tournament_hosts'
+    hosts.mkdir()
+    (hosts / 'tournament_hosts.json').write_text('{}', encoding='utf-8')
+
+    stale, problems = artifacts_module.check_artifacts()
+    assert not stale, problems
+
+
+def test_no_manifest_at_all_is_stale(isolated_data_dir):
+    (isolated_data_dir / 'a.json').write_text('{}', encoding='utf-8')
+    stale, problems = artifacts_module.check_artifacts()
+    assert stale
+    assert 'never been stamped' in problems[0]
+
+
+# ------------------------------------------------------- the committed manifest
+
+def test_the_committed_artifacts_are_all_stamped_and_current(app):
+    """The real static/data, against the real Track.db."""
+    with app.app_context():
+        stale, problems = artifacts_module.check_artifacts()
+    assert not stale, (
+        'the committed artifacts do not match web/data/Track.db:\n  '
+        + '\n  '.join(problems)
+        + '\nRun: cd web && python -m app.jobs.build_all')

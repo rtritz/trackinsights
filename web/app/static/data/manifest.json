@@ -1,0 +1,64 @@
+{
+  "artifacts": {
+    "regional_predictions/combined_rankings_2026_boys.json": {
+      "bytes": 650357,
+      "generated_at": "2026-09-20T13:40:47+00:00",
+      "source_hash": "bc2aec40a518c47105a60ad4748e710db545d244d1a1ab4bf8feb8f3880342d2",
+      "source_size": 10223616
+    },
+    "regional_predictions/combined_rankings_2026_girls.json": {
+      "bytes": 654438,
+      "generated_at": "2026-09-20T13:40:48+00:00",
+      "source_hash": "bc2aec40a518c47105a60ad4748e710db545d244d1a1ab4bf8feb8f3880342d2",
+      "source_size": 10223616
+    },
+    "regional_predictions/combined_results_2026_boys.json": {
+      "bytes": 394066,
+      "generated_at": "2026-09-20T13:40:50+00:00",
+      "source_hash": "bc2aec40a518c47105a60ad4748e710db545d244d1a1ab4bf8feb8f3880342d2",
+      "source_size": 10223616
+    },
+    "regional_predictions/combined_results_2026_girls.json": {
+      "bytes": 400664,
+      "generated_at": "2026-09-20T13:40:50+00:00",
+      "source_hash": "bc2aec40a518c47105a60ad4748e710db545d244d1a1ab4bf8feb8f3880342d2",
+      "source_size": 10223616
+    },
+    "regional_predictions/regional_predictions_2026_boys.json": {
+      "bytes": 12124,
+      "generated_at": "2026-09-20T13:40:53+00:00",
+      "source_hash": "bc2aec40a518c47105a60ad4748e710db545d244d1a1ab4bf8feb8f3880342d2",
+      "source_size": 10223616
+    },
+    "regional_predictions/regional_predictions_2026_girls.json": {
+      "bytes": 11274,
+      "generated_at": "2026-09-20T13:40:53+00:00",
+      "source_hash": "bc2aec40a518c47105a60ad4748e710db545d244d1a1ab4bf8feb8f3880342d2",
+      "source_size": 10223616
+    },
+    "state_predictions/state_predictions_2026_boys.json": {
+      "bytes": 3879,
+      "generated_at": "2026-09-20T13:40:54+00:00",
+      "source_hash": "bc2aec40a518c47105a60ad4748e710db545d244d1a1ab4bf8feb8f3880342d2",
+      "source_size": 10223616
+    },
+    "state_predictions/state_predictions_2026_girls.json": {
+      "bytes": 3321,
+      "generated_at": "2026-09-20T13:40:54+00:00",
+      "source_hash": "bc2aec40a518c47105a60ad4748e710db545d244d1a1ab4bf8feb8f3880342d2",
+      "source_size": 10223616
+    },
+    "state_predictions/state_qualifiers_2026_boys.json": {
+      "bytes": 149993,
+      "generated_at": "2026-09-20T13:40:51+00:00",
+      "source_hash": "bc2aec40a518c47105a60ad4748e710db545d244d1a1ab4bf8feb8f3880342d2",
+      "source_size": 10223616
+    },
+    "state_predictions/state_qualifiers_2026_girls.json": {
+      "bytes": 145661,
+      "generated_at": "2026-09-20T13:40:51+00:00",
+      "source_hash": "bc2aec40a518c47105a60ad4748e710db545d244d1a1ab4bf8feb8f3880342d2",
+      "source_size": 10223616
+    }
+  }
+}

@@ -92,28 +92,46 @@ def build_all():
 
 
 def check():
-    """Is the dashboard cache still in step with the results database?
+    """Is everything precomputed still in step with the results database?
 
-    Only the V4 cache records what it was built from, so it is the one that can
-    answer this. It is also the artifact most likely to be noticed if wrong, and
-    anything that changed the results changed it too -- so in practice it stands
-    for all of them.
+    Two artifacts, checked the same way: each records the SHA-256 of the
+    Track.db it was built from, and this re-hashes the Track.db that is here now
+    and compares.
+
+    Both are checked, not just the cache. The cache used to stand in for the
+    whole set on the reasoning that anything changing the results changed it
+    too -- true when everything was rebuilt together, false the moment one job
+    is run on its own. Rebuilding the dashboards alone left ten stale JSON files
+    and still reported "current", which is worse than not checking.
+
+    Exit codes: 0 current, 1 stale, 2 never built.
     """
     from app import create_app
     from app.services import dashboard_v4 as svc
+    from app.jobs.artifacts import check_artifacts
+
     app = create_app()
     with app.app_context():
         status = svc.cache_status()
+        json_stale, json_problems = check_artifacts()
+
     if not status['built']:
         print('precomputed data: NOT BUILT -- run python -m app.jobs.build_all')
         return 2
+
+    stale = status['stale'] or json_stale
+    if not stale:
+        print('precomputed data: current (built %s)' % status['generated_at'])
+        return 0
+
+    print('precomputed data: STALE')
     if status['stale']:
-        print('precomputed data: STALE')
-        print('  built %s, but the results have changed since.' % status['generated_at'])
-        print('  run: python -m app.jobs.build_all   (locally, then commit)')
-        return 1
-    print('precomputed data: current (built %s)' % status['generated_at'])
-    return 0
+        print('  dashboard cache: built %s, but the results have changed since.'
+              % status['generated_at'])
+    for problem in json_problems:
+        print('  %s' % problem)
+    print('  run: python -m app.jobs.build_all   (locally, then commit)')
+    return 1
 
 
 if __name__ == '__main__':
