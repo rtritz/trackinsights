@@ -90,6 +90,19 @@ if ! ( cd web && python -m app.jobs.build_all --check >/dev/null 2>&1 ); then
   echo "  Fix before deploying:  cd web && python -m app.jobs.build_all"
   echo "  then commit and push again. Deploying now would abort on this."
   echo
+  echo "  Nothing was published, so the release still holds the last cache that"
+  echo "  matched its results. The push itself is allowed."
+  echo
+  # Stop here rather than attempting a publish. publish.sh runs this same check
+  # and would refuse, and the hook would then report a refusal as a failure and
+  # block the push -- which made the outcome depend on whether anything had ever
+  # been published: with a recorded hash the push went through with a warning,
+  # without one it was blocked. Same situation, two behaviours, for no reason.
+  #
+  # Exit 0: the warning is the point, and the deploy is what actually stops a
+  # bad release. Blocking a template fix because the data is mid-rebuild would
+  # be out of proportion.
+  exit 0
 fi
 
 # Has the cache moved since it was last published? Without this every push --
