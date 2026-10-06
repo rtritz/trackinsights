@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Top 10 Boys 3200 - Track Insights{% endblock %}
+{% block content %}
+<div class="min-h-screen bg-white pt-20 sm:pt-24 pb-24 px-2 sm:px-4">
+<div class="max-w-3xl mx-auto">
+<h1 class="font-impact italic text-primary text-2xl sm:text-3xl font-bold mb-6">
+{{ title }}</h1>
+{% if results %}
+<div class="overflow-x-auto">
+<table class="table">
+<thead>
+<tr><th>#</th><th>Athlete</th><th>School</th><th>Time</th><th>Meet</th>
+
+</tr>
+
+</thead>
+<tbody>
+{% for r in results %}
+<tr>
+<td>{{ loop.index }}</td>
+<td>{{ r.athlete.first | title }} {{ r.athlete.last | title }}</td>
+<td>{{ r.athlete.school.school_name }}</td>
+<td>{{ r.result }}</td>
+<td>{{ r.meet.meet_type }} {{ r.meet.year }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% else %}
+<p>No results found.</p>
+{% endif %}
+</div>
+</div>
+{% endblock %}
