@@ -7,7 +7,7 @@ import time
 from flask import render_template, request, url_for, Response, current_app
 from . import main_bp
 from ..queries import get_athletes
-from ..models import Athlete, School
+from ..models import Athlete, AthleteResult, School
 from ..videos import INTERVIEW_VIDEOS
 from ..services import dashboard_v4
 from common.const import CONST
@@ -375,6 +375,23 @@ def athlete_result_detail(athlete_id, meet_id, event_name):
 @main_bp.route('/about')
 def about():
     return render_template('about.html')
+
+
+@main_bp.route('/top-3200')
+def top_3200():
+    results = (
+        AthleteResult.query
+        .join(Athlete)
+        .filter(AthleteResult.event == '3200 Meters')
+        .filter(Athlete.gender == 'Boys')
+        .filter(AthleteResult.result2 < 9999)
+        .order_by(AthleteResult.result2)
+        .limit(10)
+        .all()
+    )
+    return render_template('top-3200.html',
+                           results=results,
+                           title='Boys 3200 Meters - Top 10 Since 2023')
 
 
 @main_bp.route('/robots.txt')
