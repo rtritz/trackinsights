@@ -14,6 +14,16 @@
 
 INTERVIEW_VIDEOS = [
     { 
+        "youtube_id": "HGQXQSd6kwY",
+        "title": "Ellie Barada Interview",
+        "athlete_name": "Ellie Barada",
+        "athlete_id": 293706,
+        "school": "Bloomington South HS",
+        "event": "800m",
+        "year": 2026,
+        "description": "Ellie Barada, a standout 800 meter runner from Bloomington South HS, shares her running journey with us.",
+    },
+    { 
         "youtube_id": "jAC3aATeewU ",
         "title": "Kira Smith Interview",
         "athlete_name": "Kira Smith",
