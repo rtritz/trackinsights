@@ -32,6 +32,21 @@ def search_page():
     return render_template('athlete-search.html')
 
 
+@main_bp.route('/events')
+def events_page():
+    selected_event = request.args.get('event', '')
+    available_events = (
+        CONST.EVENT.ALL_TRACK
+        + CONST.EVENT.ALL_GIRLS_HURDLES
+        + CONST.EVENT.ALL_BOYS_HURDLES
+        + CONST.EVENT.ALL_RELAY
+        + CONST.EVENT.ALL_FIELD
+    )
+    if selected_event not in available_events:
+        selected_event = ''
+    return render_template('events.html', selected_event=selected_event)
+
+
 @main_bp.route('/insights')
 def insights_page():
     return render_template(

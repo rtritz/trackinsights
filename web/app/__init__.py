@@ -104,6 +104,42 @@ def create_app(config_class=Config):
                 return '0'
         return {'asset_version': asset_version}
 
+    @app.context_processor
+    def _event_navigation_data():
+        # Keep the event picker aligned with the canonical DB event names while
+        # presenting familiar labels in the menu and homepage search.
+        from common.const import CONST
+
+        return {'event_nav_groups': [
+            {'label': 'Sprints', 'events': [
+                (CONST.EVENT.E100, '100m Dash'),
+                (CONST.EVENT.E200, '200m Dash'),
+                (CONST.EVENT.E400, '400m Dash'),
+            ]},
+            {'label': 'Distance', 'events': [
+                (CONST.EVENT.E800, '800m Run'),
+                (CONST.EVENT.E1600, '1600m Run'),
+                (CONST.EVENT.E3200, '3200m Run'),
+            ]},
+            {'label': 'Hurdles', 'events': [
+                (CONST.EVENT.E100H, '100m Hurdles · Girls'),
+                (CONST.EVENT.E110H, '110m Hurdles · Boys'),
+                (CONST.EVENT.E300H, '300m Hurdles'),
+            ]},
+            {'label': 'Relays', 'events': [
+                (CONST.EVENT.E400R, '4×100m Relay'),
+                (CONST.EVENT.E1600R, '4×400m Relay'),
+                (CONST.EVENT.E3200R, '4×800m Relay'),
+            ]},
+            {'label': 'Field Events', 'events': [
+                (CONST.EVENT.ELJ, 'Long Jump'),
+                (CONST.EVENT.EHJ, 'High Jump'),
+                (CONST.EVENT.ESP, 'Shot Put'),
+                (CONST.EVENT.EDT, 'Discus Throw'),
+                (CONST.EVENT.EPV, 'Pole Vault'),
+            ]},
+        ]}
+
     # register blueprints
     from .routes import main_bp, api_bp
     app.register_blueprint(main_bp)

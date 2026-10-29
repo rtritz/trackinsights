@@ -1,4 +1,13 @@
 document.addEventListener('DOMContentLoaded', function () {
+  const normalizeEventSearch = value => value.toLowerCase().replace(/×/g, 'x').replace(/\s+/g, '');
+  const eventCatalog = Array.from(document.querySelectorAll('.events-dropdown [data-event-name]'))
+    .map(link => ({
+      type: 'event',
+      event: link.dataset.eventName,
+      name: link.textContent.trim(),
+      searchName: normalizeEventSearch(`${link.textContent.trim()} ${link.dataset.eventName}`),
+    }));
+
   const setupSearch = (form, searchInput, resultsDiv) => {
     if (!form || !searchInput || !resultsDiv) {
       return;
@@ -13,6 +22,8 @@ document.addEventListener('DOMContentLoaded', function () {
         window.location.href = `/school-dashboard/${item.id}`;
       } else if (item.type === 'athlete') {
         window.location.href = `/athlete-dashboard/${item.id}`;
+      } else if (item.type === 'event') {
+        window.location.href = `/events?event=${encodeURIComponent(item.event)}`;
       }
     };
 
@@ -44,6 +55,13 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         if (!res.ok) throw new Error('Search request failed');
         const data = await res.json();
+        if (form.id === 'homeSearchForm') {
+          const normalizedQuery = normalizeEventSearch(query);
+          const matchingEvents = eventCatalog
+            .filter(item => item.searchName.includes(normalizedQuery))
+            .slice(0, 6);
+          data.push(...matchingEvents);
+        }
         currentResults = data; // Store results for Enter key handling
         if (data.length === 0) {
           resultsDiv.innerHTML = '<div class="no-results">No results found for "' + escapeHtml(query) + '"</div>';
@@ -93,6 +111,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 window.location.href = `/athlete-dashboard/${item.id}`;
                 console.log('Navigating to athlete ID:', item.id);
               });
+            } else if (item.type === 'event') {
+              btn.innerHTML = `
+                <span class="result-text">${escapeHtml(item.name)}</span>
+                <span class="result-badge font-bold border-2 border-purple-500 text-purple-700 rounded-full px-3 py-0.5 text-sm whitespace-nowrap">Event</span>
+              `.trim();
+              btn.addEventListener('click', () => navigateToResult(item));
             }
 
             li.appendChild(btn);
@@ -156,6 +180,14 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('homeSearchInput'),
     document.getElementById('home-search-results'),
   );
+
+  const eventSelector = document.getElementById('event-selector');
+  if (eventSelector) {
+    eventSelector.addEventListener('change', function () {
+      const query = this.value ? `?event=${encodeURIComponent(this.value)}` : '';
+      window.location.href = `/events${query}`;
+    });
+  }
 
   const getNormalizedPath = () => {
     const rawPath = (window.location.pathname || '/').trim();

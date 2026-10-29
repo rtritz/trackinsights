@@ -223,6 +223,21 @@
           </button>
         </div>
       </div>
+      <details class="events-dropdown pointer-events-auto">
+        <summary class="events-dropdown__toggle">Events <span aria-hidden="true">⌄</span></summary>
+        <div class="events-dropdown__panel">
+          {% for group in event_nav_groups %}
+          <section class="events-dropdown__group">
+            <h2>{{ group.label }}</h2>
+            <ul>
+              {% for event_name, event_label in group.events %}
+              <li><a href="{{ url_for('main.events_page', event=event_name) }}" data-event-name="{{ event_name }}">{{ event_label }}</a></li>
+              {% endfor %}
+            </ul>
+          </section>
+          {% endfor %}
+        </div>
+      </details>
       <a href="{{ url_for('main.insights_page') }}" id="queries-toggle" class="site-nav-link pointer-events-auto">Insights</a>
       <a href="{{ url_for('main.interviews_page') }}" class="site-nav-link pointer-events-auto">Interviews</a>
       <a href="{{ url_for('main.home') }}#about" id="about-toggle" class="site-nav-link pointer-events-auto">About</a>
@@ -242,6 +257,7 @@
     <nav class="flex flex-col items-center gap-6 text-2xl font-impact tracking-wider text-center">
       <a href="{{ url_for('main.home') }}" class="mobile-menu-link uppercase">Home</a>
       <a href="{{ url_for('main.search_page') }}" class="mobile-menu-link uppercase">Search</a>
+      <a href="{{ url_for('main.events_page') }}" class="mobile-menu-link uppercase">Events</a>
       <a href="{{ url_for('main.insights_page') }}" class="mobile-menu-link uppercase">Insights</a>
       <a href="{{ url_for('main.interviews_page') }}" class="mobile-menu-link uppercase">Interviews</a>
       <a href="{{ url_for('main.home') }}#about" class="mobile-menu-link uppercase">About</a>
@@ -742,16 +758,15 @@
     /* Desktop navigation over the rotating homepage photography. */
     @media (min-width: 768px) {
       .navbar-home {
+        position: absolute;
+        top: 0;
+        left: 0;
         min-height: 5rem;
         padding: .25rem 2rem 0;
+        background: linear-gradient(180deg, rgba(12, 10, 10, .64) 0%, rgba(12, 10, 10, .34) 68%, rgba(12, 10, 10, 0) 100%) !important;
       }
       .navbar-home::before {
-        content: "";
-        position: absolute;
-        inset: 0 0 -1.2rem;
-        z-index: -1;
-        pointer-events: none;
-        background: linear-gradient(180deg, rgba(12, 10, 10, .66) 0%, rgba(12, 10, 10, .32) 58%, transparent 100%);
+        content: none;
       }
       .site-nav-desktop { padding: 0 1rem; min-height: 4rem; }
       .site-nav-brand {
@@ -762,6 +777,55 @@
         white-space: nowrap;
       }
       .site-nav-links { gap: clamp(1rem, 2.3vw, 2rem); }
+      .events-dropdown { position: static; }
+      .events-dropdown__toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        color: #fff;
+        cursor: pointer;
+        font-size: 1.2rem;
+        font-weight: 500;
+        list-style: none;
+        text-shadow: 0 2px 10px rgba(0,0,0,.5);
+        white-space: nowrap;
+      }
+      .events-dropdown__toggle::-webkit-details-marker { display: none; }
+      .events-dropdown__toggle span { font-size: 1rem; transition: transform 150ms ease; }
+      .events-dropdown[open] .events-dropdown__toggle span { transform: rotate(180deg); }
+      .events-dropdown__panel {
+        position: absolute;
+        top: calc(100% + .5rem);
+        right: 1rem;
+        z-index: 70;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 1.25rem;
+        width: min(54rem, calc(100vw - 2rem));
+        padding: 1.25rem;
+        border: 1px solid rgba(0,0,0,.14);
+        border-radius: 1rem;
+        background: rgba(255,255,255,.98);
+        color: #171717;
+        box-shadow: 0 14px 40px rgba(0,0,0,.28);
+      }
+      .events-dropdown__group h2 {
+        margin: 0 0 .55rem;
+        padding-bottom: .4rem;
+        border-bottom: 1px solid #ddd;
+        font-size: .95rem;
+        font-weight: 700;
+      }
+      .events-dropdown__group ul { list-style: none; margin: 0; padding: 0; }
+      .events-dropdown__group a {
+        display: block;
+        padding: .32rem 0;
+        color: #262626;
+        font-size: .88rem;
+        line-height: 1.3;
+      }
+      .events-dropdown__group a:hover,
+      .events-dropdown__group a:focus-visible { color: #8c0327; text-decoration: underline; }
       .site-nav-link {
         color: #fff;
         font-size: 1.2rem;
@@ -839,6 +903,7 @@
         color: #000;
         text-shadow: none;
       }
+      .navbar:not(.navbar-home) .events-dropdown__toggle { color: #000; text-shadow: none; }
       .navbar:not(.navbar-home) .site-nav-links .search-pill__icon-bubble,
       .navbar:not(.navbar-home) .site-nav-links .search-pill[data-open="true"],
       .navbar:not(.navbar-home) .site-nav-links .search-pill.open {
@@ -848,14 +913,15 @@
       .navbar:not(.navbar-home) .site-nav-links .search-pill__input::placeholder { color: #555; }
     }
     @media (max-width: 767px) {
-      .navbar-home { background: transparent !important; box-shadow: none !important; }
-      .navbar-home::before {
-        content: "";
+      .navbar-home {
         position: absolute;
-        inset: 0 0 -1rem;
-        z-index: -1;
-        pointer-events: none;
-        background: linear-gradient(180deg, rgba(12,10,10,.68), rgba(12,10,10,.24) 75%, transparent);
+        top: 0;
+        left: 0;
+        background: linear-gradient(180deg, rgba(12,10,10,.68), rgba(12,10,10,.3) 75%, transparent) !important;
+        box-shadow: none !important;
+      }
+      .navbar-home::before {
+        content: none;
       }
       .navbar-home .mobile-nav-brand { color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.5); }
       .navbar-home .mobile-nav-btn { border-color: rgba(255,255,255,.85); }
