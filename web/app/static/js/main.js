@@ -151,6 +151,12 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('results'),
   );
 
+  setupSearch(
+    document.getElementById('homeSearchForm'),
+    document.getElementById('homeSearchInput'),
+    document.getElementById('home-search-results'),
+  );
+
   const getNormalizedPath = () => {
     const rawPath = (window.location.pathname || '/').trim();
     if (!rawPath || rawPath === '/') {
