@@ -5,12 +5,13 @@
 {% block og_title %}{% if athlete_name %}{{ athlete_name }} - Athlete Dashboard{% else %}Athlete Dashboard{% endif %} - Track Insights{% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/athlete-dashboard.css') }}?v={{ asset_version('css/athlete-dashboard.css') }}">
 <!-- DaisyUI Top Navbar - consistent with home.html -->
 
 
 
 <!-- Main Content -->
-<div class="min-h-screen bg-white pt-20 sm:pt-24 pb-24 sm:pb-32 px-2 sm:px-4">
+<div class="athlete-dashboard-page min-h-screen bg-white pt-20 sm:pt-24 pb-24 sm:pb-32 px-2 sm:px-4">
 
     <!-- Loading State -->
     <div id="loading-state" class="flex flex-col items-center justify-center min-h-[60vh]">
@@ -32,14 +33,14 @@
     </div>
 
     <!-- Dashboard Content -->
-    <div id="dashboard-content" class="hidden max-w-6xl mx-auto" data-athlete-id="{{ athlete_id }}">
+    <div id="dashboard-content" class="hidden athlete-dashboard" data-athlete-id="{{ athlete_id }}">
         <!-- Header Section -->
         <div
-            class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 mb-6 sm:mb-8 shadow-lg">
-            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
-                <div class="w-full">
+            class="athlete-header">
+            <div class="athlete-header-inner">
+                <div class="athlete-header-info">
                     <h1 id="athlete-name"
-                        class="font-impact italic text-primary text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2 break-words">
+                        class="athlete-title font-impact">
                         Loading...
                     </h1>
                     <div class="flex flex-wrap gap-2 sm:gap-3 items-center">
@@ -60,7 +61,7 @@
                 <div id="school-logo-container" class="hidden flex-shrink-0">
                     <a id="school-logo-link" href="#">
                         <img id="school-logo" src="" alt="School logo"
-                            class="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 object-contain rounded-xl bg-white p-1 shadow-md" />
+                            class="athlete-school-logo" />
                     </a>
                 </div>
             </div>
@@ -97,28 +98,80 @@
         </div>
         {% endif %}
 
-        <!-- Badges Section -->
-        <div class="mb-6 sm:mb-8">
-            <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
-                Achievements <span class="text-sm">(Final Results Only)</span>
-            </h2>
-            <div id="badges-container"
-                class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 auto-rows-fr">
-            </div>
-        </div>
+        <section class="athlete-section" aria-labelledby="personal-bests-title">
+            <h2 id="personal-bests-title" class="athlete-section-title font-impact">Personal Bests</h2>
+            <div id="personal-bests-container" class="personal-bests-grid"></div>
+        </section>
 
-        <!-- Playoff History Section -->
-        <div class="mb-6 sm:mb-8">
-            <h2 class="font-impact italic text-primary text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
-                Playoff History
-                <span class="text-sm">(2023 to Present)</span>
-            </h2>
-            <div id="playoff-history-container" class="space-y-4 overflow-x-auto overflow-y-visible">
-                <!-- Playoff history will be inserted here -->
+        <section class="athlete-section" aria-labelledby="achievements-title">
+            <h2 id="achievements-title" class="athlete-section-title font-impact">Medals <span>(Hover to See Details - Final Results Only)</span></h2>
+            <div id="badges-container" class="achievement-grid"></div>
+        </section>
+
+        <section class="athlete-section event-history" aria-label="Past events and results">
+            <div id="event-tabs" class="event-tabs" role="tablist" aria-label="Events"></div>
+            <div id="event-panel" class="event-panel" role="tabpanel" tabindex="0"></div>
+            <p class="history-note">Playoff results &middot; Yearly progression shows the best recorded playoff result each year.</p>
+        </section>
+
+        <section class="athlete-section athlete-card-share" aria-labelledby="athlete-card-share-title">
+            <div id="athlete-card-preview" class="athlete-card-deck" role="group" aria-label="Athlete card designs">
+                <div id="athlete-card-stack" class="athlete-card-stack"></div>
+                <div class="athlete-card-deck-controls">
+                    <button type="button" id="athlete-card-previous" aria-label="Previous athlete card">&#8592;</button>
+                    <span id="athlete-card-position" aria-live="polite" aria-atomic="true">1 / 4</span>
+                    <button type="button" id="athlete-card-next" aria-label="Next athlete card">&#8594;</button>
+                </div>
             </div>
-        </div>
+            <div class="athlete-card-share-info">
+                <h2 id="athlete-card-share-title" class="athlete-card-share-title font-impact">Share Athlete Card</h2>
+                <p id="athlete-card-caption" class="athlete-card-caption">Scan or share this athlete's card.</p>
+                <div class="athlete-card-share-tools">
+                    <a id="athlete-card-qr-link" class="athlete-card-qr" aria-label="Open athlete dashboard">
+                        <span id="athlete-card-qr-code"></span>
+                        <img id="athlete-card-qr-logo" class="athlete-card-qr-logo" alt="" hidden />
+                    </a>
+                    <div class="athlete-card-actions" aria-label="Share athlete card">
+                        <button type="button" id="athlete-card-instagram" class="athlete-card-action">
+                            <svg class="athlete-card-social-logo" viewBox="0 0 48 48" aria-hidden="true">
+                        <defs>
+                            <linearGradient id="athlete-card-instagram-gradient" x1="0" y1="1" x2="1" y2="0">
+                                <stop offset="0" stop-color="#ffcf55" />
+                                <stop offset=".35" stop-color="#ff543e" />
+                                <stop offset=".65" stop-color="#c837ab" />
+                                <stop offset="1" stop-color="#5b51d8" />
+                            </linearGradient>
+                        </defs>
+                        <rect width="48" height="48" rx="12" fill="url(#athlete-card-instagram-gradient)" />
+                        <rect x="10" y="10" width="28" height="28" rx="8" fill="none" stroke="white" stroke-width="3" />
+                        <circle cx="24" cy="24" r="7" fill="none" stroke="white" stroke-width="3" />
+                        <circle cx="33" cy="15" r="2" fill="white" />
+                    </svg>
+                            <span>Instagram</span>
+                        </button>
+                        <button type="button" id="athlete-card-snapchat" class="athlete-card-action">
+                            <svg class="athlete-card-social-logo" viewBox="0 0 48 48" aria-hidden="true">
+                        <rect width="48" height="48" rx="12" fill="#fffc00" />
+                        <path d="M24 8c-7 0-10 5-10 11l.2 4c-1.5.6-3.3-1.5-4.3.2-1 1.6 2.1 2.8 3.7 3.4-.9 3.8-3.6 6.3-7.1 7.3-.8.3-.7 1.4.2 1.7 1.9.7 3.7.9 5.1 1.2l.8 2.5c.2.6.7.8 1.3.6 2.9-1 5.2.5 7.2 1.3 1.9.8 3.9.8 5.8 0 2-.8 4.3-2.3 7.2-1.3.6.2 1.1 0 1.3-.6l.8-2.5c1.4-.3 3.2-.5 5.1-1.2.9-.3 1-1.4.2-1.7-3.5-1-6.2-3.5-7.1-7.3 1.6-.6 4.7-1.8 3.7-3.4-1-1.7-2.8.4-4.3-.2l.2-4C34 13 31 8 24 8Z" fill="white" stroke="#111" stroke-width="1.6" stroke-linejoin="round" />
+                    </svg>
+                            <span>Snapchat</span>
+                        </button>
+                        <button type="button" id="athlete-card-copy" class="athlete-card-action">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                            <span>Copy Link</span>
+                        </button>
+                        <button type="button" id="athlete-card-download" class="athlete-card-action">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></svg>
+                            <span>Download</span>
+                        </button>
+                    </div>
+                </div>
+                <p id="athlete-card-share-status" class="athlete-card-share-status" role="status" aria-live="polite"></p>
+            </div>
+        </section>
     </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/athlete-card-vendor/qrcode.js') }}?v={{ asset_version('js/athlete-card-vendor/qrcode.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/athlete-dashboard.js') }}?v={{ asset_version('js/athlete-dashboard.js') }}" defer></script>
 {% endblock %}

@@ -96,66 +96,186 @@ const shareStatus = document.getElementById('share-dashboard-status');
         shareButton.addEventListener('click', handleShareButtonClick);
     }
 
-    const prelimTooltipMessage = 'Prelim result only — no finals performance recorded.';
+    function initializeAthleteCard(athlete) {
+        // Share the public dashboard so scanned codes work away from this computer.
+        const url = `https://www.trackinsights.org/athlete-dashboard/${athleteId}`;
+        const name = athlete.full_name || 'Athlete';
+        const status = document.getElementById('athlete-card-share-status');
+        const setStatus = message => { status.textContent = message; };
+        const designs = [
+            {name: 'Black', color: '#000000'},
+            {name: 'Burgundy', color: '#a60942'},
+            {name: 'Navy', color: '#173b67'},
+            {name: 'Green', color: '#17664e'},
+        ];
+        const filename = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `athlete-${athleteId}`}-athlete-card.png`;
+        const cardImages = designs.map(() => ({blob: null, file: null, pending: null}));
+        const imageButtons = ['athlete-card-instagram', 'athlete-card-snapchat', 'athlete-card-download']
+            .map(id => document.getElementById(id));
+        const isMobile = Boolean(navigator.userAgentData?.mobile || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+            || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+        let sharingImage = false;
+        const stack = document.getElementById('athlete-card-stack');
+        let selectedCard = 0;
+        const cardButtons = designs.map((design, index) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'athlete-card-option';
+            button.setAttribute('aria-label', `${design.name} athlete card`);
+            button.style.setProperty('--card-color', design.color);
+            button.innerHTML = '<span class="athlete-card-face" aria-hidden="true"></span>';
+            button.addEventListener('click', () => selectCard(index));
+            button.addEventListener('keydown', event => {
+                let next;
+                if (event.key === 'ArrowRight') next = (selectedCard + 1) % designs.length;
+                if (event.key === 'ArrowLeft') next = (selectedCard - 1 + designs.length) % designs.length;
+                if (event.key === 'Home') next = 0;
+                if (event.key === 'End') next = designs.length - 1;
+                if (next === undefined) return;
+                event.preventDefault();
+                selectCard(next);
+                cardButtons[next].focus();
+            });
+            stack.appendChild(button);
+            return button;
+        });
+        function selectCard(index) {
+            selectedCard = index;
+            cardButtons.forEach((button, cardIndex) => {
+                button.style.setProperty('--stack-index', (cardIndex - index + designs.length) % designs.length);
+                button.setAttribute('aria-pressed', String(cardIndex === index));
+            });
+            document.getElementById('athlete-card-position').textContent = `${index + 1} / ${designs.length}`;
+            prepareCardImage(index);
+            updateImageButtons();
+        }
+        selectCard(0);
+        document.getElementById('athlete-card-previous').addEventListener('click', () => selectCard((selectedCard - 1 + designs.length) % designs.length));
+        document.getElementById('athlete-card-next').addEventListener('click', () => selectCard((selectedCard + 1) % designs.length));
+        document.getElementById('athlete-card-caption').textContent =
+            `Scan or share ${athlete.first || name}'s athlete card.`;
+        const qrLink = document.getElementById('athlete-card-qr-link');
+        qrLink.href = url;
+        qrLink.setAttribute('aria-label', `Open ${name}'s athlete dashboard`);
 
-    function createStageCell(stageData) {
-        const td = document.createElement('td');
-        td.className = 'text-xs sm:text-sm lg:text-base leading-relaxed overflow-visible';
-
-        if (!stageData) {
-            td.textContent = '–';
-            td.classList.add('text-gray-400');
-            return td;
+        try {
+            const code = qrcode(0, 'H');
+            code.addData(url);
+            code.make();
+            document.getElementById('athlete-card-qr-code').innerHTML = code.createSvgTag({
+                cellSize: 5, margin: 20, scalable: true,
+            });
+            const logo = document.getElementById('athlete-card-qr-logo');
+            if (athlete.logo_url) {
+                logo.onerror = () => { logo.hidden = true; };
+                logo.src = athlete.logo_url;
+                logo.alt = `${athlete.school || 'School'} logo`;
+                logo.hidden = false;
+            }
+        } catch (error) {
+            console.error('Unable to generate athlete QR code:', error);
+            setStatus('QR code unavailable. Use Copy Link to share this athlete.');
         }
 
-        const createPrelimMarker = () => {
-            const tooltip = document.createElement('span');
-            tooltip.className = 'tooltip tooltip-bottom tooltip-error ml-1 align-middle overflow-visible';
-            tooltip.dataset.tip = prelimTooltipMessage;
+        document.getElementById('athlete-card-copy').addEventListener('click', async () => {
+            const copied = await copyTextToClipboard(url);
+            setStatus(copied ? 'Athlete link copied!' : `Copy this link: ${url}`);
+        });
 
-            const marker = document.createElement('span');
-            marker.textContent = '(P)';
-            marker.className = 'text-[10px] sm:text-xs font-semibold text-primary cursor-pointer';
-            marker.setAttribute('role', 'note');
-            marker.tabIndex = 0;
+        function updateImageButtons() {
+            const disabled = !cardImages[selectedCard].blob || sharingImage;
+            imageButtons.forEach(button => { button.disabled = disabled; });
+        }
 
-            tooltip.appendChild(marker);
-            return tooltip;
-        };
+        function prepareCardImage(index) {
+            const image = cardImages[index];
+            if (image.pending) return image.pending;
+            // Render before a tap: awaiting canvas.toBlob inside the click handler
+            // can lose the transient activation required by iOS Safari's share sheet.
+            image.pending = new Promise((resolve, reject) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 750;
+                canvas.height = 1050;
+                const context = canvas.getContext('2d');
+                if (!context) throw new Error('Card rendering is unavailable.');
+                context.fillStyle = designs[index].color;
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('PNG generation failed.')), 'image/png');
+            }).then(blob => {
+                image.blob = blob;
+                image.file = typeof File === 'function' ? new File([blob], filename, {type: 'image/png'}) : null;
+            }).catch(() => {
+                if (selectedCard === index) setStatus('Unable to prepare the card image. Reload to try again.');
+            }).finally(updateImageButtons);
+            return image.pending;
+        }
 
-        const textValue = stageData.text || '–';
-        const isPrelimOnly = stageData.result_type === 'Prelim';
-        if (stageData.has_detail && stageData.meet_id && stageData.event) {
-            const encodedEvent = encodeURIComponent(stageData.event);
-            let detailUrl = `/athlete-dashboard/${athleteId}/result/${stageData.meet_id}/${encodedEvent}`;
-            if (stageData.result_type) {
-                detailUrl += `?result_type=${encodeURIComponent(stageData.result_type)}`;
-            }
-
+        function downloadCardImage(image) {
+            const objectUrl = URL.createObjectURL(image.blob);
             const link = document.createElement('a');
-            link.href = detailUrl;
-            link.textContent = textValue;
-            link.className = 'text-primary font-semibold underline decoration-solid underline-offset-2 hover:text-primary/80';
-            link.title = `See ranking breakdown for ${stageData.meet_type || 'this result'}`;
-            td.appendChild(link);
-            if (isPrelimOnly) {
-                td.appendChild(createPrelimMarker());
-            }
-        } else {
-            if (isPrelimOnly) {
-                td.appendChild(document.createTextNode(textValue + ' '));
-                td.appendChild(createPrelimMarker());
-            } else {
-                td.textContent = textValue;
-            }
+            link.href = objectUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            // Give mobile browsers time to start reading the download.
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
         }
 
-        return td;
+        const shareToApp = async platform => {
+            const image = cardImages[selectedCard];
+            if (!image.blob || sharingImage) return;
+            sharingImage = true;
+            updateImageButtons();
+            try {
+                // Call share directly in the tap handler, with the prepared PNG.
+                // File support must be checked separately from text/link support.
+                if (isMobile && image.file && navigator.share && navigator.canShare
+                    && navigator.canShare({files: [image.file]})) {
+                    await navigator.share({files: [image.file], title: `${name} - Track Insights`});
+                    setStatus('Athlete card shared.');
+                    return;
+                }
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    setStatus('Sharing canceled.');
+                    return;
+                }
+                // Unsupported or blocked image sharing falls back to the same PNG.
+            } finally {
+                sharingImage = false;
+                updateImageButtons();
+            }
+            try {
+                downloadCardImage(image);
+                setStatus(platform === 'Instagram'
+                    ? 'Card downloaded. Save it to your photos, then add it to an Instagram Story.'
+                    : 'Card downloaded. Save it to your photos, then choose it in Snapchat Memories.');
+            } catch {
+                setStatus('Unable to download the card. Please try again.');
+            }
+        };
+        document.getElementById('athlete-card-instagram').addEventListener('click', () => shareToApp('Instagram'));
+        document.getElementById('athlete-card-snapchat').addEventListener('click', () => shareToApp('Snapchat'));
+
+        document.getElementById('athlete-card-download').addEventListener('click', () => {
+            const image = cardImages[selectedCard];
+            if (image.blob) {
+                try {
+                    downloadCardImage(image);
+                    setStatus('Athlete card downloaded.');
+                } catch {
+                    setStatus('Unable to download the card. Please try again.');
+                }
+            }
+        });
+        // There are only four designs; warming each once also covers rapid changes.
+        designs.forEach((_, index) => prepareCardImage(index));
     }
 
     const stageConfigs = {
         sectional: {
-            title: 'Sectional Spotlight',
+            title: 'Sectionals',
             accent: 'text-rose-700',
             encouragements: [
                 'A finals appearance is within reach. Keep pushing!',
@@ -164,7 +284,7 @@ const shareStatus = document.getElementById('share-dashboard-status');
             ],
         },
         regional: {
-            title: 'Regional Rise',
+            title: 'Regionals',
             accent: 'text-rose-700',
             encouragements: [
                 'Regional history gets written by grinders like you.',
@@ -173,7 +293,7 @@ const shareStatus = document.getElementById('share-dashboard-status');
             ],
         },
         state: {
-            title: 'State Legends',
+            title: 'State',
             accent: 'text-rose-700',
             encouragements: [
                 'State is calling. Answer with your next PR.',
@@ -198,65 +318,149 @@ const shareStatus = document.getElementById('share-dashboard-status');
         return fallbackEncouragement;
     }
 
-    function getMedalCircleClass(place) {
-        if (place === 1) {
-            return 'bg-yellow-300 text-yellow-900 shadow-lg shadow-yellow-500/50 ring-2 ring-white/60';
-        }
-        if (place === 2) {
-            return 'bg-slate-200 text-slate-800 shadow-md shadow-slate-400/40 ring-2 ring-white/50';
-        }
-        if (place === 3) {
-            return 'bg-amber-600 text-white shadow-lg shadow-amber-700/40 ring-2 ring-white/40';
-        }
-        if (typeof place === 'number' && place > 3) {
-            return 'bg-sky-100 text-sky-700 shadow-inner ring-2 ring-white/30';
-        }
-        return 'bg-slate-100 text-slate-700 shadow-inner ring-2 ring-white/30';
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
+
+    function resultLink(result) {
+        const event = encodeURIComponent(result.event);
+        const type = encodeURIComponent(result.result_type || 'Final');
+        return `/athlete-dashboard/${athleteId}/result/${result.meet_id}/${event}?result_type=${type}`;
+    }
+
+    function ordinal(place) {
+        if (!place || place < 1) return '\u2014';
+        const remainder = place % 100;
+        return `${place}${remainder >= 11 && remainder <= 13 ? 'th' : ({1: 'st', 2: 'nd', 3: 'rd'}[place % 10] || 'th')}`;
     }
 
     function createMedalElement(entry) {
-        const wrapper = document.createElement('button');
-        wrapper.type = 'button';
-        wrapper.className = 'group relative flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition z-0';
-        wrapper.setAttribute('aria-label', `${entry.event || 'Event'} medal`);
+        const button = document.createElement('a');
+        button.href = resultLink(entry);
+        button.className = 'medal-button';
+        const label = entry.place_label || 'Q';
+        button.setAttribute('aria-label', `${entry.year || ''} ${entry.event || 'Event'}, ${label}, ${entry.result || 'Qualified'}`);
+        const tone = entry.place === 1 ? 'gold' : entry.place === 2 ? 'silver' : entry.place === 3 ? 'bronze' : entry.place > 3 ? 'blue' : 'qualified';
+        button.innerHTML = `<span class="medal-circle medal-${tone}">${escapeHtml(label)}</span>
+            <span class="medal-details" role="tooltip"><strong>${escapeHtml(entry.event || 'Event')}</strong>
+            ${escapeHtml(entry.year || '')}${entry.is_relay ? ' &middot; Relay' : ''}<br>
+            Result: ${escapeHtml(entry.result || 'Qualified')}<br>Place: ${escapeHtml(label)}</span>`;
+        button.addEventListener('mouseenter', () => button.style.zIndex = '40');
+        button.addEventListener('mouseleave', () => button.style.zIndex = '');
+        button.addEventListener('focus', () => button.style.zIndex = '40');
+        button.addEventListener('blur', () => button.style.zIndex = '');
+        return button;
+    }
 
-        const circleClass = getMedalCircleClass(entry.place);
-        const circle = document.createElement('div');
-        circle.className = `w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-lg font-extrabold tracking-tight shadow-lg ${circleClass}`;
-        circle.textContent = entry.place_label || 'Q';
+    function renderPersonalBests(bests) {
+        const container = document.getElementById('personal-bests-container');
+        container.style.setProperty('--personal-best-count', Math.max(bests.length, 1));
+        container.innerHTML = bests.map(best => `<div class="personal-best">
+            <span class="personal-best-label">${escapeHtml(best.event)}</span>
+            <span class="personal-best-value">${escapeHtml(best.result)}</span>
+        </div>`).join('') || '<p class="dashboard-empty">No personal bests recorded yet.</p>';
+    }
 
-        const detailPanel = document.createElement('div');
-        detailPanel.className = 'absolute top-full left-1/2 -translate-x-1/2 mt-3 w-48 sm:w-56 rounded-2xl bg-white shadow-2xl border border-rose-100 p-3 text-[11px] sm:text-xs text-gray-700 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto transition z-20';
-
-        const detailLines = [
-            entry.year ? `${entry.year}${entry.is_relay ? ' • Relay' : ''}` : (entry.is_relay ? 'Relay' : null),
-            entry.result ? `Result: ${entry.result}` : null,
-            entry.place_label ? `Place: ${entry.place_label}` : null,
-        ].filter(Boolean);
-
-        detailPanel.innerHTML = `
-            <p class="font-bold text-gray-900 text-sm">${entry.event || 'Event'}</p>
-            <div class="mt-1 space-y-1">
-                ${detailLines.map(line => `<p>${line}</p>`).join('') || '<p>Qualified</p>'}
-            </div>
-        `;
-
-        wrapper.appendChild(circle);
-        wrapper.appendChild(detailPanel);
-
-        const elevate = () => {
-            wrapper.style.zIndex = '40';
+    function renderProgression(eventName, rows, eventType) {
+        const fieldEvent = eventType === 'Field' || /jump|vault|throw|shot|discus|javelin/i.test(eventName);
+        const yearly = new Map();
+        rows.forEach(row => {
+            const value = row.result_value;
+            if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value >= 9999 || !row.year) return;
+            const current = yearly.get(row.year);
+            if (!current || (fieldEvent ? value > current.result_value : value < current.result_value)) yearly.set(row.year, row);
+        });
+        const points = [...yearly.values()].sort((a, b) => a.year - b.year);
+        if (points.length < 2) return '';
+        const values = points.map(point => point.result_value);
+        const low = Math.min(...values), high = Math.max(...values);
+        const pad = Math.max((high - low) * 0.45, high * 0.015, 0.1);
+        const min = Math.max(0, low - pad), max = high + pad;
+        const x = year => points.length === 1 ? 228 : 66 + (year - points[0].year) / (points.at(-1).year - points[0].year) * 316;
+        const y = value => 166 - (value - min) / (max - min) * 124;
+        const format = value => {
+            if (fieldEvent) return `${Math.floor(value / 12)}\u2032 ${Number((value % 12).toFixed(1))}\u2033`;
+            if (value >= 60) return `${Math.floor(value / 60)}:${(value % 60).toFixed(1).padStart(4, '0')}`;
+            return value.toFixed(2);
         };
-        const resetElevation = () => {
-            wrapper.style.zIndex = '';
+        const ticks = Array.from({length: 5}, (_, index) => min + (max - min) * index / 4);
+        return `<svg class="progression-chart" viewBox="0 0 420 220" role="img" aria-label="${escapeHtml(eventName)} yearly best playoff progression">
+            <title>${escapeHtml(eventName)} progression</title>
+            <desc>${escapeHtml(points.map(point => `${point.year}: ${point.result}`).join('; '))}</desc>
+            ${ticks.map(value => `<line x1="60" x2="400" y1="${y(value)}" y2="${y(value)}" stroke="#e4e8ef"/><text x="53" y="${y(value) + 4}" text-anchor="end">${format(value)}</text>`).join('')}
+            <text transform="translate(13 105) rotate(-90)" text-anchor="middle">${fieldEvent ? 'Distance (feet / inches)' : 'Time (seconds)'}</text>
+            <polyline points="${points.map(point => `${x(point.year)},${y(point.result_value)}`).join(' ')}" fill="none" stroke="#ad0a46" stroke-width="3" stroke-linejoin="round"/>
+            ${points.map((point, index) => `<circle cx="${x(point.year)}" cy="${y(point.result_value)}" r="4.5" fill="#ad0a46"><title>${escapeHtml(`${point.year}: ${point.result}`)}</title></circle>
+            <text class="point-label" x="${x(point.year)}" y="${y(point.result_value) - (index % 2 ? 13 : 15)}" text-anchor="middle">${escapeHtml(point.result)}</text>`).join('')}
+            ${points.filter((point, index) => points.length <= 6 || index % Math.ceil(points.length / 6) === 0 || index === points.length - 1).map(point => `<text x="${x(point.year)}" y="194" text-anchor="middle">${point.year}</text>`).join('')}
+        </svg>`;
+    }
+
+    function formatRank(rank) {
+        return rank && Number.isInteger(rank.rank) && Number.isInteger(rank.total)
+            ? `${rank.rank}/${rank.total}` : '\u2014';
+    }
+
+    function renderEventFolders(history, bests) {
+        const tabs = document.getElementById('event-tabs');
+        const panel = document.getElementById('event-panel');
+        const events = new Map();
+        history.forEach(row => {
+            if (!events.has(row.event)) events.set(row.event, []);
+            ['state', 'regional', 'sectional'].forEach(stage => {
+                if (row[stage]) events.get(row.event).push({...row[stage], year: row.year});
+            });
+        });
+        // Include personal-best events even when there is no playoff history.
+        bests.forEach(best => { if (!events.has(best.event)) events.set(best.event, []); });
+        const names = [...events.keys()].sort((a, b) => a.localeCompare(b));
+        if (!names.length) {
+            tabs.hidden = true;
+            panel.innerHTML = '<p class="dashboard-empty">No event results recorded yet.</p>';
+            return;
+        }
+        const activate = index => {
+            [...tabs.children].forEach((tab, tabIndex) => {
+                tab.setAttribute('aria-selected', String(index === tabIndex));
+                tab.tabIndex = index === tabIndex ? 0 : -1;
+            });
+            const name = names[index];
+            panel.setAttribute('aria-labelledby', `event-tab-${index}`);
+            const rows = events.get(name).sort((a, b) => b.year - a.year);
+            const type = bests.find(best => best.event === name)?.event_type;
+            const progression = renderProgression(name, rows, type);
+            panel.innerHTML = `<div class="event-columns${progression ? '' : ' event-columns-results-only'}">
+                <div class="event-results"><h3>${escapeHtml(name)} Results</h3>
+                ${rows.length ? `<div class="event-table-scroll"><table><thead><tr><th scope="col">Year</th><th scope="col">Meet</th><th scope="col">${type === 'Field' || /jump|vault|throw|shot|discus/i.test(name) ? 'Mark' : 'Time'}</th><th scope="col">Place</th><th scope="col" title="Statewide rank for this event, year, gender and meet round">State Rank</th><th scope="col" title="Statewide rank among athletes in the same grade for this event, year, gender and meet round">Class Rank</th></tr></thead><tbody>
+                ${rows.map(row => `<tr><td>${escapeHtml(row.year)}</td><td>${escapeHtml(row.meet_type)}${row.result_type === 'Prelim' ? ' <span class="prelim-marker" title="Prelim result only; no final recorded">(P)</span>' : ''}</td><td>${row.has_detail ? `<a href="${resultLink(row)}">${escapeHtml(row.result || '\u2014')}</a>` : escapeHtml(row.result || '\u2014')}</td><td>${ordinal(row.place)}</td><td>${formatRank(row.state_rank)}</td><td title="${escapeHtml(row.class_rank?.grade || (row.is_relay ? 'Class rank is unavailable for relay teams' : ''))}">${formatRank(row.class_rank)}</td></tr>`).join('')}
+                </tbody></table></div>` : '<p class="dashboard-empty">No playoff results recorded for this event.</p>'}</div>
+                ${progression ? `<div class="event-progression"><h3>${escapeHtml(name)} Progression</h3>${progression}</div>` : ''}
+            </div>`;
         };
-
-        wrapper.addEventListener('mouseenter', elevate);
-        wrapper.addEventListener('mouseleave', resetElevation);
-        wrapper.addEventListener('focus', elevate);
-        wrapper.addEventListener('blur', resetElevation);
-
-        return wrapper;
+        names.forEach((name, index) => {
+            const tab = document.createElement('button');
+            tab.type = 'button';
+            tab.id = `event-tab-${index}`;
+            tab.className = 'event-tab';
+            tab.setAttribute('role', 'tab');
+            tab.setAttribute('aria-controls', 'event-panel');
+            tab.textContent = name;
+            tab.addEventListener('click', () => activate(index));
+            tab.addEventListener('keydown', event => {
+                let next;
+                if (event.key === 'ArrowRight') next = (index + 1) % names.length;
+                if (event.key === 'ArrowLeft') next = (index - 1 + names.length) % names.length;
+                if (event.key === 'Home') next = 0;
+                if (event.key === 'End') next = names.length - 1;
+                if (next === undefined) return;
+                event.preventDefault();
+                activate(next);
+                tabs.children[next].focus();
+                tabs.children[next].scrollIntoView({block: 'nearest', inline: 'nearest'});
+            });
+            tabs.appendChild(tab);
+        });
+        activate(0);
     }
 
     try {
@@ -306,9 +510,9 @@ const shareStatus = document.getElementById('share-dashboard-status');
         const genderBadge = document.getElementById('athlete-gender');
         if (data.athlete.gender) {
             const genderText = data.athlete.gender === 'M' ? 'Boys' : data.athlete.gender === 'F' ? 'Girls' : data.athlete.gender;
-            const genderClass = data.athlete.gender === 'Boys'
+            const genderClass = genderText === 'Boys'
                 ? 'font-bold px-2 py-0.5 border-2 border-blue-500 text-blue-600 rounded-full'
-                : data.athlete.gender === 'Girls'
+                : genderText === 'Girls'
                     ? 'font-bold px-2 py-0.5 border-2 border-pink-500 text-pink-600 rounded-full'
                     : 'font-bold px-2 py-0.5 border-2 border-gray-400 text-gray-600 rounded-full';
             genderBadge.textContent = genderText;
@@ -335,20 +539,19 @@ const shareStatus = document.getElementById('share-dashboard-status');
             const config = stageConfigs[stageKey];
 
             const badgeCard = document.createElement('div');
-            badgeCard.className = 'rounded-3xl border border-gray-200 bg-gray-50/80 p-4 sm:p-6 flex flex-col gap-4 shadow-sm';
+            badgeCard.className = 'achievement-card';
 
             const headingLabel = stageData?.label || `${stageKey.charAt(0).toUpperCase()}${stageKey.slice(1)} Stage`;
-            const totalAppearances = stageData?.entries?.length || 0;
             const emptyStateText = getStageEncouragement(stageKey);
 
             badgeCard.innerHTML = `
                     <div class="flex flex-wrap items-center gap-3 justify-between">
                         <div>
-                            <h3 class="text-2xl font-black text-gray-900">${config.title}</h3>
+                            <h3>${config.title}</h3>
                             <p class="hidden text-sm text-gray-600">${headingLabel}</p>
                         </div>
                     </div>
-                    <div class="flex flex-wrap gap-3 sm:gap-4" data-stage-medals="${stageKey}"></div>
+                    <div class="medal-grid" data-stage-medals="${stageKey}"></div>
                     ${(!stageData || !stageData.entries || stageData.entries.length === 0)
                     ? `<p class="text-sm text-gray-500 italic">${emptyStateText}</p>`
                     : ''}
@@ -364,60 +567,14 @@ const shareStatus = document.getElementById('share-dashboard-status');
             badgesContainer.appendChild(badgeCard);
         });
 
-        // Populate playoff history
-        const playoffContainer = document.getElementById('playoff-history-container');
-        playoffContainer.innerHTML = '';
-
-        if (data.playoff_history && data.playoff_history.length > 0) {
-            // Create table
-            const table = document.createElement('div');
-            table.className = 'overflow-x-auto overflow-y-visible w-full max-w-full';
-            table.innerHTML = `
-                    <table class="table table-compact sm:table-normal w-full min-w-full">
-                        <thead>
-                            <tr class="text-primary">
-                                <th class="text-sm sm:text-base lg:text-lg">Year</th>
-                                <th class="text-sm sm:text-base lg:text-lg">Event</th>
-                                <th class="text-sm sm:text-base lg:text-lg">Sectional</th>
-                                <th class="text-sm sm:text-base lg:text-lg">Regional</th>
-                                <th class="text-sm sm:text-base lg:text-lg">State</th>
-                            </tr>
-                        </thead>
-                        <tbody id="playoff-table-body">
-                        </tbody>
-                    </table>
-                `;
-            playoffContainer.appendChild(table);
-
-            // Populate table rows
-            const tbody = document.getElementById('playoff-table-body');
-            data.playoff_history.forEach(row => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-primary/5';
-
-                const yearCell = document.createElement('td');
-                yearCell.className = 'font-semibold text-xs sm:text-sm lg:text-base whitespace-nowrap';
-                yearCell.textContent = row.year || '–';
-                tr.appendChild(yearCell);
-
-                const eventCell = document.createElement('td');
-                eventCell.className = 'text-xs sm:text-sm lg:text-base';
-                eventCell.textContent = row.event || '–';
-                tr.appendChild(eventCell);
-
-                tr.appendChild(createStageCell(row.sectional));
-                tr.appendChild(createStageCell(row.regional));
-                tr.appendChild(createStageCell(row.state));
-
-                tbody.appendChild(tr);
-            });
-        } else {
-            playoffContainer.innerHTML = '<p class="text-gray-600 text-center py-8">No playoff history available</p>';
-        }
+        renderPersonalBests(data.personal_bests || []);
+        renderEventFolders(data.playoff_history || [], data.personal_bests || []);
+        initializeAthleteCard(data.athlete);
 
     } catch (error) {
         console.error('Error loading athlete data:', error);
         loadingState.classList.add('hidden');
+        dashboardContent.classList.add('hidden');
         errorState.classList.remove('hidden');
     }
 });

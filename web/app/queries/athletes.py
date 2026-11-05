@@ -3,6 +3,8 @@
 Athlete dashboards, their result rankings and badges.
 """
 
+from bisect import bisect_left
+from math import isfinite
 from typing import Optional
 
 from sqlalchemy import and_, func
@@ -90,6 +92,7 @@ def get_athlete_dashboard_data(athlete_id: int):
 
     badges = _compute_badges(athlete_id)
     playoff_history = _build_playoff_history(athlete_id)
+    _add_dashboard_history_ranks(playoff_history, athlete)
     personal_bests = get_athlete_personal_bests(athlete_id, athlete_obj=athlete)
 
     school_logo_url = _school_logo_url(athlete.school) if athlete.school else None
@@ -235,6 +238,119 @@ def _build_playoff_history(athlete_id: int):
 
     history_rows.sort(key=lambda row: (-row["year"], row["event"]))
     return history_rows
+
+def _add_dashboard_history_ranks(history, athlete):
+    """Rank dashboard rows across statewide event/year/stage/gender cohorts.
+
+    Each athlete contributes one mark per meet: Final first, with a Prelim
+    fallback for non-finalists. Class means the grade recorded for that race.
+    Relay teams receive a statewide rank but have no single class to compare.
+    """
+    if not history:
+        return
+
+    scopes = {
+        (row["year"], row["event"], stage["meet_type"])
+        for row in history
+        for key in ("sectional", "regional", "state")
+        if (stage := row.get(key))
+    }
+    years = {scope[0] for scope in scopes}
+    events = {scope[1] for scope in scopes}
+    stages = {scope[2] for scope in scopes}
+    cohorts = {}
+
+    def grade_key(grade):
+        value = str(grade or "").strip().upper()
+        return {"9": "FR", "10": "SO", "11": "JR", "12": "SR"}.get(value, value)
+
+    individual_rows = (
+        db.session.query(AthleteResult, Meet, Event.event_type)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .join(Event, AthleteResult.event == Event.event)
+        .filter(
+            AthleteResult.event.in_(events),
+            AthleteResult.result_type.in_(("Final", "Prelim")),
+            Meet.year.in_(years),
+            Meet.meet_type.in_(stages),
+            Meet.gender == athlete.gender,
+            Event.event_type != "Relay",
+        ).all()
+    )
+    for result, meet, event_type in individual_rows:
+        scope = (meet.year, result.event, meet.meet_type)
+        if scope not in scopes:
+            continue
+        cohort = cohorts.setdefault(scope, {"type": event_type, "entries": {}})
+        key = (result.athlete_id, result.meet_id)
+        existing = cohort["entries"].get(key)
+        if existing is None or (existing.result_type != "Final" and result.result_type == "Final"):
+            cohort["entries"][key] = result
+
+    relay_events = {row["event"] for row in history if any(
+        row.get(key) and row[key].get("is_relay") for key in ("sectional", "regional", "state")
+    )}
+    if relay_events:
+        relay_rows = (
+            db.session.query(RelayResult, Meet)
+            .join(Meet, RelayResult.meet_id == Meet.meet_id)
+            .filter(
+                RelayResult.event.in_(relay_events),
+                Meet.year.in_(years), Meet.meet_type.in_(stages),
+                Meet.gender == athlete.gender,
+            ).all()
+        )
+        for result, meet in relay_rows:
+            scope = (meet.year, result.event, meet.meet_type)
+            if scope in scopes:
+                cohort = cohorts.setdefault(scope, {"type": "Relay", "entries": {}})
+                cohort["entries"][(result.school_id, result.meet_id)] = result
+
+    for cohort in cohorts.values():
+        direction = 1 if _is_lower_better(cohort["type"]) else -1
+        valid = {
+            key: result for key, result in cohort["entries"].items()
+            if result.result2 is not None and isfinite(result.result2)
+            and 0 < result.result2 < 9999
+            and not str(result.result or "").strip().isalpha()
+        }
+        cohort["valid"] = valid
+        cohort["values"] = sorted(direction * result.result2 for result in valid.values())
+        cohort["grades"] = {}
+        for result in valid.values():
+            grade = grade_key(getattr(result, "grade", None))
+            if grade:
+                cohort["grades"].setdefault(grade, []).append(direction * result.result2)
+        for values in cohort["grades"].values():
+            values.sort()
+
+    for row in history:
+        for key in ("sectional", "regional", "state"):
+            stage = row.get(key)
+            if not stage:
+                continue
+            stage["state_rank"] = None
+            stage["class_rank"] = None
+            cohort = cohorts.get((row["year"], row["event"], stage["meet_type"]))
+            if not cohort:
+                continue
+            target_id = athlete.school_id if stage.get("is_relay") else athlete.athlete_id
+            target = cohort["valid"].get((target_id, stage["meet_id"]))
+            if target is None:
+                continue
+            value = target.result2 if _is_lower_better(cohort["type"]) else -target.result2
+            stage["state_rank"] = {
+                "rank": bisect_left(cohort["values"], value) + 1,
+                "total": len(cohort["values"]),
+            }
+            grade = grade_key(getattr(target, "grade", None))
+            if grade and grade in cohort["grades"]:
+                values = cohort["grades"][grade]
+                stage["class_rank"] = {
+                    "rank": bisect_left(values, value) + 1,
+                    "total": len(values), "grade": grade,
+                }
+
 
 def get_athlete_personal_bests(athlete_id: int, min_year: int = 2022, athlete_obj=None):
     """Return personal-best results for each individual event the athlete has contested."""
