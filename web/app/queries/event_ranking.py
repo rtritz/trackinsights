@@ -14,16 +14,20 @@ Depends on formatting for display and on shared for the row helpers; nothing
 here is imported back by either.
 """
 from functools import lru_cache
+from math import ceil, floor
+from statistics import median
 from typing import Any, Dict, List
 
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 
 from .. import db
-from ..models import Athlete, AthleteResult, Event, Meet
+from ..models import Athlete, AthleteResult, Event, Meet, RelayResult, School
 from .formatting import (
     _format_place_label,
     _format_sectional_name,
     _format_sectional_result,
+    _format_result_display,
     _safe_int,
 )
 from .shared import (
@@ -49,6 +53,421 @@ def _get_field_size(meet_id, event, result_type):
         )
         .scalar()
     )
+
+
+def get_event_leaderboard(event_name, gender, meet_type=None, year=None, limit=50):
+    """Return each athlete's best valid postseason mark at every filtered meet."""
+    event_type = _get_event_types_map().get(event_name, "Track")
+    lower_is_better = _is_lower_better(event_type)
+    if event_type == "Relay":
+        query = (
+            RelayResult.query
+            .join(Meet, RelayResult.meet_id == Meet.meet_id)
+            .join(School, RelayResult.school_id == School.school_id)
+            .options(
+                joinedload(RelayResult.school),
+                joinedload(RelayResult.meet),
+            )
+            .filter(
+                RelayResult.event == event_name,
+                RelayResult.result2.isnot(None),
+                RelayResult.result2 > 0,
+                RelayResult.result2 < 9999,
+                Meet.gender == gender,
+                Meet.meet_type.in_(("Sectional", "Regional", "State")),
+            )
+        )
+        if meet_type:
+            query = query.filter(Meet.meet_type == meet_type)
+        if year is not None:
+            query = query.filter(Meet.year == year)
+
+        return [
+            {"result": result, "result_value": float(result.result2)}
+            for result in sorted(
+                query.all(),
+                key=lambda result: (
+                    result.result2 if lower_is_better else -result.result2,
+                    (result.school.school_name or "").lower(),
+                    result.meet_id,
+                ),
+            )[:limit]
+        ]
+
+    query = (
+        AthleteResult.query
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .options(
+            joinedload(AthleteResult.athlete).joinedload(Athlete.school),
+            joinedload(AthleteResult.meet),
+        )
+        .filter(
+            AthleteResult.event == event_name,
+            AthleteResult.result2.isnot(None),
+            AthleteResult.result2 > 0,
+            AthleteResult.result2 < 9999,
+            Athlete.gender == gender,
+            Meet.meet_type.in_(("Sectional", "Regional", "State")),
+        )
+    )
+    if meet_type:
+        query = query.filter(Meet.meet_type == meet_type)
+    if year is not None:
+        query = query.filter(Meet.year == year)
+
+    per_meet = {}
+    for result in query.all():
+        key = (result.athlete_id, result.meet_id)
+        existing = per_meet.get(key)
+        better_mark = False
+        final_tie = (
+            existing is not None
+            and result.result2 == existing["result_value"]
+            and result.result_type == "Final"
+            and existing["result"].result_type != "Final"
+        )
+        if existing is not None:
+            better_mark = (
+                result.result2 < existing["result_value"]
+                if lower_is_better
+                else result.result2 > existing["result_value"]
+            )
+        if existing is None or better_mark or final_tie:
+            per_meet[key] = {"result": result, "result_value": result.result2}
+
+    return sorted(
+        per_meet.values(),
+        key=lambda entry: (
+            entry["result_value"] if lower_is_better else -entry["result_value"],
+            (entry["result"].athlete.last or "").lower(),
+            (entry["result"].athlete.first or "").lower(),
+            entry["result"].meet_id,
+        ),
+    )[:limit]
+
+
+def get_100m_leaderboard(gender, meet_type=None, year=None, limit=50):
+    return get_event_leaderboard(
+        "100 Meters", gender, meet_type=meet_type, year=year, limit=limit
+    )
+
+
+def _get_event_result_records(event_name, gender):
+    event_type = _get_event_types_map().get(event_name, "Track")
+    if event_type == "Relay":
+        rows = (
+            db.session.query(
+                RelayResult.school_id.label("athlete_id"),
+                School.school_name.label("school"),
+                Meet.meet_type.label("meet_type"),
+                Meet.year.label("year"),
+                Meet.host.label("host"),
+                Meet.meet_num.label("meet_num"),
+                Event.event_type.label("event_type"),
+                RelayResult.result.label("result"),
+                RelayResult.result2.label("value"),
+                RelayResult.place.label("place"),
+            )
+            .join(School, RelayResult.school_id == School.school_id)
+            .join(Meet, RelayResult.meet_id == Meet.meet_id)
+            .join(Event, RelayResult.event == Event.event)
+            .filter(
+                RelayResult.event == event_name,
+                Meet.gender == gender,
+                RelayResult.result2.isnot(None),
+                RelayResult.result2 > 0,
+                RelayResult.result2 < 9999,
+                Meet.year.isnot(None),
+                Meet.meet_type.in_(("Sectional", "Regional", "State")),
+            )
+            .all()
+        )
+        return [
+            {
+                "athlete_id": row.athlete_id,
+                "first": "",
+                "last": row.school or "",
+                "school": row.school or "—",
+                "meet_type": row.meet_type,
+                "year": row.year,
+                "host": row.host or "",
+                "meet_num": row.meet_num,
+                "event_type": row.event_type or "Relay",
+                "result": row.result or f"{row.value:.2f}",
+                "value": float(row.value),
+                "result_type": "Final",
+                "place": row.place,
+            }
+            for row in rows
+        ]
+
+    rows = (
+        db.session.query(
+            AthleteResult.athlete_id.label("athlete_id"),
+            Athlete.first.label("first"),
+            Athlete.last.label("last"),
+            School.school_name.label("school"),
+            Meet.meet_type.label("meet_type"),
+            Meet.year.label("year"),
+            Meet.host.label("host"),
+            Meet.meet_num.label("meet_num"),
+            Event.event_type.label("event_type"),
+            AthleteResult.result.label("result"),
+            AthleteResult.result2.label("value"),
+            AthleteResult.result_type.label("result_type"),
+            AthleteResult.place.label("place"),
+        )
+        .join(Athlete, AthleteResult.athlete_id == Athlete.athlete_id)
+        .outerjoin(School, Athlete.school_id == School.school_id)
+        .join(Meet, AthleteResult.meet_id == Meet.meet_id)
+        .join(Event, AthleteResult.event == Event.event)
+        .filter(
+            AthleteResult.event == event_name,
+            Athlete.gender == gender,
+            AthleteResult.result2.isnot(None),
+            AthleteResult.result2 > 0,
+            AthleteResult.result2 < 9999,
+            Meet.year.isnot(None),
+            Meet.meet_type.in_(("Sectional", "Regional", "State")),
+        )
+        .all()
+    )
+
+    def row_dict(row):
+        return {
+            "athlete_id": row.athlete_id,
+            "first": row.first or "",
+            "last": row.last or "",
+            "school": row.school or "—",
+            "meet_type": row.meet_type,
+            "year": row.year,
+            "host": row.host or "",
+            "meet_num": row.meet_num,
+            "event_type": row.event_type or "Track",
+            "result": row.result or f"{row.value:.2f}",
+            "value": float(row.value),
+            "result_type": row.result_type,
+            "place": row.place,
+        }
+
+    return [row_dict(row) for row in rows]
+
+
+def _best_event_records(records, key, lower_is_better):
+    best = {}
+    for record in records:
+        bucket = key(record)
+        current = best.get(bucket)
+        better_mark = (
+            record["value"] < current["value"]
+            if lower_is_better
+            else record["value"] > current["value"]
+        ) if current is not None else False
+        preferred_tie = (
+            current is not None
+            and record["value"] == current["value"]
+            and record["result_type"] == "Final"
+            and current["result_type"] != "Final"
+        )
+        if current is None or better_mark or preferred_tie:
+            best[bucket] = record
+    return list(best.values())
+
+
+def _event_record_sort_key(record, lower_is_better):
+    return (
+        record["value"] if lower_is_better else -record["value"],
+        record["last"].lower(),
+        record["first"].lower(),
+        record["year"],
+        record["meet_type"],
+    )
+
+
+def _interpolated_percentile(values, percentile):
+    position = (len(values) - 1) * percentile / 100
+    lower = floor(position)
+    upper = ceil(position)
+    return values[lower] + (values[upper] - values[lower]) * (position - lower)
+
+
+def get_event_dashboard_analytics(event_name, gender, meet_type=None, year=None):
+    """Summarize valid postseason results for one event and gender."""
+    event_type = _get_event_types_map().get(event_name, "Track")
+    lower_is_better = _is_lower_better(event_type)
+    records = _get_event_result_records(event_name, gender)
+    if not records:
+        return {
+            "years": [],
+            "window": [],
+            "distribution": {"labels": [], "counts": []},
+            "percentiles": [],
+            "advancement_ranges": {},
+            "trend": {"years": [], "datasets": []},
+            "event_type": event_type,
+            "lower_is_better": lower_is_better,
+            "unit_label": "sec" if lower_is_better else "in",
+            "distribution_uses_minutes": False,
+        }
+
+    years = sorted({record["year"] for record in records})
+    latest_season = years[-1]
+    window_start = max(years[0], latest_season - 4)
+    window_years = [year for year in years if window_start <= year <= latest_season]
+
+    window_records = [
+        record for record in records if record["year"] in window_years
+    ]
+    distribution_window = [year] if year is not None else window_years
+    distribution_records = [
+        record for record in records
+        if record["year"] in distribution_window
+        and (meet_type is None or record["meet_type"] == meet_type)
+    ]
+    athlete_season_bests = _best_event_records(
+        distribution_records,
+        lambda record: (record["athlete_id"], record["year"]),
+        lower_is_better,
+    )
+    values = sorted(record["value"] for record in athlete_season_bests)
+    percentile_rows = []
+    distribution_labels = []
+    distribution_counts = []
+    distribution_max = None
+    if values:
+        for percentile in (25, 50, 75):
+            value = _interpolated_percentile(values, percentile)
+            percentile_rows.append({
+                "label": f"{percentile}th",
+                "value": round(value, 2),
+                "display": _format_result_display(value, event_type),
+            })
+
+        distribution_min = _interpolated_percentile(values, 1)
+        distribution_max = _interpolated_percentile(values, 99)
+        value_range = distribution_max - distribution_min
+        bin_width = (
+            max(2, ceil(value_range / 15))
+            if event_type == "Field"
+            else max(0.2, ceil(value_range / 15 * 10) / 10)
+        )
+        first_bin = floor(distribution_min / bin_width) * bin_width
+        last_bin = ceil(distribution_max / bin_width) * bin_width
+        if last_bin <= first_bin:
+            last_bin = first_bin + bin_width
+        bin_count = max(1, round((last_bin - first_bin) / bin_width))
+        distribution_counts = [0] * bin_count
+        underflow_count = sum(value < first_bin for value in values)
+        overflow_count = sum(value > last_bin for value in values)
+        for value in values:
+            if value < first_bin or value > last_bin:
+                continue
+            bin_index = min(int((value - first_bin) / bin_width), bin_count - 1)
+            distribution_counts[bin_index] += 1
+
+        def format_distribution_mark(value):
+            if event_type == "Field":
+                return f"{value:g}"
+            if value >= 60:
+                return _format_result_display(value, event_type)
+            return f"{value:.1f}"
+
+        for index in range(bin_count):
+            start = first_bin + index * bin_width
+            end = first_bin + (index + 1) * bin_width
+            distribution_labels.append(
+                f"{format_distribution_mark(start)}–{format_distribution_mark(end)}"
+            )
+        if underflow_count:
+            distribution_labels.insert(0, f"<{format_distribution_mark(first_bin)}")
+            distribution_counts.insert(0, underflow_count)
+        if overflow_count:
+            distribution_labels.append(f">{format_distribution_mark(last_bin)}")
+            distribution_counts.append(overflow_count)
+
+    advancement_ranges = {}
+    for source_level, target_level in (
+        ("Sectional", "Regional"),
+        ("Regional", "State"),
+    ):
+        third_place_values = [
+            record["value"] for record in window_records
+            if record["meet_type"] == source_level
+            and record["place"] == 3
+            and record["result_type"] == "Final"
+        ]
+        advancement_ranges[target_level] = (
+            {
+                "low": round(min(third_place_values), 2),
+                "high": round(max(third_place_values), 2),
+                "low_display": _format_result_display(
+                    min(third_place_values), event_type
+                ),
+                "high_display": _format_result_display(
+                    max(third_place_values), event_type
+                ),
+                "count": len(third_place_values),
+            }
+            if third_place_values else None
+        )
+
+    trend_bests = _best_event_records(
+        records,
+        lambda record: (record["athlete_id"], record["year"], record["meet_type"]),
+        lower_is_better,
+    )
+    trend_levels = ("Sectional", "Regional", "State")
+    trend_datasets = []
+    colors = {
+        "Sectional": "#9f1239",
+        "Regional": "#c2410c",
+        "State": "#166534",
+    }
+    for level in trend_levels:
+        medians = []
+        for year in years:
+            level_values = [
+                record["value"] for record in trend_bests
+                if record["year"] == year and record["meet_type"] == level
+            ]
+            medians.append(round(median(level_values), 2) if level_values else None)
+        trend_datasets.append({
+            "label": level,
+            "data": medians,
+            "borderColor": colors[level],
+            "backgroundColor": colors[level],
+            "spanGaps": False,
+            "tension": 0.25,
+        })
+
+    return {
+        "years": years,
+        "window": distribution_window,
+        "distribution": {
+            "labels": distribution_labels,
+            "counts": distribution_counts,
+        },
+        "percentiles": percentile_rows,
+        "advancement_ranges": advancement_ranges,
+        "trend": {
+            "years": years,
+            "datasets": trend_datasets,
+        },
+        "event_type": event_type,
+        "lower_is_better": lower_is_better,
+        "unit_label": "sec" if lower_is_better else "in",
+        "distribution_uses_minutes": (
+            event_type != "Field"
+            and distribution_max is not None
+            and distribution_max >= 60
+        ),
+    }
+
+
+def get_100m_dashboard_analytics(gender):
+    """Preserve the 100m helper while dashboards share the generic calculation."""
+    return get_event_dashboard_analytics("100 Meters", gender)
 
 
 def _compute_rank_for_event(event_name, event_type, athlete_id, min_year, school_id=None, gender=None):

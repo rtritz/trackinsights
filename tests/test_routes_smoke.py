@@ -25,6 +25,7 @@ PARAMS = {
     'school_id': 1,
     'meet_id': 4,
     'event_name': '100 Meters',
+    'event_slug': '100m',
     'gender': 'Boys',
     'season': '2024',
 }

@@ -1,0 +1,368 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }} - Track Insights{% endblock %}
+{% block meta_description %}Explore Indiana high school {{ event_name }} postseason marks with filters, percentiles, advancement benchmarks, and season trends.{% endblock %}
+
+{% block content %}
+<style>
+  .event-dashboard-page {
+    font-size: 1.05rem;
+    line-height: 1.6;
+  }
+
+  .event-dashboard-page .text-xs {
+    font-size: 0.8rem !important;
+  }
+
+  .event-dashboard-page .text-sm {
+    font-size: 0.92rem !important;
+  }
+
+  .event-dashboard-page .text-lg {
+    font-size: 1.12rem !important;
+  }
+
+  .event-dashboard-page .text-xl {
+    font-size: 1.35rem !important;
+  }
+
+  .event-dashboard-page .text-2xl {
+    font-size: 1.7rem !important;
+  }
+
+  .event-dashboard-page .analytics-cutoff-label {
+    font-size: 0.84rem !important;
+  }
+
+  .event-dashboard-page .leaderboard-section {
+    font-size: 1.1875rem;
+  }
+
+  .dashboard-analytics-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .dashboard-trend-card {
+    grid-column: 1 / -1;
+  }
+
+  .distribution-chart-frame,
+  .trend-chart-frame {
+    position: relative;
+    height: 14rem;
+  }
+
+  .leaderboard-desktop {
+    display: none;
+  }
+
+  @media (min-width: 40rem) {
+    .distribution-chart-frame {
+      height: 16rem;
+    }
+
+    .trend-chart-frame {
+      height: 18rem;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .dashboard-analytics-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .leaderboard-mobile {
+      display: none;
+    }
+
+    .leaderboard-desktop {
+      display: block;
+    }
+  }
+</style>
+
+<main class="event-dashboard-page min-h-screen bg-white pt-20 sm:pt-24 pb-5 px-3 sm:px-6 font-sans">
+  <div class="relative max-w-6xl mx-auto">
+    <div class="absolute inset-0 -z-10 mx-0 sm:mx-[-40px] rounded-[48px] bg-gradient-to-b from-primary/5 via-transparent to-base-200/40 blur-3xl opacity-80 pointer-events-none"></div>
+
+    <div class="relative space-y-8">
+      <header class="text-center space-y-4">
+        <h1 class="font-impact italic text-4xl sm:text-5xl text-primary">{{ page_title }}</h1>
+  
+      </header>
+
+      <div class="rounded-[32px] bg-white/90 ring-1 ring-base-200 shadow-[0_25px_70px_rgba(15,23,42,0.08)] p-4 sm:p-6 space-y-6">
+
+    <section class="bg-white border border-base-200/80 rounded-2xl shadow-lg shadow-base-300/40 p-4 sm:p-5" aria-labelledby="filters-heading">
+      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <h2 id="filters-heading" class="text-lg font-semibold text-base-content">Filters</h2>
+        </div>
+        <form method="get" action="{{ dashboard_url }}" class="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full sm:max-w-3xl">
+          <label class="form-control">
+            <span class="label-text text-xs uppercase tracking-wide font-semibold mb-1">Gender</span>
+            <select class="select select-bordered rounded-xl" name="gender" aria-label="Gender">
+              {% for option in available_genders %}
+              <option value="{{ option }}" {% if gender == option %}selected{% endif %}>{{ option }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="form-control">
+            <span class="label-text text-xs uppercase tracking-wide font-semibold mb-1">Meet level</span>
+            <select class="select select-bordered rounded-xl" name="meet_type" aria-label="Meet level">
+              {% for option in ['All'] + ['Sectional', 'Regional', 'State'] %}
+              <option value="{{ option }}" {% if meet_type == option %}selected{% endif %}>{{ option }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="form-control">
+            <span class="label-text text-xs uppercase tracking-wide font-semibold mb-1">Season</span>
+            <select class="select select-bordered rounded-xl" name="year" aria-label="Season">
+              <option value="All" {% if selected_year == 'All' %}selected{% endif %}>All seasons</option>
+              {% for year in years %}
+              <option value="{{ year }}" {% if selected_year|string == year|string %}selected{% endif %}>{{ year }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <div class="sm:col-span-3 flex flex-wrap gap-2 pt-1">
+            <button type="submit" class="btn btn-primary rounded-full px-7">Apply filters</button>
+            <a href="{{ dashboard_url }}" class="btn btn-ghost rounded-full">Reset</a>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="dashboard-analytics-grid" aria-label="Historical performance insights">
+      <article class="bg-white border border-base-200/80 rounded-2xl shadow-lg shadow-base-300/40 p-4 sm:p-5">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 class="font-impact italic text-xl text-primary mt-1">Performance Distribution</h2>
+            <p class="text-xs text-base-content/55 mt-1">
+              {{ meet_type if meet_type != 'All' else 'all meet levels' }}
+              {% if selected_year != 'All' %}
+                {{ selected_year }}
+              {% endif %}
+            </p>
+          </div>
+        </div>
+        {% if analytics.distribution.labels %}
+        <div class="mt-3 distribution-chart-frame"><canvas id="event-distribution-chart" aria-label="Filtered {{ event_name }} performance distribution" role="img"></canvas></div>
+        {% else %}
+        <p class="py-10 text-center text-sm text-base-content/55">No results match the selected filters.</p>
+        {% endif %}
+      </article>
+
+      <article class="bg-white border border-base-200/80 rounded-2xl shadow-lg shadow-base-300/40 p-4 sm:p-5">
+        <h2 class="font-impact italic text-xl text-primary mt-1">Cutoffs</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+          {% for target, label, stage in [
+            ('Regional', 'Regional', 'Sectional'),
+            ('State', 'State', 'Regional')
+          ] %}
+          {% set cutoff = analytics.advancement_ranges.get(target) %}
+          <div class="flex min-h-32 flex-col justify-center rounded-xl border border-base-200 bg-base-200/30 p-4 sm:p-5">
+            <p class="analytics-cutoff-label text-xs font-semibold uppercase tracking-wide text-base-content/55">{{ label }}</p>
+            {% if cutoff %}
+            <p class="mt-1 font-impact italic text-primary text-2xl">{{ cutoff.low_display }}–{{ cutoff.high_display }}{% if analytics.event_type != 'Field' %}<span class="ml-1 text-sm not-italic text-base-content/55">sec</span>{% endif %}</p>
+            <p class="text-xs text-base-content/55">3rd-place {% if analytics.event_type == 'Field' %}marks{% else %}times{% endif %} across {{ cutoff.count }} {{ stage }} meets</p>
+            {% else %}
+            <p class="mt-2 text-sm text-base-content/55">No third-place results available.</p>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </article>
+
+      <article class="dashboard-trend-card bg-white border border-base-200/80 rounded-2xl shadow-lg shadow-base-300/40 p-4 sm:p-5">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <h2 class="text-lg font-semibold text-base-content">Season-over-season median</h2>
+          </div>
+          {% if analytics.years %}<span class="text-xs text-base-content/55">{{ analytics.years[0] }}–{{ analytics.years[-1] }}</span>{% endif %}
+        </div>
+        <fieldset class="mt-3 flex flex-wrap gap-x-5 gap-y-2" aria-label="Choose trend lines">
+          <legend class="sr-only">Choose which meet-level trends to view</legend>
+          {% for level, color in [
+            ('Sectional', 'text-rose-800'),
+            ('Regional', 'text-orange-700'),
+            ('State', 'text-green-800')
+          ] %}
+          <label class="inline-flex items-center gap-2 text-sm font-medium {{ color }}">
+            <input type="checkbox" class="checkbox checkbox-sm checkbox-primary event-trend-toggle" data-trend="{{ level }}" checked>
+            {{ level }}
+          </label>
+          {% endfor %}
+        </fieldset>
+        {% if analytics.trend.years %}
+        <div class="mt-3 trend-chart-frame"><canvas id="event-trend-chart" aria-label="Median {{ event_name }} mark by season and meet level" role="img"></canvas></div>
+        {% else %}
+        <p class="py-10 text-center text-sm text-base-content/55">No results are available for this gender.</p>
+        {% endif %}
+      </article>
+    </section>
+
+    <section class="leaderboard-section bg-white border border-base-200/80 rounded-2xl shadow-xl shadow-base-300/30 overflow-hidden" aria-labelledby="leaderboard-heading">
+      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 px-4 sm:px-6 py-4 border-b border-base-200">
+        <div>
+          <p class="text-xs uppercase tracking-[0.2em] text-base-content/50 font-bold">{{ gender }} · {{ meet_type }} · {{ selected_year if selected_year != 'All' else 'All seasons' }}</p>
+          <h2 id="leaderboard-heading" class="text-xl font-semibold text-primary mt-1">{% if analytics.event_type == 'Field' %}Best marks{% elif is_relay %}Fastest relays{% else %}Fastest marks{% endif %}</h2>
+        </div>
+        <span class="badge badge-outline rounded-full">{{ results|length }} {% if is_relay %}relay{% else %}mark{% endif %}{% if results|length != 1 %}s{% endif %}</span>
+      </div>
+
+      {% if results %}
+      <ol class="leaderboard-mobile divide-y divide-gray-300/70" aria-label="{{ event_name }} leaderboard">
+        {% for entry in results[:10] %}
+        {% set result = entry.result %}
+        <li class="flex items-center gap-3 px-3 py-2.5">
+          <span class="w-7 shrink-0 font-impact italic text-primary text-lg text-center">{{ loop.index }}</span>
+          <div class="min-w-0 flex-1">
+          {% if is_relay %}
+          <a class="block truncate text-sm font-semibold link link-hover" href="{{ url_for('main.school_dashboard', school_id=result.school.school_id) }}">
+            {{ result.school.school_name }}
+          </a>
+          <p class="truncate text-xs text-base-content/60">{{ result.athlete_names or 'Relay lineup unavailable' }}</p>
+          {% else %}
+          <a class="block truncate text-sm font-semibold link link-hover" href="{{ url_for('main.athlete_dashboard', athlete_id=result.athlete.athlete_id) }}">
+            {{ result.athlete.first|title }} {{ result.athlete.last|title }}
+          </a>
+          <p class="truncate text-xs text-base-content/60">
+            {{ result.athlete.school.school_name if result.athlete.school else '—' }}
+          </p>
+          {% endif %}
+          <p class="truncate text-[11px] text-base-content/50">
+            {{ result.meet.year }}{% if result.meet.host %} · {{ result.meet.host }}{% endif %}
+          </p>
+          </div>
+          <div class="shrink-0 text-right">
+            <p class="font-impact italic text-primary text-lg leading-tight">{{ result.result }}</p>
+            <span class="badge badge-xs {{ 'badge-primary' if result.meet.meet_type == 'State' else ('badge-secondary' if result.meet.meet_type == 'Regional' else 'badge-outline') }}">
+              {{ result.meet.meet_type }}
+            </span>
+            {% if not is_relay and result.result_type == 'Prelim' %}<span class="badge badge-ghost badge-xs">Prelim</span>{% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+      <div class="leaderboard-desktop overflow-x-auto">
+        <table class="table table-zebra table-sm text-sm">
+          <thead>
+            <tr class="text-[11px] uppercase tracking-wide text-base-content/55">
+              <th scope="col" class="w-12 px-3 py-2">Rank</th>
+              <th scope="col" class="px-3 py-2">{{ 'School' if is_relay else 'Athlete' }}</th>
+              <th scope="col" class="px-3 py-2">{{ 'Relay members' if is_relay else 'School' }}</th>
+              <th scope="col" class="px-3 py-2">Time</th>
+              <th scope="col" class="px-3 py-2">Set at</th>
+              <th scope="col" class="px-3 py-2">Season</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for entry in results[:10] %}
+            {% set result = entry.result %}
+            <tr class="leading-tight">
+              <th class="px-3 py-2 font-impact italic text-primary">{{ loop.index }}</th>
+            {% if is_relay %}
+            <td class="px-3 py-2 font-semibold whitespace-nowrap">
+              <a class="link link-hover" href="{{ url_for('main.school_dashboard', school_id=result.school.school_id) }}">{{ result.school.school_name }}</a>
+            </td>
+            <td class="px-3 py-2">{{ result.athlete_names or 'Relay lineup unavailable' }}</td>
+            {% else %}
+            <td class="px-3 py-2 font-semibold whitespace-nowrap">
+              <a class="link link-hover" href="{{ url_for('main.athlete_dashboard', athlete_id=result.athlete.athlete_id) }}">
+                {{ result.athlete.first|title }} {{ result.athlete.last|title }}
+                </a>
+                {% if not is_relay and result.result_type == 'Prelim' %}
+                <span class="badge badge-ghost badge-xs ml-1">Prelim</span>
+                {% endif %}
+              </td>
+              <td class="px-3 py-2 whitespace-nowrap">{{ result.athlete.school.school_name if result.athlete.school else '—' }}</td>
+              {% endif %}
+              <td class="px-3 py-2 font-impact italic text-primary text-lg whitespace-nowrap">{{ result.result }}</td>
+              <td class="px-3 py-2 whitespace-nowrap">
+                {% set level_class = 'badge-primary' if result.meet.meet_type == 'State' else ('badge-secondary' if result.meet.meet_type == 'Regional' else 'badge-outline') %}
+                <span class="badge badge-sm {{ level_class }} rounded-full">{{ result.meet.meet_type }}</span>
+                {% if result.meet.host %}<span class="text-xs text-base-content/55 ml-1">{{ result.meet.host }}</span>{% endif %}
+              </td>
+              <td class="px-3 py-2 whitespace-nowrap">{{ result.meet.year }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if results|length > 10 %}
+      <details class="leaderboard-mobile mx-3 mb-3 border-t border-base-200 pt-2">
+        <summary class="cursor-pointer text-sm font-semibold text-primary">Show all {{ results|length }} filtered marks</summary>
+        <ol start="11" class="mt-2 divide-y divide-gray-300/70">
+          {% for entry in results[10:] %}
+          {% set result = entry.result %}
+          <li class="flex items-center gap-3 py-2">
+            <span class="w-7 shrink-0 text-center font-impact italic text-primary">{{ loop.index + 10 }}</span>
+            <div class="min-w-0 flex-1">
+              {% if is_relay %}
+              <a class="block truncate text-sm font-semibold link link-hover" href="{{ url_for('main.school_dashboard', school_id=result.school.school_id) }}">{{ result.school.school_name }}</a>
+              <p class="truncate text-xs text-base-content/55">{{ result.athlete_names or 'Relay lineup unavailable' }} · {{ result.meet.year }}</p>
+              {% else %}
+              <a class="block truncate text-sm font-semibold link link-hover" href="{{ url_for('main.athlete_dashboard', athlete_id=result.athlete.athlete_id) }}">{{ result.athlete.first|title }} {{ result.athlete.last|title }}</a>
+              <p class="truncate text-xs text-base-content/55">{{ result.athlete.school.school_name if result.athlete.school else '—' }} · {{ result.meet.year }}</p>
+              {% endif %}
+            </div>
+            <span class="shrink-0 font-impact italic text-primary">{{ result.result }}</span>
+            <span class="badge badge-xs">{{ result.meet.meet_type }}</span>
+          </li>
+          {% endfor %}
+        </ol>
+      </details>
+      <details class="leaderboard-desktop mx-4 mb-3 border-t border-base-200 pt-2">
+        <summary class="cursor-pointer text-sm font-semibold text-primary">Show all {{ results|length }} filtered marks</summary>
+        <div class="overflow-x-auto">
+          <table class="table table-zebra table-sm text-sm">
+            <tbody>
+              {% for entry in results[10:] %}
+              {% set result = entry.result %}
+              <tr>
+                <th class="px-3 py-2 font-impact italic text-primary">{{ loop.index + 10 }}</th>
+                {% if is_relay %}
+                <td class="px-3 py-2 font-semibold whitespace-nowrap"><a class="link link-hover" href="{{ url_for('main.school_dashboard', school_id=result.school.school_id) }}">{{ result.school.school_name }}</a></td>
+                <td class="px-3 py-2">{{ result.athlete_names or 'Relay lineup unavailable' }}</td>
+                {% else %}
+                <td class="px-3 py-2 font-semibold whitespace-nowrap"><a class="link link-hover" href="{{ url_for('main.athlete_dashboard', athlete_id=result.athlete.athlete_id) }}">{{ result.athlete.first|title }} {{ result.athlete.last|title }}</a></td>
+                <td class="px-3 py-2 whitespace-nowrap">{{ result.athlete.school.school_name if result.athlete.school else '—' }}</td>
+                {% endif %}
+                <td class="px-3 py-2 font-impact italic text-primary text-lg whitespace-nowrap">{{ result.result }}</td>
+                <td class="px-3 py-2 whitespace-nowrap"><span class="badge badge-sm">{{ result.meet.meet_type }}</span> {{ result.meet.host }}</td>
+                <td class="px-3 py-2 whitespace-nowrap">{{ result.meet.year }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      {% endif %}
+      {% else %}
+      <div class="px-6 py-16 text-center">
+        <p class="font-impact italic text-primary text-2xl">No marks match those filters yet.</p>
+        <p class="text-sm text-base-content/60 mt-2">Try another season, meet level, or gender.</p>
+      </div>
+      {% endif %}
+    </section>
+      </div>
+    </div>
+  </div>
+</main>
+<script type="application/json" id="event-chart-data">{{ {
+  "distribution": analytics.distribution,
+  "percentiles": analytics.percentiles,
+  "trend": analytics.trend,
+  "window": analytics.window,
+  "eventType": analytics.event_type,
+  "lowerIsBetter": analytics.lower_is_better,
+  "unitLabel": analytics.unit_label,
+  "distributionUsesMinutes": analytics.distribution_uses_minutes
+}|tojson }}</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+<script src="{{ url_for('static', filename='js/event-dashboard.js') }}?v={{ asset_version('js/event-dashboard.js') }}" defer></script>
+{% endblock %}

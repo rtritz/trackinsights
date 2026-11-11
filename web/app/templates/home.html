@@ -365,6 +365,19 @@
               <p class="text-base sm:text-lg text-gray-700"><b>Advanced Queries</b>: Explore data insights and track
                 trends in IHSAA playoff performances.</p>
             </div>
+            <div class="flex gap-4">
+              <span class="text-primary font-impact text-2xl">05</span>
+              <div class="min-w-0">
+                <p class="text-base sm:text-lg text-gray-700">
+                  <b>Event Dashboards</b>: Compare postseason marks, percentiles, advancement benchmarks, and season trends.
+                </p>
+                <div class="flex flex-wrap gap-2 mt-3">
+                  {% for event_page in event_pages %}
+                  <a href="{{ event_page.url }}" class="badge badge-outline badge-primary">{{ event_page.label }}</a>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

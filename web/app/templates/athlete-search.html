@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Search Athletes & Schools - Track Insights{% endblock %}
+{% block title %}Search Track Insights - Track Insights{% endblock %}
 {% block meta_description %}Search for Indiana high school track and field athletes and schools. Find dashboards, performance data, and sectional projections.{% endblock %}
 
 {% block content %}
@@ -8,10 +8,10 @@
   <div class="max-w-3xl mx-auto space-y-10">
     <header class="space-y-4 text-center">
       <h1 class="font-impact text-primary text-4xl sm:text-5xl md:text-6xl">
-        Find Athletes & Schools
+        Search Track Insights
       </h1>
       <p class="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto">
-        Search by athlete name or school to jump directly to their dashboard.
+        Search for an athlete, school, or event dashboard.
       </p>
     </header>
 
@@ -19,8 +19,8 @@
       <form id="searchForm" class="space-y-4" autocomplete="off">
         <label for="searchInput" class="text-sm font-semibold text-primary tracking-wide uppercase">Search</label>
         <input id="searchInput" name="q" type="text"
-          class="input input-lg input-primary w-full bg-white text-base-content" placeholder="Ex: Jordan Smith Cathedral"
-          aria-label="Search athletes by name or school" />
+          class="input input-lg input-primary w-full bg-white text-base-content" placeholder="Ex: Jordan Smith, Cathedral, or 200m"
+          aria-label="Search athletes, schools, and events" />
       </form>
       <div id="results" class="rounded-2xl border border-primary/30 bg-white text-base-content p-4 min-h-[180px] athlete-search-results"
         aria-live="polite">
