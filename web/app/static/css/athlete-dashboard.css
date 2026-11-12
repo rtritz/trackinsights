@@ -80,6 +80,7 @@
 .athlete-card-stack-dragging { cursor: grabbing; }
 .athlete-card-stack-dragging .athlete-card-face { transition: none; }
 .athlete-card-option { position: absolute; top: 0; left: calc(var(--stack-index) * 12px); width: 100%; height: 100%; z-index: calc(4 - var(--stack-index)); padding: 0; border: 0; background: transparent; cursor: inherit; border-radius: 18px; transition: left 220ms ease, transform 220ms ease, opacity 220ms ease; transform: translateY(calc(var(--stack-index) * 3px)) scale(calc(1 - var(--stack-index) * 0.015)); transform-origin: center bottom; opacity: calc(1 - var(--stack-index) * 0.08); }
+.athlete-card-option[aria-pressed="false"] { pointer-events: none; }
 .athlete-card-option[aria-pressed="true"] { opacity: 1; }
 .athlete-card-face { display: block; width: 100%; height: 100%; background: var(--card-color, #16161c); border: 3px solid white; border-radius: 18px; box-shadow: 0 3px 10px #501e3233; overflow: hidden; box-sizing: border-box; }
 .athlete-card-face iframe { display: block; width: 1080px; height: 1350px; border: 0; transform-origin: top left; transform: scale(var(--athlete-card-scale, 0.2)); pointer-events: none; background: #16161c; }
@@ -114,6 +115,9 @@
 .athlete-card-action:disabled { opacity: 0.6; cursor: default; }
 .athlete-card-action:focus-visible { outline: 2px solid var(--athlete-accent); outline-offset: 3px; }
 .athlete-card-action svg { display: block; width: 52px; height: 52px; flex-shrink: 0; }
+.athlete-card-action .athlete-card-photos-icon { display: none; width: 52px; height: 52px; flex-shrink: 0; border-radius: 12px; }
+.athlete-card-action.athlete-card-mobile .athlete-card-download-icon { display: none; }
+.athlete-card-action.athlete-card-mobile .athlete-card-photos-icon { display: block; }
 .athlete-card-share-status { color: #52617a; font-size: 13px; margin-top: 12px; min-height: 18px; }
 @media (max-width: 767px) {
   .personal-bests-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 104px), 1fr)); }

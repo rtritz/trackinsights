@@ -114,6 +114,7 @@ const shareStatus = document.getElementById('share-dashboard-status');
             || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
         const downloadButton = document.getElementById('athlete-card-download');
         if (isMobile) {
+            downloadButton.classList.add('athlete-card-mobile');
             downloadButton.querySelector('span').textContent = 'Add to Photos';
         }
         // Each card comes in two designs; the server renders the PNG once and caches it.
@@ -203,12 +204,9 @@ const shareStatus = document.getElementById('share-dashboard-status');
             button.appendChild(face);
             button.addEventListener('click', () => {
                 if (Date.now() < suppressClickUntil) return;
-                // Tapping the top card steps forward; tapping one behind brings it up.
-                if (index === selectedCard && cards.length > 1) {
-                    selectCard((selectedCard + 1) % cards.length);
-                } else {
-                    selectCard(index);
-                }
+                // Only the top card can be clicked to step forward.
+                if (index !== selectedCard || cards.length < 2) return;
+                selectCard((selectedCard + 1) % cards.length);
             });
             button.addEventListener('keydown', event => {
                 let next;

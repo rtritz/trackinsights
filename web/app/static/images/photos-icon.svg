@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect x="2" y="2" width="96" height="96" rx="23" fill="#fff"/>
+  <g opacity=".9" style="mix-blend-mode:multiply">
+    <path d="M50 50C42 43 36 33 36 26c0-9 6-16 14-16s14 7 14 16c0 7-6 17-14 24Z" fill="#ffad00"/>
+    <path d="M50 50C42 43 36 33 36 26c0-9 6-16 14-16s14 7 14 16c0 7-6 17-14 24Z" fill="#f5e500" transform="rotate(45 50 50)"/>
+    <path d="M50 50C42 43 36 33 36 26c0-9 6-16 14-16s14 7 14 16c0 7-6 17-14 24Z" fill="#91d644" transform="rotate(90 50 50)"/>
+    <path d="M50 50C42 43 36 33 36 26c0-9 6-16 14-16s14 7 14 16c0 7-6 17-14 24Z" fill="#2ec59e" transform="rotate(135 50 50)"/>
+    <path d="M50 50C42 43 36 33 36 26c0-9 6-16 14-16s14 7 14 16c0 7-6 17-14 24Z" fill="#68a9df" transform="rotate(180 50 50)"/>
+    <path d="M50 50C42 43 36 33 36 26c0-9 6-16 14-16s14 7 14 16c0 7-6 17-14 24Z" fill="#a27abc" transform="rotate(225 50 50)"/>
+    <path d="M50 50C42 43 36 33 36 26c0-9 6-16 14-16s14 7 14 16c0 7-6 17-14 24Z" fill="#d95b9d" transform="rotate(270 50 50)"/>
+    <path d="M50 50C42 43 36 33 36 26c0-9 6-16 14-16s14 7 14 16c0 7-6 17-14 24Z" fill="#ff777b" transform="rotate(315 50 50)"/>
+  </g>
+  <circle cx="50" cy="50" r="2.5" fill="#fff"/>
+</svg>
