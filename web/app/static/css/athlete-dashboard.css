@@ -118,6 +118,11 @@
 .athlete-card-action svg { display: block; width: 52px; height: 52px; flex-shrink: 0; }
 .athlete-card-share-status { color: #52617a; font-size: 13px; margin-top: 12px; min-height: 18px; }
 @media (max-width: 767px) {
+  .personal-bests-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 104px), 1fr)); }
+  .personal-best { min-width: 0; container-type: inline-size; }
+  .personal-best-label { line-height: 1.25; min-height: 2.5em; }
+  .personal-best-distance, .personal-best-relay { display: block; white-space: nowrap; }
+  .personal-best .personal-best-value { white-space: nowrap; overflow-wrap: normal; font-size: clamp(12px, 18cqi, 23px); }
   .event-tabs { display: flex; flex-wrap: nowrap; align-items: stretch; gap: 0; overflow: visible; padding: 2px 0 0; }
   .event-tab { flex: 1 1 0; width: 0; min-width: 0; margin-right: 0; padding: 12px 14px; border: 1px solid #d9b6c4; border-bottom: none; border-radius: 13px 18px 0 0; white-space: normal; overflow-wrap: anywhere; font-size: 12px; text-align: center; }
   .event-tabs:not(.event-tabs-horizontal) .event-tab + .event-tab { margin-left: -12px; }
@@ -196,3 +201,8 @@
 .athlete-card-handoff-qr { width: 220px; margin: 0 auto 14px; padding: 10px; border: 1px solid #e0e4eb; border-radius: 14px; background: white; }
 .athlete-card-handoff-qr svg { display: block; width: 100%; height: auto; }
 .athlete-card-handoff-link { font-size: 13px; color: var(--athlete-accent); text-decoration: underline; text-underline-offset: 2px; }
+.athlete-photo-save { width: min(92vw, 440px); max-height: 90vh; overflow-y: auto; margin: auto; padding: 18px; border: 0; border-radius: 16px; background: white; color: #172033; }
+.athlete-photo-save::backdrop { background: #172033bb; }
+.athlete-photo-save h2 { font-size: 22px; font-weight: 700; }
+.athlete-photo-save p { margin: 8px 0 12px; }
+.athlete-photo-save img { display: block; width: 100%; height: auto; margin-top: 14px; border-radius: 12px; -webkit-touch-callout: default; user-select: auto; }

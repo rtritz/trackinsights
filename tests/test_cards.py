@@ -172,6 +172,20 @@ def test_card_page_renders_the_approved_markup(client):
     assert "#ff4d6d" not in theBlackoutHtml
 
 
+@pytest.mark.parametrize("suffix,content_type", [
+    ("", "text/html"),
+    (".png", "image/png"),
+    ("/share", "text/html"),
+])
+def test_card_routes_accept_event_names_left_encoded_by_the_host(client, suffix, content_type):
+    # Some WSGI adapters leave percent escapes in PATH_INFO. The router still
+    # matches, but the card lookup must receive the database's decoded event.
+    path = "/card/102/4/100%20Meters" + suffix
+    response = client.get(path, environ_overrides={"PATH_INFO": path})
+    assert response.status_code == 200
+    assert response.mimetype == content_type
+
+
 def test_card_page_rejects_unknown_designs_and_missing_cards(client):
     assert client.get("/card/102/4/100 Meters?design=Z").status_code == 400
     assert client.get("/card/101/6/100 Meters").status_code == 404

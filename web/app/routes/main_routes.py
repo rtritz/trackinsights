@@ -3,6 +3,7 @@ from datetime import datetime
 import json
 import os
 import time
+from urllib.parse import unquote
 
 from flask import abort, redirect, render_template, request, url_for, Response, current_app
 from . import main_bp
@@ -390,6 +391,12 @@ def _card_design():
 
 def _card_or_404(athlete_id, meet_id, event_name):
     theCard = cards.get_card(athlete_id, meet_id, event_name)
+    # WSGI hosts can leave percent escapes in the route parameter. Try the
+    # exact event first, then decode once so hosted preview/image URLs work.
+    if theCard is None:
+        theDecodedEvent = unquote(event_name)
+        if theDecodedEvent != event_name:
+            theCard = cards.get_card(athlete_id, meet_id, theDecodedEvent)
     if theCard is None:
         abort(404)
     return theCard
@@ -459,8 +466,8 @@ def card_share_page(athlete_id, meet_id, event_name):
         design=theDesign,
         other_designs=[(code, cards.design_name(code)) for code in cards.theDesignCodes if code != theDesign],
         design_name=cards.design_name(theDesign),
-        png_url=url_for('main.card_png', athlete_id=athlete_id, meet_id=meet_id, event_name=event_name, design=theDesign, _external=True),
-        sticker_url=url_for('main.card_sticker', athlete_id=athlete_id, meet_id=meet_id, event_name=event_name, design=theDesign, _external=True),
+        png_url=url_for('main.card_png', athlete_id=athlete_id, meet_id=meet_id, event_name=theCard['event'], design=theDesign, _external=True),
+        sticker_url=url_for('main.card_sticker', athlete_id=athlete_id, meet_id=meet_id, event_name=theCard['event'], design=theDesign, _external=True),
         share_url=theSummary['share_url'][theDesign],
         dashboard_url=url_for('main.athlete_dashboard', athlete_id=athlete_id, _external=True),
     )

@@ -15,7 +15,7 @@
   Tab switching is a class toggle in school-dashboard-v4.js, so moving between
   tabs costs nothing and works before the script loads (every pane is in the HTML).
 #}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/school-dashboard-v4.css') }}?v={{ asset_version('js/school-dashboard-v4.js') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/school-dashboard-v4.css') }}?v={{ asset_version('css/school-dashboard-v4.css') }}">
 
 {% macro who(row) -%}
     {%- if row.is_relay -%}

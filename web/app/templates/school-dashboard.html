@@ -5,7 +5,10 @@
 {% block og_title %}{% if school_name %}{{ school_name }} - School Dashboard{% else %}School Dashboard{% endif %} - Track Insights{% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-white pt-20 sm:pt-24 pb-24 sm:pb-32 px-2 sm:px-4">
+<style>
+    .school-dashboard-page { padding-top: 24px; }
+</style>
+<div class="school-dashboard-page min-h-screen bg-white pb-24 sm:pb-32 px-2 sm:px-4">
 
     <!-- Loading State -->
     <div id="loading-state" class="flex flex-col items-center justify-center min-h-[60vh]">

@@ -112,6 +112,10 @@ const shareStatus = document.getElementById('share-dashboard-status');
             .map(id => document.getElementById(id));
         const isMobile = Boolean(navigator.userAgentData?.mobile || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
             || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+        const downloadButton = document.getElementById('athlete-card-download');
+        if (isMobile) {
+            downloadButton.querySelector('span').textContent = 'Add to Photos';
+        }
         // Each card comes in two designs; the server renders the PNG once and caches it.
         const cardImages = new Map();
         let design = 'B';
@@ -460,9 +464,25 @@ const shareStatus = document.getElementById('share-dashboard-status');
         document.getElementById('athlete-card-instagram').addEventListener('click', () => shareToApp('Instagram'));
         document.getElementById('athlete-card-snapchat').addEventListener('click', () => shareToApp('Snapchat'));
 
-        const downloadButton = document.getElementById('athlete-card-download');
-        if (isMobile) {
-            downloadButton.querySelector('span').textContent = 'Save to Photos';
+        function showPhotoSave(image) {
+            const objectUrl = URL.createObjectURL(image.blob);
+            const dialog = document.createElement('dialog');
+            dialog.className = 'athlete-photo-save';
+            dialog.setAttribute('aria-labelledby', 'athlete-photo-save-title');
+            dialog.innerHTML = '<form method="dialog"><h2 id="athlete-photo-save-title">Add to Photos</h2>'
+                + '<p>Touch and hold the card, then choose Save Image, Save to Photos, or Download image. The option depends on your browser.</p>'
+                + '<button class="btn btn-primary" type="submit">Done</button></form>';
+            const preview = document.createElement('img');
+            preview.src = objectUrl;
+            preview.alt = cardLabel(cards[selectedCard]);
+            dialog.appendChild(preview);
+            dialog.addEventListener('close', () => {
+                URL.revokeObjectURL(objectUrl);
+                dialog.remove();
+            }, {once: true});
+            document.body.appendChild(dialog);
+            dialog.showModal();
+            setStatus('Touch and hold the full-size card to save it to your photos.');
         }
 
         const saveToPhotos = image => {
@@ -475,8 +495,7 @@ const shareStatus = document.getElementById('share-dashboard-status');
             navigator.share({files: [image.file], title: `${name} - Track Insights`}).catch(error => {
                 if (error.name === 'AbortError') { setStatus('Saving canceled.'); return; }
                 console.warn('Share sheet failed', error);
-                downloadCardImage(image, cards[selectedCard].download_name[design]);
-                setStatus('Athlete card downloaded.');
+                showPhotoSave(image);
             });
             setStatus('Tap Save Image in the sheet to add the card to your Photos.');
             return true;
@@ -486,6 +505,7 @@ const shareStatus = document.getElementById('share-dashboard-status');
             const image = cardImages.get(imageKey(selectedCard));
             if (!image?.blob) return;
             if (saveToPhotos(image)) return;
+            if (isMobile) { showPhotoSave(image); return; }
             try {
                 downloadCardImage(image, cards[selectedCard].download_name[design]);
                 setStatus('Athlete card downloaded.');
@@ -547,10 +567,16 @@ const shareStatus = document.getElementById('share-dashboard-status');
     function renderPersonalBests(bests) {
         const container = document.getElementById('personal-bests-container');
         container.style.setProperty('--personal-best-count', Math.max(bests.length, 3));
-        container.innerHTML = bests.map(best => `<div class="personal-best">
-            <span class="personal-best-label">${escapeHtml(best.event)}</span>
+        container.innerHTML = bests.map(best => {
+            const relay = /^(.*?)\s+Relay$/i.exec(best.event);
+            const label = relay
+                ? `<span class="personal-best-distance">${escapeHtml(relay[1])}</span> <span class="personal-best-relay">Relay</span>`
+                : escapeHtml(best.event);
+            return `<div class="personal-best">
+            <span class="personal-best-label">${label}</span>
             <span class="personal-best-value">${escapeHtml(best.result)}</span>
-        </div>`).join('') || '<p class="dashboard-empty">No personal bests recorded yet.</p>';
+        </div>`;
+        }).join('') || '<p class="dashboard-empty">No personal bests recorded yet.</p>';
     }
 
     function renderProgression(eventName, rows, eventType) {
@@ -605,7 +631,15 @@ const shareStatus = document.getElementById('share-dashboard-status');
         });
         // Include personal-best events even when there is no playoff history.
         bests.forEach(best => { if (!events.has(best.event)) events.set(best.event, []); });
-        const names = [...events.keys()].sort((a, b) => a.localeCompare(b));
+        const eventOrder = new Map([
+            '100 Meters', '100 Hurdles', '110 Hurdles', '4 x 100 Relay',
+            '200 Meters', '300 Hurdles', '400 Meters', '4 x 400 Relay',
+            '800 Meters', '4 x 800 Relay', '1600 Meters', '3200 Meters',
+            'Long Jump', 'High Jump', 'Pole Vault', 'Shot Put', 'Discus',
+        ].map((name, index) => [name, index]));
+        const names = [...events.keys()].sort((a, b) =>
+            (eventOrder.get(a) ?? Infinity) - (eventOrder.get(b) ?? Infinity)
+            || a.localeCompare(b));
         tabs.classList.toggle('event-tabs-horizontal', names.length <= 2);
         if (!names.length) {
             tabs.hidden = true;
@@ -638,7 +672,7 @@ const shareStatus = document.getElementById('share-dashboard-status');
             tab.className = 'event-tab';
             tab.setAttribute('role', 'tab');
             tab.setAttribute('aria-controls', 'event-panel');
-            tab.textContent = name.replace(/\bMeters\b/gi, '').replace(/\s+/g, ' ').trim();
+            tab.textContent = name;
             tab.setAttribute('aria-label', name);
             tab.addEventListener('click', () => activate(index));
             tab.addEventListener('keydown', event => {
@@ -655,6 +689,16 @@ const shareStatus = document.getElementById('share-dashboard-status');
             });
             tabs.appendChild(tab);
         });
+        const mobileTabs = window.matchMedia('(max-width: 767px)');
+        const updateTabLabels = () => {
+            [...tabs.children].forEach((tab, index) => {
+                tab.textContent = mobileTabs.matches
+                    ? names[index].replace(/\bMeters\b/gi, '').replace(/\s+/g, ' ').trim()
+                    : names[index];
+            });
+        };
+        mobileTabs.addEventListener('change', updateTabLabels);
+        updateTabLabels();
         activate(0);
     }
 

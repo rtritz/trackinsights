@@ -1,4 +1,18 @@
 document.addEventListener('DOMContentLoaded', function () {
+  // Keep arrows on page text scrolling the page, even if browser caret
+  // browsing is enabled. Inputs, links, and widgets keep their own keys.
+  document.addEventListener('keydown', event => {
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
+        || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    if (event.target instanceof Element && event.target.closest(
+      'input, textarea, select, button, a, [contenteditable]:not([contenteditable="false"]), [role="tab"], [role="slider"], [role="listbox"]'
+    )) return;
+    event.preventDefault();
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      window.scrollBy({top: event.key === 'ArrowDown' ? 48 : -48, behavior: 'instant'});
+    }
+  });
+
   const normalizeEventSearch = value => value.toLowerCase().replace(/×/g, 'x').replace(/\s+/g, '');
   const eventCatalog = Array.from(document.querySelectorAll('.events-dropdown [data-event-name]'))
     .map(link => ({

@@ -511,7 +511,7 @@
         <li><img src="{{ url_for('static', filename='images/developer_portraits/derek.webp') }}" alt="Derek A." width="320" height="320" loading="lazy" /><span class="font-impact text-primary">Derek A.</span><small>Homepage &amp; Navigation</small></li>
         <li><img src="{{ url_for('static', filename='images/developer_portraits/navraj.webp') }}" alt="Navraj B." width="320" height="320" loading="lazy" /><span class="font-impact text-primary">Navraj B.</span><small>Insights &amp; Social</small></li>
         <li><img src="{{ url_for('static', filename='images/developer_portraits/aryav.webp') }}" alt="Aryav D." width="320" height="320" loading="lazy" /><span class="font-impact text-primary">Aryav D.</span><small>Design, Predictions &amp; Data</small></li>
-        <li><img src="{{ url_for('static', filename='images/developer_portraits/dominic.webp') }}" alt="Dominic G." width="320" height="320" loading="lazy" /><span class="font-impact text-primary">Dominic G.</span><small>Dashboards &amp; User Experience</small></li>
+        <li><div class="about-portrait-crop"><img src="{{ url_for('static', filename='images/developer_portraits/dominic.webp') }}" alt="Dominic G." width="320" height="320" loading="lazy" /></div><span class="font-impact text-primary">Dominic G.</span><small>Dashboards &amp; User Experience</small></li>
         <li><img src="{{ url_for('static', filename='images/developer_portraits/sameer.webp') }}" alt="Sameer Z." width="320" height="320" loading="lazy" /><span class="font-impact text-primary">Sameer Z.</span><small>Event Pages &amp; Data Visualization</small></li>
       </ul>
     </div>
@@ -519,7 +519,7 @@
     <div class="about-contact">
       <div>
         <h3 class="font-impact italic">Contact</h3>
-        <p>We&rsquo;d love to hear from you! Please reach out to us at <a href="mailto:trackinsights@yahoo.com">trackinsights@yahoo.com</a>, and see our past posts on Instagram: <a href="https://www.instagram.com/trackinsights/" target="_blank" rel="noopener noreferrer">@trackinsights</a></p>
+        <p>Contact us to request our track and field data, ask questions, or share feedback at <a href="mailto:trackinsights@yahoo.com">trackinsights@yahoo.com</a>. See our past posts on Instagram: <a href="https://www.instagram.com/trackinsights/" target="_blank" rel="noopener noreferrer">@trackinsights</a></p>
       </div>
       <div class="about-links">
         <a href="mailto:trackinsights@yahoo.com">Email us</a>
@@ -568,6 +568,8 @@
     .about-people { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1.25rem; }
     .about-people li { display: flex; flex-direction: column; gap: .15rem; }
     .about-people img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: .75rem; margin-bottom: .7rem; background: #e5e7eb; }
+    .about-portrait-crop { aspect-ratio: 1; overflow: hidden; border-radius: .75rem; margin-bottom: .7rem; }
+    .about-portrait-crop img { display: block; margin: 0; transform: scale(1.25); transform-origin: 50% 65%; }
     .about-people span { font-size: 1.3rem; line-height: 1.1; }
     .about-people small { font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; color: #6b7280; line-height: 1.4; }
 
