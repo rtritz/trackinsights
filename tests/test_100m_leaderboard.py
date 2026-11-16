@@ -128,7 +128,8 @@ def test_relay_leaderboards_show_school_lineup_and_respect_filters(client, app):
     assert response.status_code == 200
     assert b'Fastest relays' in response.data
     assert b'Alpha High' in response.data
-    assert b'A Sprinter, B Sprinter, C Curve, D Jumper' in response.data
+    assert b'A. Sprinter, B. Sprinter, C. Curve, D. Jumper' in response.data
+    assert b'A Sprinter, B Sprinter, C Curve, D Jumper' not in response.data
     assert b'43.00' in response.data
     assert b'42.80' not in response.data
     assert b'Relay members' in response.data
