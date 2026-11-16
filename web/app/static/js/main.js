@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', function () {
         window.location.href = `/school-dashboard/${item.id}`;
       } else if (item.type === 'athlete') {
         window.location.href = `/athlete-dashboard/${item.id}`;
+      } else if (item.type === 'event') {
+        window.location.href = item.url;
       }
     };
 
@@ -92,6 +94,14 @@ document.addEventListener('DOMContentLoaded', function () {
               btn.addEventListener('click', () => {
                 window.location.href = `/athlete-dashboard/${item.id}`;
                 console.log('Navigating to athlete ID:', item.id);
+              });
+            } else if (item.type === 'event') {
+              btn.innerHTML = `
+                <span class="result-text">${escapeHtml(item.name)}</span>
+                <span class="result-badge font-bold border-2 border-primary text-primary rounded-full px-3 py-0.5 text-sm whitespace-nowrap" style="margin-right:4px;">Event</span>
+              `.trim();
+              btn.addEventListener('click', () => {
+                window.location.href = item.url;
               });
             }
 

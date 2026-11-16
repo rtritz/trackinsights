@@ -7,6 +7,7 @@ from sqlalchemy import or_
 
 from .. import db
 from ..models import Athlete, School
+from ..event_dashboards import EVENT_DASHBOARDS
 
 from .search_scoring import (
     _calculate_combined_score,
@@ -72,6 +73,26 @@ def search_bar(query_text: str):
         athletes = []
     
     results = []
+
+    # Put event pages first when the query matches a dashboard's search terms,
+    # so common event names are not pushed out by athlete/school matches.
+    for event_page in EVENT_DASHBOARDS:
+        matched_term = next(
+            (
+                term for term in event_page["search_terms"]
+                if all(word in term for word in query_words)
+            ),
+            None,
+        )
+        if matched_term:
+            results.append({
+                "type": "event",
+                "id": event_page["slug"],
+                "name": f"{event_page['label']} Leaderboard",
+                "url": f"/{event_page['slug']}",
+                "score": len(query_words) / len(matched_term.split()),
+                "priority": 0,
+            })
     
     # Score schools
     for school_id, school_name in schools:
