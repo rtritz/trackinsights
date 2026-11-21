@@ -125,7 +125,8 @@ def test_relay_leaderboards_show_school_lineup_and_respect_filters(client, app):
     response = client.get('/4x100?gender=Boys&meet_type=Sectional&year=2024')
     assert response.status_code == 200
     assert b'Alpha High' in response.data
-    assert b'A Sprinter, B Sprinter, C Curve, D Jumper' in response.data
+    assert b'A. Sprinter, B. Sprinter, C. Curve, D. Jumper' in response.data
+    assert b'A Sprinter, B Sprinter, C Curve, D Jumper' not in response.data
     assert b'43.00' in response.data
     assert b'42.80' not in response.data
     assert b'Relay members' in response.data

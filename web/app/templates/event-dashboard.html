@@ -270,7 +270,7 @@
           <a class="block truncate text-sm font-semibold link link-hover" href="{{ url_for('main.school_dashboard', school_id=result.school.school_id) }}">
             {{ result.school.school_name }}
           </a>
-          <p class="truncate text-xs text-base-content/60">{{ result.athlete_names or 'Relay lineup unavailable' }}</p>
+          <p class="truncate text-xs text-base-content/60">{{ result.athlete_names|relay_names or 'Relay lineup unavailable' }}</p>
           {% else %}
           <a class="block truncate text-sm font-semibold link link-hover" href="{{ url_for('main.athlete_dashboard', athlete_id=result.athlete.athlete_id) }}">
             {{ result.athlete.first|title }} {{ result.athlete.last|title }}
@@ -314,7 +314,7 @@
             <td class="px-3 py-2 font-semibold whitespace-nowrap">
               <a class="link link-hover" href="{{ url_for('main.school_dashboard', school_id=result.school.school_id) }}">{{ result.school.school_name }}</a>
             </td>
-            <td class="px-3 py-2">{{ result.athlete_names or 'Relay lineup unavailable' }}</td>
+            <td class="px-3 py-2">{{ result.athlete_names|relay_names or 'Relay lineup unavailable' }}</td>
             {% else %}
             <td class="px-3 py-2 font-semibold whitespace-nowrap">
               <a class="link link-hover" href="{{ url_for('main.athlete_dashboard', athlete_id=result.athlete.athlete_id) }}">
@@ -349,7 +349,7 @@
             <div class="min-w-0 flex-1">
               {% if is_relay %}
               <a class="block truncate text-sm font-semibold link link-hover" href="{{ url_for('main.school_dashboard', school_id=result.school.school_id) }}">{{ result.school.school_name }}</a>
-              <p class="truncate text-xs text-base-content/55">{{ result.athlete_names or 'Relay lineup unavailable' }} · {{ result.meet.year }}</p>
+              <p class="truncate text-xs text-base-content/55">{{ result.athlete_names|relay_names or 'Relay lineup unavailable' }} · {{ result.meet.year }}</p>
               {% else %}
               <a class="block truncate text-sm font-semibold link link-hover" href="{{ url_for('main.athlete_dashboard', athlete_id=result.athlete.athlete_id) }}">{{ result.athlete.first|title }} {{ result.athlete.last|title }}</a>
               <p class="truncate text-xs text-base-content/55">{{ result.athlete.school.school_name if result.athlete.school else '—' }} · {{ result.meet.year }}</p>
@@ -372,7 +372,7 @@
                 <th class="px-3 py-2 font-impact italic text-primary">{{ loop.index + 10 }}</th>
                 {% if is_relay %}
                 <td class="px-3 py-2 font-semibold whitespace-nowrap"><a class="link link-hover" href="{{ url_for('main.school_dashboard', school_id=result.school.school_id) }}">{{ result.school.school_name }}</a></td>
-                <td class="px-3 py-2">{{ result.athlete_names or 'Relay lineup unavailable' }}</td>
+                <td class="px-3 py-2">{{ result.athlete_names|relay_names or 'Relay lineup unavailable' }}</td>
                 {% else %}
                 <td class="px-3 py-2 font-semibold whitespace-nowrap"><a class="link link-hover" href="{{ url_for('main.athlete_dashboard', athlete_id=result.athlete.athlete_id) }}">{{ result.athlete.first|title }} {{ result.athlete.last|title }}</a></td>
                 <td class="px-3 py-2 whitespace-nowrap">{{ result.athlete.school.school_name if result.athlete.school else '—' }}</td>

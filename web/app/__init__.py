@@ -19,6 +19,7 @@ no configuration, which is one less thing to get wrong.
 The site is started by web/wsgi.py, one directory up.
 """
 import os
+import re
 
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
@@ -75,6 +76,21 @@ def create_app(config_class=Config):
         if 11 <= (number % 100) <= 13:
             return '%dth' % number
         return '%d%s' % (number, {1: 'st', 2: 'nd', 3: 'rd'}.get(number % 10, 'th'))
+
+    @app.template_filter('relay_names')
+    def _relay_names(value):
+        if not value:
+            return value
+
+        names = re.split(r'\band\b|&|/|;|,|\+', value, flags=re.IGNORECASE)
+        abbreviated = []
+        for name in names:
+            parts = name.split()
+            if len(parts) > 1:
+                abbreviated.append('%s. %s' % (parts[0][0].upper(), parts[-1]))
+            elif parts:
+                abbreviated.append(parts[0])
+        return ', '.join(abbreviated)
 
     # Points can be halves -- ties split the combined value of the slots they
     # occupy -- so they are floats. "27.0 points" is noise; "27.5" is the reason
