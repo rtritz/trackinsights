@@ -243,8 +243,12 @@
               <svg class="events-dropdown__chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
             </summary>
             <ul>
-              {% for event_name, event_label in group.events %}
-              <li><a href="{{ event_dashboard_urls.get(event_name) or url_for('main.events_page', event=event_name) }}" data-event-name="{{ event_name }}">{{ event_label }}</a></li>
+              {% for row in group.events %}
+              <li class="events-dropdown__event-row">
+                {% for link in row.links %}
+                <a href="{{ link.url }}" data-event-name="{{ link.event_name }}" data-gender="{{ link.gender }}">{{ link.label }}</a>
+                {% endfor %}
+              </li>
               {% endfor %}
             </ul>
           </details>
@@ -858,7 +862,7 @@
         display: flex;
         flex-direction: column;
         gap: .25rem;
-        width: min(22rem, calc(100vw - 2rem));
+        width: min(26rem, calc(100vw - 2rem));
         max-height: min(75vh, 36rem);
         overflow-y: auto;
         padding: .85rem 1.1rem;
@@ -894,6 +898,17 @@
       }
       .events-dropdown__category a:hover,
       .events-dropdown__category a:focus-visible { color: #8c0327; text-decoration: underline; }
+      .events-dropdown__event-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: .75rem;
+        padding: .35rem 0;
+      }
+      .events-dropdown__event-row a { display: inline; padding: 0; }
+      .events-dropdown__event-row a[data-gender="Boys"] { color: #1d4ed8; }
+      .events-dropdown__event-row a[data-gender="Girls"] { color: #db2777; }
+      .events-dropdown__event-row a:hover,
+      .events-dropdown__event-row a:focus-visible { text-decoration: underline; }
       .site-nav-link {
         display: inline-flex;
         width: 100%;

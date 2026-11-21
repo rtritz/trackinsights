@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const queriesButton = document.getElementById('queries-toggle');
   const aboutButton = document.getElementById('about-toggle');
   const eventsDropdown = document.querySelector('.events-dropdown');
+  const eventsPanel = eventsDropdown?.querySelector('.events-dropdown__panel');
   const navbarEnd = document.querySelector('.desktop-nav');
   const mobileNavToggle = document.getElementById('mobile-nav-toggle');
   const mobileNavOverlay = document.getElementById('mobile-nav-overlay');
@@ -40,14 +41,27 @@ document.addEventListener('DOMContentLoaded', function () {
     window.location.href = SEARCH_URL;
   };
 
+  const alignEventsPanel = () => {
+    if (!eventsDropdown?.open || !eventsPanel || !navbarEnd) return;
+    const panelWidth = eventsPanel.getBoundingClientRect().width;
+    const viewportWidth = document.documentElement.clientWidth;
+    const buttonLeft = eventsDropdown.getBoundingClientRect().left;
+    const left = Math.min(Math.max(buttonLeft, 16), Math.max(16, viewportWidth - panelWidth - 16));
+    eventsPanel.style.left = `${left - navbarEnd.getBoundingClientRect().left}px`;
+    eventsPanel.style.right = 'auto';
+  };
+
   if (eventsDropdown) {
     eventsDropdown.addEventListener('toggle', () => {
-      if (!eventsDropdown.open) {
+      if (eventsDropdown.open) {
+        alignEventsPanel();
+      } else {
         eventsDropdown.querySelectorAll('.events-dropdown__category[open]').forEach(category => {
           category.open = false;
         });
       }
     });
+    window.addEventListener('resize', alignEventsPanel);
   }
 
   const openMobileMenu = () => {

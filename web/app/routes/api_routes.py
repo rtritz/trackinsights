@@ -1,6 +1,8 @@
 import os
-from flask import jsonify, request, current_app
+from flask import jsonify, render_template, request, current_app
 from . import api_bp
+from ..event_dashboards import EVENT_DASHBOARDS
+from ..queries.event_ranking import get_event_dashboard_analytics, get_event_leaderboard
 from ..services import cards
 from ..queries import (
     get_athletes,
@@ -102,6 +104,74 @@ def api_search_bar():
         return jsonify([])
     results = search_bar(query)
     return jsonify(results)
+
+
+@api_bp.route('/events/<event_slug>/distribution')
+def api_event_distribution(event_slug):
+    event_page = next((page for page in EVENT_DASHBOARDS if page['slug'] == event_slug), None)
+    if event_page is None:
+        return jsonify({'error': 'Event not found'}), 404
+
+    gender = request.args.get('gender', event_page['genders'][0])
+    meet_type = request.args.get('meet_type', 'All')
+    selected_year = request.args.get('year', 'All')
+    if gender not in event_page['genders'] or meet_type not in ('All', *CONST.MEET_TYPE.ALL):
+        return jsonify({'error': 'Invalid distribution filters'}), 400
+    try:
+        year = None if selected_year == 'All' else int(selected_year)
+    except ValueError:
+        return jsonify({'error': 'Invalid season'}), 400
+
+    analytics = get_event_dashboard_analytics(
+        event_page['event'],
+        gender,
+        meet_type=None if meet_type == 'All' else meet_type,
+        year=year,
+    )
+    if year is not None and year not in analytics['years']:
+        return jsonify({'error': 'Invalid season'}), 400
+    return jsonify({
+        'distribution': analytics['distribution'],
+        'percentiles': analytics['percentiles'],
+        'eventType': analytics['event_type'],
+        'lowerIsBetter': analytics['lower_is_better'],
+        'distributionUsesMinutes': analytics['distribution_uses_minutes'],
+    })
+
+
+@api_bp.route('/events/<event_slug>/leaderboard')
+def api_event_leaderboard(event_slug):
+    event_page = next((page for page in EVENT_DASHBOARDS if page['slug'] == event_slug), None)
+    if event_page is None:
+        return jsonify({'error': 'Event not found'}), 404
+
+    gender = request.args.get('gender', event_page['genders'][0])
+    meet_type = request.args.get('meet_type', 'All')
+    selected_year = request.args.get('year', 'All')
+    if gender not in event_page['genders'] or meet_type not in ('All', *CONST.MEET_TYPE.ALL):
+        return jsonify({'error': 'Invalid leaderboard filters'}), 400
+    try:
+        year = None if selected_year == 'All' else int(selected_year)
+    except ValueError:
+        return jsonify({'error': 'Invalid season'}), 400
+
+    results = get_event_leaderboard(
+        event_page['event'],
+        gender,
+        meet_type=None if meet_type == 'All' else meet_type,
+        year=year,
+    )
+    is_relay = event_page.get('is_relay', False)
+    count = len(results)
+    return jsonify({
+        'html': render_template(
+            'event-leaderboard-results.html',
+            results=results,
+            event_name=event_page['event'],
+            is_relay=is_relay,
+        ),
+        'countLabel': f"{count} {'relay' if is_relay else 'mark'}{'s' if count != 1 else ''}",
+    })
 
 
 @api_bp.route('/athletes/<int:aid>/dashboard')

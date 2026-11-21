@@ -2,7 +2,9 @@ def test_100m_leaderboard_shows_best_marks_and_meet_level(client):
     response = client.get('/100m')
 
     assert response.status_code == 200
-    assert b'100m Leaderboard' in response.data
+    assert b'Boys 100m - Track Insights' in response.data
+    assert b'>Boys 100m</h1>' in response.data
+    assert b'id="filters-heading"' not in response.data
     assert b'10.60' in response.data
     assert b'Sectional' in response.data
     assert b'Regional' in response.data
@@ -12,6 +14,24 @@ def test_100m_leaderboard_shows_best_marks_and_meet_level(client):
     assert b"divide-gray-300/70" in response.data
     assert b'class="leaderboard-desktop overflow-x-auto"' in response.data
     assert b'@media (min-width: 64rem)' in response.data
+
+
+def test_gender_event_pages_are_separate_and_only_show_their_gender(client):
+    boys = client.get('/events/boys/100m')
+    girls = client.get('/events/girls/100m?gender=Boys')
+
+    assert boys.status_code == 200
+    assert girls.status_code == 200
+    assert b'>Boys 100m</h1>' in boys.data
+    assert b'>Girls 100m</h1>' in girls.data
+    assert b'data-gender="Boys"' in boys.data
+    assert b'data-gender="Girls"' in girls.data
+    assert b'id="filters-heading"' not in boys.data
+    assert b'id="filters-heading"' not in girls.data
+    assert client.get('/events/boys/100h').status_code == 404
+    assert client.get('/events/girls/110h').status_code == 404
+    assert client.get('/events/girls/100h').status_code == 200
+    assert client.get('/events/boys/110h').status_code == 200
 
 
 def test_100m_leaderboard_filters_by_gender_level_and_season(client):
@@ -119,6 +139,56 @@ def test_event_dashboard_passes_selected_filters_to_distribution(client):
     assert b'2024' in selected_results.data
 
 
+def test_distribution_dropdowns_fetch_filtered_chart_and_percentiles(client):
+    page = client.get('/100m?gender=Boys&meet_type=State&year=2024')
+    assert b'id="distribution-meet-type"' in page.data
+    assert b'id="distribution-season"' in page.data
+    assert b'data-url="/api/events/100m/distribution"' in page.data
+
+    response = client.get('/api/events/100m/distribution?gender=Boys&meet_type=State&year=2024')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert sum(data['distribution']['counts']) == 1
+    assert data['percentiles'][1]['value'] == 10.85
+    assert data['lowerIsBetter'] is True
+
+    all_meets = client.get('/api/events/100m/distribution?gender=Boys&meet_type=All&year=All')
+    assert sum(all_meets.get_json()['distribution']['counts']) == 6
+    empty = client.get('/api/events/100m/distribution?gender=Boys&meet_type=State&year=2023')
+    assert empty.status_code == 200
+    assert empty.get_json()['distribution']['labels'] == []
+    assert empty.get_json()['percentiles'] == []
+    assert b'id="event-distribution-chart"' in client.get('/100m?meet_type=State&year=2023').data
+    assert client.get('/api/events/not-an-event/distribution').status_code == 404
+    assert client.get('/api/events/100m/distribution?year=invalid').status_code == 400
+
+
+def test_leaderboard_dropdowns_fetch_filtered_rows_and_count(client):
+    page = client.get('/100m')
+    assert b'id="leaderboard-meet-type"' in page.data
+    assert b'id="leaderboard-season"' in page.data
+    assert b'data-url="/api/events/100m/leaderboard"' in page.data
+
+    state = client.get('/api/events/100m/leaderboard?gender=Boys&meet_type=State&year=2024')
+    assert state.status_code == 200
+    data = state.get_json()
+    assert data['countLabel'] == '1 mark'
+    assert '10.85' in data['html']
+    assert 'Regional' not in data['html']
+
+    empty = client.get('/api/events/100m/leaderboard?gender=Boys&meet_type=State&year=2023')
+    assert empty.status_code == 200
+    assert empty.get_json()['countLabel'] == '0 marks'
+    assert 'No marks match those filters yet.' in empty.get_json()['html']
+
+    relay = client.get('/api/events/4x100/leaderboard?gender=Boys&meet_type=Sectional&year=2024')
+    assert relay.status_code == 200
+    assert 'Relay members' in relay.get_json()['html']
+    assert 'relay' in relay.get_json()['countLabel']
+    assert client.get('/api/events/not-an-event/leaderboard').status_code == 404
+    assert client.get('/api/events/100m/leaderboard?year=invalid').status_code == 400
+
+
 def test_relay_leaderboards_show_school_lineup_and_respect_filters(client, app):
     import json
 
@@ -175,7 +245,7 @@ def test_all_requested_event_dashboard_routes_render(client):
 
         assert response.status_code == 200
         assert event_name.encode() in response.data
-        assert b'Leaderboard' in response.data
+        assert b' Leaderboard</h1>' not in response.data
         assert b'aria-label="Event dashboards"' not in response.data
         assert b'Performance Distribution' in response.data
         assert b'Event Trends' in response.data
@@ -189,29 +259,39 @@ def test_search_returns_matching_event_dashboards(client):
 
     assert shot_put[0] == {
         'type': 'event',
-        'id': 'shot-put',
-        'name': 'Shot Put Leaderboard',
-        'url': '/shot-put',
+        'id': 'boys-shot-put',
+        'name': 'Boys Shot Put',
+        'url': '/events/boys/shot-put',
     }
+    assert shot_put[1]['name'] == 'Girls Shot Put'
+    hundred = client.get('/api/search?q=100m').get_json()
+    girls_hundred = client.get('/api/search?q=Girls%20100m').get_json()
+    assert [item['url'] for item in hundred if item['type'] == 'event'] == [
+        '/events/boys/100m', '/events/girls/100m',
+    ]
+    assert [item['url'] for item in girls_hundred if item['type'] == 'event'] == [
+        '/events/girls/100m',
+    ]
     assert compact_hurdles[0]['type'] == 'event'
-    assert compact_hurdles[0]['url'] == '/110h'
+    assert compact_hurdles[0]['url'] == '/events/boys/110h'
     assert relay[0]['type'] == 'event'
-    assert relay[0]['url'] == '/4x100'
+    assert relay[0]['url'] == '/events/boys/4x100'
     assert any(item['type'] == 'athlete' and item['name'] == 'Maya Hurdle'
                for item in existing_athlete)
 
 
 def test_homepage_links_to_every_event_dashboard(client):
+    from app.event_dashboards import EVENT_DASHBOARDS
+
     response = client.get('/')
 
     assert response.status_code == 200
-    for path in (
-        '/100m', '/200m', '/400m', '/800m', '/1600m', '/3200m',
-        '/100h', '/110h', '/300h', '/4x100', '/4x400', '/4x800',
-        '/shot-put', '/discus', '/pole-vault',
-        '/high-jump', '/long-jump',
-    ):
-        assert f'href="{path}"'.encode() in response.data
+    for page in EVENT_DASHBOARDS:
+        for gender in page['genders']:
+            path = f"/events/{gender.lower()}/{page['slug']}"
+            assert f'href="{path}"'.encode() in response.data
+    assert b'Boys 100m Dash' in response.data
+    assert b'Girls 100m Dash' in response.data
 
 
 def test_event_dashboard_gender_defaults_and_track_filters(client):
@@ -219,7 +299,7 @@ def test_event_dashboard_gender_defaults_and_track_filters(client):
     filtered = client.get('/200m?gender=Boys&meet_type=Sectional&year=2024')
 
     assert hurdles.status_code == 200
-    assert b'Girls</option>' in hurdles.data
+    assert b'Girls 100 Hurdles' in hurdles.data
     assert b'15.20' in hurdles.data
     assert filtered.status_code == 200
     table_rows = filtered.data.split(b'<tbody>', 1)[1].split(b'</tbody>', 1)[0]

@@ -39,22 +39,14 @@ def search_page():
 
 @main_bp.route('/events')
 def events_page():
-    # An event that has its own dashboard goes straight there; the index is
-    # for picking one, and for the relays, which do not have a page yet.
     selected_event = request.args.get('event', '')
     for page in EVENT_DASHBOARDS:
         if page['event'] == selected_event:
-            return redirect('/' + page['slug'])
-    if selected_event not in CONST.EVENT.ALL_RELAY:
-        selected_event = ''
-    return render_template(
-        'events.html',
-        selected_event=selected_event,
-        event_pages=[
-            {**page, 'url': '/' + page['slug']} for page in EVENT_DASHBOARDS
-        ],
-        relay_events=CONST.EVENT.ALL_RELAY,
-    )
+            requested_gender = request.args.get('gender', '').title()
+            gender = (requested_gender if requested_gender in page['genders']
+                      else page['genders'][0]).lower()
+            return redirect(f"/events/{gender}/{page['slug']}")
+    return render_template('events.html')
 
 
 @main_bp.route('/insights')
@@ -527,8 +519,9 @@ def sitemap_xml():
         url_for('main.state_qualifiers_page', _external=True),
     ]
     pages.extend(
-        f"{request.url_root.rstrip('/')}/{page['slug']}"
+        f"{request.url_root.rstrip('/')}/events/{gender.lower()}/{page['slug']}"
         for page in EVENT_DASHBOARDS
+        for gender in page['genders']
     )
 
     athletes = Athlete.query.with_entities(Athlete.athlete_id).all()
@@ -550,6 +543,15 @@ def sitemap_xml():
         + '\n</urlset>'
     )
     return Response(xml, mimetype='application/xml')
+
+
+@main_bp.route('/events/<gender_slug>/<event_slug>')
+def gender_event_dashboard(gender_slug, event_slug):
+    if gender_slug not in ('boys', 'girls'):
+        return 'Not Found', 404
+    return event_dashboard(event_slug, fixed_gender=gender_slug.title())
+
+
 @main_bp.route('/100m', defaults={"event_slug": "100m"}, endpoint="hundred_meter_leaderboard")
 @main_bp.route('/200m', defaults={"event_slug": "200m"})
 @main_bp.route('/400m', defaults={"event_slug": "400m"})
@@ -567,7 +569,7 @@ def sitemap_xml():
 @main_bp.route('/pole-vault', defaults={"event_slug": "pole-vault"})
 @main_bp.route('/high-jump', defaults={"event_slug": "high-jump"})
 @main_bp.route('/long-jump', defaults={"event_slug": "long-jump"})
-def event_dashboard(event_slug):
+def event_dashboard(event_slug, fixed_gender=None):
     event_page = next(
         (page for page in EVENT_DASHBOARDS if page["slug"] == event_slug),
         None,
@@ -576,7 +578,9 @@ def event_dashboard(event_slug):
         return "Not Found", 404
 
     available_genders = event_page["genders"]
-    gender = request.args.get('gender', 'Boys')
+    if fixed_gender is not None and fixed_gender not in available_genders:
+        return 'Not Found', 404
+    gender = fixed_gender or request.args.get('gender', 'Boys')
     if gender not in available_genders:
         gender = available_genders[0]
 
@@ -628,8 +632,7 @@ def event_dashboard(event_slug):
         years=years,
         event_name=event_name,
         event_slug=event_slug,
-        page_title=f"{event_page['label']} Leaderboard",
-        dashboard_url=request.path,
+        page_title=f"{gender} {event_page['label']}",
         is_relay=event_page.get("is_relay", False),
     )
    

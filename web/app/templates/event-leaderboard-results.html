@@ -1,0 +1,134 @@
+      {% if results %}
+      <ol class="leaderboard-mobile divide-y divide-gray-300/70" aria-label="{{ event_name }} leaderboard">
+        {% for entry in results[:10] %}
+        {% set result = entry.result %}
+        <li class="flex items-center gap-3 px-3 py-2.5">
+          <span class="w-7 shrink-0 font-impact italic text-primary text-lg text-center">{{ loop.index }}</span>
+          <div class="min-w-0 flex-1">
+          {% if is_relay %}
+          <a class="block truncate text-sm font-semibold link link-hover" href="{{ url_for('main.school_dashboard', school_id=result.school.school_id) }}">
+            {{ result.school.school_name }}
+          </a>
+          <p class="truncate text-xs text-base-content/60">{{ result.athlete_names|relay_names or 'Relay lineup unavailable' }}</p>
+          {% else %}
+          <a class="block truncate text-sm font-semibold link link-hover" href="{{ url_for('main.athlete_dashboard', athlete_id=result.athlete.athlete_id) }}">
+            {{ result.athlete.first|title }} {{ result.athlete.last|title }}
+          </a>
+          <p class="truncate text-xs text-base-content/60">
+            {{ result.athlete.school.school_name if result.athlete.school else '—' }}
+          </p>
+          {% endif %}
+          <p class="truncate text-[11px] text-base-content/50">
+            {{ result.meet.year }}{% if result.meet.host %} · {{ result.meet.host }}{% endif %}
+          </p>
+          </div>
+          <div class="shrink-0 text-right">
+            <p class="font-impact italic text-primary text-lg leading-tight">{{ result.result }}</p>
+            <span class="badge badge-xs {{ 'badge-primary' if result.meet.meet_type == 'State' else ('badge-secondary' if result.meet.meet_type == 'Regional' else 'badge-outline') }}">
+              {{ result.meet.meet_type }}
+            </span>
+            {% if not is_relay and result.result_type == 'Prelim' %}<span class="badge badge-ghost badge-xs">Prelim</span>{% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+      <div class="leaderboard-desktop overflow-x-auto">
+        <table class="table table-zebra table-sm text-sm">
+          <thead>
+            <tr class="text-[11px] uppercase tracking-wide text-base-content/55">
+              <th scope="col" class="w-12 px-3 py-2">Rank</th>
+              <th scope="col" class="px-3 py-2">{{ 'School' if is_relay else 'Athlete' }}</th>
+              <th scope="col" class="px-3 py-2">{{ 'Relay members' if is_relay else 'School' }}</th>
+              <th scope="col" class="px-3 py-2">Time</th>
+              <th scope="col" class="px-3 py-2">Set at</th>
+              <th scope="col" class="px-3 py-2">Season</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for entry in results[:10] %}
+            {% set result = entry.result %}
+            <tr class="leading-tight">
+              <th class="px-3 py-2 font-impact italic text-primary">{{ loop.index }}</th>
+            {% if is_relay %}
+            <td class="px-3 py-2 font-semibold whitespace-nowrap">
+              <a class="link link-hover" href="{{ url_for('main.school_dashboard', school_id=result.school.school_id) }}">{{ result.school.school_name }}</a>
+            </td>
+            <td class="px-3 py-2">{{ result.athlete_names|relay_names or 'Relay lineup unavailable' }}</td>
+            {% else %}
+            <td class="px-3 py-2 font-semibold whitespace-nowrap">
+              <a class="link link-hover" href="{{ url_for('main.athlete_dashboard', athlete_id=result.athlete.athlete_id) }}">
+                {{ result.athlete.first|title }} {{ result.athlete.last|title }}
+                </a>
+                {% if not is_relay and result.result_type == 'Prelim' %}
+                <span class="badge badge-ghost badge-xs ml-1">Prelim</span>
+                {% endif %}
+              </td>
+              <td class="px-3 py-2 whitespace-nowrap">{{ result.athlete.school.school_name if result.athlete.school else '—' }}</td>
+              {% endif %}
+              <td class="px-3 py-2 font-impact italic text-primary text-lg whitespace-nowrap">{{ result.result }}</td>
+              <td class="px-3 py-2 whitespace-nowrap">
+                {% set level_class = 'badge-primary' if result.meet.meet_type == 'State' else ('badge-secondary' if result.meet.meet_type == 'Regional' else 'badge-outline') %}
+                <span class="badge badge-sm {{ level_class }} rounded-full">{{ result.meet.meet_type }}</span>
+                {% if result.meet.host %}<span class="text-xs text-base-content/55 ml-1">{{ result.meet.host }}</span>{% endif %}
+              </td>
+              <td class="px-3 py-2 whitespace-nowrap">{{ result.meet.year }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if results|length > 10 %}
+      <details class="leaderboard-mobile mx-3 mb-3 border-t border-base-200 pt-2">
+        <summary class="cursor-pointer text-sm font-semibold text-primary">Show all {{ results|length }} filtered marks</summary>
+        <ol start="11" class="mt-2 divide-y divide-gray-300/70">
+          {% for entry in results[10:] %}
+          {% set result = entry.result %}
+          <li class="flex items-center gap-3 py-2">
+            <span class="w-7 shrink-0 text-center font-impact italic text-primary">{{ loop.index + 10 }}</span>
+            <div class="min-w-0 flex-1">
+              {% if is_relay %}
+              <a class="block truncate text-sm font-semibold link link-hover" href="{{ url_for('main.school_dashboard', school_id=result.school.school_id) }}">{{ result.school.school_name }}</a>
+              <p class="truncate text-xs text-base-content/55">{{ result.athlete_names|relay_names or 'Relay lineup unavailable' }} · {{ result.meet.year }}</p>
+              {% else %}
+              <a class="block truncate text-sm font-semibold link link-hover" href="{{ url_for('main.athlete_dashboard', athlete_id=result.athlete.athlete_id) }}">{{ result.athlete.first|title }} {{ result.athlete.last|title }}</a>
+              <p class="truncate text-xs text-base-content/55">{{ result.athlete.school.school_name if result.athlete.school else '—' }} · {{ result.meet.year }}</p>
+              {% endif %}
+            </div>
+            <span class="shrink-0 font-impact italic text-primary">{{ result.result }}</span>
+            <span class="badge badge-xs">{{ result.meet.meet_type }}</span>
+          </li>
+          {% endfor %}
+        </ol>
+      </details>
+      <details class="leaderboard-desktop mx-4 mb-3 border-t border-base-200 pt-2">
+        <summary class="cursor-pointer text-sm font-semibold text-primary">Show all {{ results|length }} filtered marks</summary>
+        <div class="overflow-x-auto">
+          <table class="table table-zebra table-sm text-sm">
+            <tbody>
+              {% for entry in results[10:] %}
+              {% set result = entry.result %}
+              <tr>
+                <th class="px-3 py-2 font-impact italic text-primary">{{ loop.index + 10 }}</th>
+                {% if is_relay %}
+                <td class="px-3 py-2 font-semibold whitespace-nowrap"><a class="link link-hover" href="{{ url_for('main.school_dashboard', school_id=result.school.school_id) }}">{{ result.school.school_name }}</a></td>
+                <td class="px-3 py-2">{{ result.athlete_names|relay_names or 'Relay lineup unavailable' }}</td>
+                {% else %}
+                <td class="px-3 py-2 font-semibold whitespace-nowrap"><a class="link link-hover" href="{{ url_for('main.athlete_dashboard', athlete_id=result.athlete.athlete_id) }}">{{ result.athlete.first|title }} {{ result.athlete.last|title }}</a></td>
+                <td class="px-3 py-2 whitespace-nowrap">{{ result.athlete.school.school_name if result.athlete.school else '—' }}</td>
+                {% endif %}
+                <td class="px-3 py-2 font-impact italic text-primary text-lg whitespace-nowrap">{{ result.result }}</td>
+                <td class="px-3 py-2 whitespace-nowrap"><span class="badge badge-sm">{{ result.meet.meet_type }}</span> {{ result.meet.host }}</td>
+                <td class="px-3 py-2 whitespace-nowrap">{{ result.meet.year }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      {% endif %}
+      {% else %}
+      <div class="px-6 py-16 text-center">
+        <p class="font-impact italic text-primary text-2xl">No marks match those filters yet.</p>
+        <p class="text-sm text-base-content/60 mt-2">Try another season, meet level, or gender.</p>
+      </div>
+      {% endif %}

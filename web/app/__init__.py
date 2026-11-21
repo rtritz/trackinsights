@@ -127,38 +127,50 @@ def create_app(config_class=Config):
         from common.const import CONST
         from .event_dashboards import EVENT_DASHBOARDS
 
-        # Events with a dashboard link straight to it; the rest go through
-        # the events index page.
-        dashboard_urls = {
-            page['event']: '/' + page['slug'] for page in EVENT_DASHBOARDS}
+        pages_by_event = {page['event']: page for page in EVENT_DASHBOARDS}
 
-        return {'event_dashboard_urls': dashboard_urls, 'event_nav_groups': [
+        def event_row(boys_event, boys_label, girls_event=None, girls_label=None):
+            girls_event = girls_event or boys_event
+            girls_label = girls_label or boys_label
+            return {'links': [
+                {
+                    'event_name': event_name,
+                    'label': f'{gender} {label}',
+                    'url': f"/events/{gender.lower()}/{pages_by_event[event_name]['slug']}",
+                    'gender': gender,
+                }
+                for gender, event_name, label in (
+                    ('Boys', boys_event, boys_label),
+                    ('Girls', girls_event, girls_label),
+                )
+            ]}
+
+        return {'event_nav_groups': [
             {'label': 'Sprints', 'events': [
-                (CONST.EVENT.E100, '100m Dash'),
-                (CONST.EVENT.E200, '200m Dash'),
-                (CONST.EVENT.E400, '400m Dash'),
+                event_row(CONST.EVENT.E100, '100m Dash'),
+                event_row(CONST.EVENT.E200, '200m Dash'),
+                event_row(CONST.EVENT.E400, '400m Dash'),
             ]},
             {'label': 'Distance', 'events': [
-                (CONST.EVENT.E800, '800m Run'),
-                (CONST.EVENT.E1600, '1600m Run'),
-                (CONST.EVENT.E3200, '3200m Run'),
+                event_row(CONST.EVENT.E800, '800m Run'),
+                event_row(CONST.EVENT.E1600, '1600m Run'),
+                event_row(CONST.EVENT.E3200, '3200m Run'),
             ]},
             {'label': 'Hurdles', 'events': [
-                (CONST.EVENT.E100H, '100m Hurdles · Girls'),
-                (CONST.EVENT.E110H, '110m Hurdles · Boys'),
-                (CONST.EVENT.E300H, '300m Hurdles'),
+                event_row(CONST.EVENT.E110H, '110m Hurdles', CONST.EVENT.E100H, '100m Hurdles'),
+                event_row(CONST.EVENT.E300H, '300m Hurdles'),
             ]},
             {'label': 'Relays', 'events': [
-                (CONST.EVENT.E400R, '4×100m Relay'),
-                (CONST.EVENT.E1600R, '4×400m Relay'),
-                (CONST.EVENT.E3200R, '4×800m Relay'),
+                event_row(CONST.EVENT.E400R, '4×100m Relay'),
+                event_row(CONST.EVENT.E1600R, '4×400m Relay'),
+                event_row(CONST.EVENT.E3200R, '4×800m Relay'),
             ]},
             {'label': 'Field Events', 'events': [
-                (CONST.EVENT.ELJ, 'Long Jump'),
-                (CONST.EVENT.EHJ, 'High Jump'),
-                (CONST.EVENT.ESP, 'Shot Put'),
-                (CONST.EVENT.EDT, 'Discus Throw'),
-                (CONST.EVENT.EPV, 'Pole Vault'),
+                event_row(CONST.EVENT.ELJ, 'Long Jump'),
+                event_row(CONST.EVENT.EHJ, 'High Jump'),
+                event_row(CONST.EVENT.ESP, 'Shot Put'),
+                event_row(CONST.EVENT.EDT, 'Discus Throw'),
+                event_row(CONST.EVENT.EPV, 'Pole Vault'),
             ]},
         ]}
 

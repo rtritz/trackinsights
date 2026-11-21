@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', function () {
       type: 'event',
       event: link.dataset.eventName,
       name: link.textContent.trim(),
+      url: link.getAttribute('href'),
       searchName: normalizeEventSearch(`${link.textContent.trim()} ${link.dataset.eventName}`),
     }));
 
@@ -71,8 +72,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const data = await res.json();
         if (form.id === 'homeSearchForm') {
           const normalizedQuery = normalizeEventSearch(query);
+          const knownUrls = new Set(data.filter(item => item.type === 'event').map(item => item.url));
           const matchingEvents = eventCatalog
-            .filter(item => item.searchName.includes(normalizedQuery))
+            .filter(item => item.searchName.includes(normalizedQuery) && !knownUrls.has(item.url))
             .slice(0, 6);
           data.push(...matchingEvents);
         }

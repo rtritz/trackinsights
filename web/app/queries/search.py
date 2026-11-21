@@ -76,23 +76,28 @@ def search_bar(query_text: str):
 
     # Put event pages first when the query matches a dashboard's search terms,
     # so common event names are not pushed out by athlete/school matches.
+    requested_genders = {word for word in query_words if word in ('boys', 'girls')}
+    event_words = [word for word in query_words if word not in requested_genders]
     for event_page in EVENT_DASHBOARDS:
         matched_term = next(
             (
                 term for term in event_page["search_terms"]
-                if all(word in term for word in query_words)
+                if event_words and all(word in term for word in event_words)
             ),
             None,
         )
         if matched_term:
-            results.append({
-                "type": "event",
-                "id": event_page["slug"],
-                "name": f"{event_page['label']} Leaderboard",
-                "url": f"/{event_page['slug']}",
-                "score": len(query_words) / len(matched_term.split()),
-                "priority": 0,
-            })
+            for gender in event_page['genders']:
+                if requested_genders and gender.lower() not in requested_genders:
+                    continue
+                results.append({
+                    "type": "event",
+                    "id": f"{gender.lower()}-{event_page['slug']}",
+                    "name": f"{gender} {event_page['label']}",
+                    "url": f"/events/{gender.lower()}/{event_page['slug']}",
+                    "score": len(event_words) / len(matched_term.split()),
+                    "priority": 0,
+                })
     
     # Score schools
     for school_id, school_name in schools:
