@@ -22,7 +22,8 @@ from pathlib import Path
 
 WEB_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(WEB_DIR))
-from app import create_app
+
+from web.app import create_app
 
 app = create_app()
 
