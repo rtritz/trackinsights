@@ -17,6 +17,11 @@ servers speak, and a "wsgi.py" holding an importable `app` is what a host looks
 for. It cannot be called app.py, because app/ next to it is the package and
 Python would not know which one `import app` meant.
 """
+import sys
+from pathlib import Path
+
+WEB_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(WEB_DIR))
 from app import create_app
 
 app = create_app()
