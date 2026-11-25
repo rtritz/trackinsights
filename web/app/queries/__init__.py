@@ -11,10 +11,10 @@ did not have to change, and new code can import from the specific module instead
     event_ranking.py     where one mark stands in a field
     search_scoring.py    name matching and relevance for the search box
 
-    school_dashboard.py  the dashboards themselves
+    school_dashboard.py  event groups and covered seasons for the school page
     program_rankings.py  where a whole program sits statewide
     scorecard.py         one school's entries, round by round
-    outlook.py           returning athletes and head-to-head
+    outlook.py           class years (who returns next season)
     meets.py             meet results, team scoring, relays
     qualifiers.py        regional and state qualifiers, advancement rules
     athletes.py          athlete dashboards, rankings, badges
@@ -38,6 +38,7 @@ when something outside the package genuinely imports it from the package.
 """
 
 from .shared import (  # noqa: F401
+    current_season,
     _covered_rank_seasons,
     _get_event_types_map,
     _schools_with_logos,
@@ -64,28 +65,15 @@ from .athletes import (  # noqa: F401
     get_hypothetical_result_rankings,
 )
 
-from .school_dashboard import (  # noqa: F401
-    get_school_dashboard_data,
-    get_school_qualifiers,
-    get_school_season_core,
-)
-
 from .program_rankings import (  # noqa: F401
     _build_statewide_program_rankings,
-    get_program_rank,
 )
 
 from .scorecard import (  # noqa: F401
     get_athlete_scorecard,
 )
 
-from .outlook import (  # noqa: F401
-    get_returning_athletes,
-    get_season_h2h,
-)
-
 from .percentiles import (  # noqa: F401
-    _compute_school_percentiles,
     get_percentile_options,
     get_percentiles_report,
 )

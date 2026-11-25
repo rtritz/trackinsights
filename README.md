@@ -31,6 +31,14 @@ python wsgi.py
 
 `web/data/Track.db` is tracked in git (the deployed site pulls it directly from GitHub), so it's already present and populated -- no separate DB setup step is needed.
 
+The precomputed cache (`web/data/dashboard_cache.db`: rank popups, report pages) is not in git. To get the published one, run from `web/`:
+
+```bash
+python -m app.jobs.get_cache
+```
+
+School pages work without it; see `docs/PROJECT_GUIDE.md` §9a for what needs it.
+
 ## Working with `standalone/`
 
 - `standalone/notebooks/` -- open with Jupyter/VS Code once the venv above is set up and selected as the kernel.

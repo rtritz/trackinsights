@@ -62,7 +62,7 @@ def create_app(config_class=Config):
         with app.app_context():
             db.create_all()
 
-    # "166" -> "166th". Used by the V4 dashboard, which prints a lot of places
+    # "166" -> "166th". Used by the school page, which prints a lot of places
     # and ranks; a filter keeps that formatting out of both the template and the
     # precomputed payload, so the cache stores numbers and the page decides how
     # to say them.

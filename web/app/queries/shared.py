@@ -117,8 +117,6 @@ _SCHOOL_LOGO_DIR = os.path.join(CONST.WEB_DIR, "app", "static", CONST.SCHOOL_LOG
 # uncentered peer set instead of a genuinely local one.
 PEER_WINDOW_HALF = 30
 
-CURRENT_QUALIFIER_YEAR = 2026
-
 REGIONAL_SECTIONAL_GROUPS = {
     1: (1, 2, 3, 4),
     2: (5, 6, 7, 8),
@@ -338,6 +336,23 @@ def _covered_rank_seasons():
 
 
 @lru_cache(maxsize=1)
+def current_season():
+    """The newest season with any result in Track.db, or None for an empty one.
+
+    The current season is whatever the results say it is: loading the first
+    2027 result (girls or boys) makes 2027 current, with nothing to edit. The
+    qualifier pages show only this season, and build_all builds their data for
+    it. Cleared with the other query caches when Track.db changes.
+    """
+    year = db.session.execute(sqlalchemy_text(
+        "select max(m.year) from meet m where m.year is not null and ("
+        " exists (select 1 from athlete_result ar where ar.meet_id = m.meet_id) or"
+        " exists (select 1 from relay_result rr where rr.meet_id = m.meet_id))"
+    )).scalar()
+    return int(year) if year is not None else None
+
+
+@lru_cache(maxsize=1)
 def _schools_with_logos() -> frozenset:
     """school_ids that have a logo file on disk, cached for the process
     lifetime -- this directory only changes when standalone/notebooks/Load
@@ -364,33 +379,6 @@ def _school_logo_url(school) -> Optional[str]:
     if not school or school.school_id not in _schools_with_logos():
         return None
     return f"/static/{CONST.SCHOOL_LOGO_STATIC_SUBDIR}/{school.school_id}.{CONST.SCHOOL_LOGO_EXT}"
-
-def _build_school_roster(school_id: int):
-    """Return list of athletes at this school, sorted by graduation year desc then last name."""
-    athletes = (
-        db.session.query(
-            Athlete.athlete_id,
-            Athlete.first,
-            Athlete.last,
-            Athlete.gender,
-            Athlete.graduation_year,
-        )
-        .filter(Athlete.school_id == school_id)
-        .all()
-    )
-
-    roster = []
-    for a in athletes:
-        roster.append({
-            "athlete_id": a.athlete_id,
-            "name": f"{a.first} {a.last}".strip(),
-            "gender": a.gender,
-            "graduation_year": a.graduation_year,
-        })
-
-    roster.sort(key=lambda r: (-(r["graduation_year"] or 0), r["name"]))
-    return roster
-
 
 def _compute_school_records(school_id: int):
     """Unofficial school records: best mark per event+gender from 2023 onwards."""
@@ -629,7 +617,17 @@ def _resolve_postseason_individual_rows(
     gender: Optional[str] = None,
     year: Optional[int] = None,
     school_id: Optional[int] = None,
+    best_of_rounds: bool = False,
 ) -> List[Dict[str, Any]]:
+    """One row per athlete, event and meet.
+
+    By default the meet's final is chosen over its prelim: advancement, places
+    and qualifying standards are decided in finals (IHSAA). With
+    best_of_rounds=True the athlete's best valid mark at the meet is chosen,
+    whichever round it came from -- a prelim is a mark the athlete ran, so it
+    counts for rankings, records and PRs. An invalid mark (DNF, DQ) never
+    beats a valid one.
+    """
     query = (
         db.session.query(
             Athlete.school_id.label("school_id"),
@@ -687,8 +685,29 @@ def _resolve_postseason_individual_rows(
         }
         key = (row.athlete_id, row.event, row.meet_id)
         lower_is_better = _is_lower_better(candidate["event_type"])
-        per_meet[key] = _choose_result_entry(per_meet.get(key), candidate, lower_is_better)
+        if best_of_rounds:
+            per_meet[key] = _choose_best_mark(per_meet.get(key), candidate, lower_is_better)
+        else:
+            per_meet[key] = _choose_result_entry(per_meet.get(key), candidate, lower_is_better)
     return list(per_meet.values())
+
+
+def _choose_best_mark(existing, candidate, lower_is_better: bool):
+    """The better valid mark of two rounds at one meet; any valid beats invalid."""
+    if existing is None:
+        return candidate
+    valid_new = _is_valid_postseason_mark(candidate["result_value"], candidate["event_type"])
+    valid_old = _is_valid_postseason_mark(existing["result_value"], existing["event_type"])
+    if valid_new != valid_old:
+        return candidate if valid_new else existing
+    if not valid_new:
+        return _choose_result_entry(existing, candidate, lower_is_better)
+    if candidate["result_value"] == existing["result_value"]:
+        # Same mark in both rounds: report the final.
+        return _choose_result_entry(existing, candidate, lower_is_better)
+    better = candidate["result_value"] < existing["result_value"] if lower_is_better \
+        else candidate["result_value"] > existing["result_value"]
+    return candidate if better else existing
 
 def _prior_season_status_for_best_mark(
     *,
@@ -753,7 +772,7 @@ def _state_target_field_size(year: int) -> int:
     try:
         parsed_year = int(year)
     except (TypeError, ValueError):
-        parsed_year = CURRENT_QUALIFIER_YEAR
+        return 30  # the current rule (2026 on)
 
     if parsed_year >= 2026:
         return 30

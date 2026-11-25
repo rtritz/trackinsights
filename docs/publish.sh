@@ -5,12 +5,12 @@
 # The counterpart to docs/deploy.sh. That script consumes what this one
 # publishes:
 #
-#     you:     build_all  ->  git push (Track.db, static/data)
+#     you:     build_all  ->  git push (Track.db)
 #                         ->  publish.sh (dashboard_cache.db, as a release asset)
 #     server:  deploy.sh  ->  clone + curl  ->  reload
 #
-# dashboard_cache.db is generated, ~12MB, and rewritten whole on every build, so
-# it is not in git -- tracking it put a fresh 12MB blob in history on every data
+# dashboard_cache.db is generated, large, and rewritten on every build, so it
+# is not in git -- tracking it would put a fresh copy in history on every data
 # update. A release asset is replaced in place and costs nothing in clone size.
 #
 # Creating the release is a one-time thing, so this does it only if it is
@@ -83,8 +83,8 @@ STATE="$(git rev-parse --git-dir)/last-published-cache"
 # ---- is Track.db committed? ----
 # The server reads Track.db from git and the cache from the release. Uploading
 # the cache while Track.db sits uncommitted means the two arrive out of step.
-if ! git diff --quiet HEAD -- web/data/Track.db web/app/static/data; then
-  echo "WARNING: Track.db or static/data has uncommitted changes."
+if ! git diff --quiet HEAD -- web/data/Track.db; then
+  echo "WARNING: Track.db has uncommitted changes."
   echo "  Commit them, or the server gets this cache with older results."
   if [ "$ASSUME_YES" = yes ] || [ ! -t 0 ]; then
     # No terminal to ask at -- a pre-push hook has git's ref list on stdin, and
@@ -122,4 +122,4 @@ sha256sum "$CACHE" | cut -d' ' -f1 > "$STATE"
 
 echo
 echo "Published $(du -h "$CACHE" | cut -f1) to the $TAG release."
-echo "If Track.db or static/data changed too, push them before deploying."
+echo "If Track.db changed too, push it before deploying."

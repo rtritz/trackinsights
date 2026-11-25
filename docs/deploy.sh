@@ -5,14 +5,15 @@
 # copied up, so ~/mysite holds app/, config.py, wsgi.py and data/ directly,
 # with common/ beside them.
 #
-# Two artifacts arrive by two routes. Track.db is source data and travels in
-# git. dashboard_cache.db is generated from it, weighs ~12MB and is rewritten
-# whole on every build, so it is NOT in git -- it is published as a GitHub
-# Release asset and downloaded below. Publishing an update is therefore:
+# Two files arrive by two routes. Track.db is source data and travels in git.
+# dashboard_cache.db holds everything precomputed from it (rankings, school
+# pages, report data); it is large and rewritten on every build, so it is NOT in
+# git -- it is published as a GitHub Release asset and downloaded below.
+# Publishing an update is therefore:
 #
 #     cd web && python -m app.jobs.build_all
-#     git add web/data/Track.db web/app/static/data && git commit && git push
-#     gh release upload cache-latest web/data/dashboard_cache.db --clobber
+#     git add web/data/Track.db && git commit && git push
+#     ./docs/publish.sh      (uploads the cache to the release)
 #
 set -euo pipefail
 
@@ -59,8 +60,8 @@ head -c 15 "$TEMP/web/data/dashboard_cache.db" | grep -q "SQLite format" \
 # failed check.
 #
 # --check returns 0 current, 1 stale, 2 never built; anything else means the
-# check itself failed. Each artifact is compared against its own season, so
-# loading a new season flags that season's files and leaves older ones alone.
+# check itself failed. Each report is compared against its own season, so
+# loading a new season flags that season's reports and leaves older ones alone.
 set +e
 ( cd "$TEMP/web" && PYTHONPATH="$TEMP" python -m app.jobs.build_all --check )
 CHECK=$?
@@ -74,7 +75,7 @@ case $CHECK in
      echo "  add --warn-only to the check above for this run."
      exit 1 ;;
   2) echo "ABORTING: precomputed data was never built."
-     echo "  The cache downloaded but has no contents, or the JSON is unstamped."
+     echo "  The cache downloaded but has no contents."
      exit 1 ;;
   *) echo "ABORTING: the freshness check itself failed -- see the output above."
      exit 1 ;;
@@ -95,7 +96,7 @@ rm -rf "$TEMP"
 # The cache came from the clone along with everything else, so this is the last
 # chance to notice it did not survive the copy.
 test -f "$SITE/data/dashboard_cache.db" \
-  || echo "WARNING: dashboard_cache.db is missing from the site -- dashboards will be empty."
+  || echo "WARNING: dashboard_cache.db is missing from the site -- school pages and reports will be slow or empty."
 
 # ---- reload ----
 # Touching the WSGI file is what the dashboard's Reload button does. Kept

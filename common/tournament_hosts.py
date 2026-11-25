@@ -1,13 +1,13 @@
-"""Sectional and regional host names, read from a precomputed file.
+"""Sectional and regional host names, read from the precomputed cache.
 
 Track.db records a tournament meet as "IHSAA Sectional 12"; the host school is
 what people recognise. IHSAA publishes the pairing, so it is scraped -- but
 *offline*, by ``app.jobs.precompute_tournament_hosts``, never while a visitor
 waits.
 
-    ihsaa.org  --(the job, run by hand)-->  tournament_hosts.json  -->  the site
+    ihsaa.org  --(the job)-->  dashboard_cache.db (artifact 'tournament_hosts')  -->  the site
 
-This module is the one place that knows where that file lives and what shape it
+This module is the one place that knows where that data lives and what shape it
 has, so the job that writes it and the web app that reads it cannot drift apart.
 
 WHY NOT FETCH IT LIVE
@@ -28,14 +28,12 @@ RELATED
 ``common/regional_hosts.py`` holds *hand-entered* regional hosts, which take
 priority over anything scraped. This module is the scraped layer underneath it.
 """
-from __future__ import annotations
 
-import json
 import os
 from functools import lru_cache
 from typing import Dict
 
-from .const import CONST
+from . import cache_db
 
 # The tournament rounds this file covers. These are the IHSAA page's own names
 # for them, and they appear verbatim in the JSON keys.
@@ -43,12 +41,10 @@ ROUND_SECTIONAL = "sectional"
 ROUND_REGIONAL = "regional"
 ALL_ROUNDS = (ROUND_SECTIONAL, ROUND_REGIONAL)
 
-# Beside the other precomputed JSON the site serves.
-TOURNAMENT_HOSTS_DIR = os.path.join(
-    CONST.WEB_DIR, "app", "static", "data", "tournament_hosts")
-TOURNAMENT_HOSTS_PATH = os.path.join(TOURNAMENT_HOSTS_DIR, "tournament_hosts.json")
+# Stored as one artifact in dashboard_cache.db (common/cache_db.py).
+ARTIFACT_NAME = "tournament_hosts"
 
-# On disk the keys are strings, because JSON has no tuples and no integer keys:
+# Stored, the keys are strings, because JSON has no tuples and no integer keys:
 #   {"2026|Boys|sectional": {"1": "Portage", "2": "Goshen", ...}, ...}
 # _KEY_SEPARATOR is the one place that format is spelled out.
 _KEY_SEPARATOR = "|"
@@ -72,9 +68,9 @@ def _normalize_round(round_name: str) -> str:
 
 
 def _file_stamp():
-    """Cheap identity of the file, so an edit is picked up without a restart."""
+    """Cheap identity of the cache file, so a rebuild is picked up without a restart."""
     try:
-        stat = os.stat(TOURNAMENT_HOSTS_PATH)
+        stat = os.stat(cache_db.CACHE_DB_PATH)
     except OSError:
         return None
     return (stat.st_size, stat.st_mtime_ns)
@@ -82,7 +78,7 @@ def _file_stamp():
 
 @lru_cache(maxsize=4)
 def _load_stamped(stamp):
-    """Parse the file once per distinct version of it.
+    """Read the hosts once per distinct version of the cache file.
 
     Keyed on the stamp rather than taking no arguments, so that replacing the
     file invalidates the entry by changing the key. mtime is safe here because it
@@ -91,21 +87,17 @@ def _load_stamped(stamp):
     """
     if stamp is None:
         return {}
-    try:
-        with open(TOURNAMENT_HOSTS_PATH, encoding="utf-8") as handle:
-            data = json.load(handle)
-    except (OSError, ValueError):
-        return {}
+    data = cache_db.load_artifact(ARTIFACT_NAME, {})
     return data if isinstance(data, dict) else {}
 
 
 def load_all() -> Dict[str, Dict[str, str]]:
-    """Every mapping in the file, or {} when it has not been built.
+    """Every stored mapping, or {} when it has not been built.
 
-    One os.stat per call; the JSON is parsed once per version of the file. The
+    One os.stat per call; the data is read once per version of the cache. The
     qualifier pages ask for a host once per row, so this is on a hot path.
 
-    A missing or unreadable file is not an error: callers fall back to the host
+    Missing or unreadable data is not an error: callers fall back to the host
     recorded in Track.db, which is what happened whenever the live fetch failed
     too. The site renders either way.
     """
@@ -115,7 +107,7 @@ def load_all() -> Dict[str, Dict[str, str]]:
 def get_hosts(year: int, gender: str, round_name: str) -> Dict[int, str]:
     """{meet number: host name} for one season, gender and round.
 
-    Empty when the file has not been built or holds nothing for that key.
+    Empty when the hosts have not been built or hold nothing for that key.
     """
     try:
         key = storage_key(year, gender, round_name)
@@ -143,16 +135,13 @@ def get_regional_hosts(year: int, gender: str) -> Dict[int, str]:
 
 
 def save_all(mapping: Dict[str, Dict[int, str]]) -> str:
-    """Write the whole file. Used by the precompute job, not by the site."""
-    os.makedirs(TOURNAMENT_HOSTS_DIR, exist_ok=True)
+    """Store every mapping. Used by the precompute job, not by the site.
+
+    Not stamped with a Track.db hash: the hosts come from ihsaa.org.
+    """
     serialisable = {
         key: {str(number): host for number, host in sorted(hosts.items())}
         for key, hosts in sorted(mapping.items())
     }
-    # newline="" so the bytes are exactly what was serialised. Without it Python
-    # rewrites every \n as \r\n on Windows, so the file differs between machines
-    # for no reason -- the same fix app/jobs/artifacts.py carries.
-    with open(TOURNAMENT_HOSTS_PATH, "w", encoding="utf-8", newline="") as handle:
-        json.dump(serialisable, handle, indent=2, sort_keys=True)
-        handle.write("\n")
-    return TOURNAMENT_HOSTS_PATH
+    cache_db.write_artifact(ARTIFACT_NAME, serialisable)
+    return ARTIFACT_NAME

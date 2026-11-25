@@ -25,9 +25,9 @@ web/data/Track_backup_*.db
 web/data/Track_archive.db
 
 # dashboard_cache.db is GENERATED from Track.db by app.jobs.build_all, and it is
-# big: ~12MB, rewritten whole on every rebuild. Tracking it put a fresh 12MB blob
-# in history every time results were updated -- 58MB across five commits, for a
-# file that can always be rebuilt from something already in the repo.
+# big (~36MB: rankings, every school page, the report data) and rewritten on
+# every rebuild. Tracking it put a fresh blob in history every time results were
+# updated, for a file that can always be rebuilt from something already in the repo.
 #
 # The deploy gets it from a GitHub Release asset instead. See docs/PROJECT_GUIDE.md
 # section 10: publish it with `gh release upload`, and the deploy curls it down.

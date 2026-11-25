@@ -1,16 +1,11 @@
 from datetime import datetime
 
-import json
-import os
-import time
-
-from flask import render_template, request, url_for, Response, current_app
+from flask import render_template, request, url_for, Response
 from . import main_bp
-from ..queries import get_athletes
+from ..queries import current_season, get_athletes
 from ..models import Athlete, School
 from ..videos import INTERVIEW_VIDEOS
-from ..services import dashboard_v4
-from common.const import CONST
+from common import cache_db
 from common.regional_hosts import get_configured_regional_hosts
 from sqlalchemy.orm import joinedload
 
@@ -78,29 +73,9 @@ def hypothetical_query_page():
     return render_template('insights/hypothetical.html')
 
 
-# Register the 2026 regional predictions report route
-# The precomputed JSON the report pages read. Resolved from this file rather
-# than from current_app.root_path: the deploy flattens web/ into the app root,
-# so anything walking up from the package finds a directory that is not there.
-# That exact mistake once sent both qualifier pages back to live computation.
-def _static_data_path(subdir, filename):
-    return os.path.join(os.path.dirname(__file__), '..', 'static', 'data', subdir, filename)
-
-
-def _load_json(path, default):
-    """Whatever is on disk, or `default` if the build has not produced it yet.
-
-    A report page missing its data is a page that says so, not a 500 -- the
-    precompute job runs between seasons and the site has to stand up in
-    between.
-    """
-    try:
-        with open(path, encoding='utf-8') as handle:
-            return json.load(handle)
-    except Exception:
-        return default
-
-
+# The report pages read their data from dashboard_cache.db (common/cache_db.py),
+# built by build_all. A report whose data has not been built shows its "not
+# available" state rather than an error.
 def _updated_label():
     return '%s %d, %d' % (datetime.now().strftime('%B'), datetime.now().day,
                           datetime.now().year)
@@ -110,10 +85,8 @@ def _updated_label():
 def regional_predictions_2026_report_page():
     year = 2026
     top_n = 10
-    predictions_girls = _load_json(_static_data_path(
-        'regional_predictions', f'regional_predictions_{year}_girls.json'), [])
-    predictions_boys = _load_json(_static_data_path(
-        'regional_predictions', f'regional_predictions_{year}_boys.json'), [])
+    predictions_girls = cache_db.load_artifact(f'regional_predictions_{year}_girls', [])
+    predictions_boys = cache_db.load_artifact(f'regional_predictions_{year}_boys', [])
     updated_label = _updated_label()
 
     girls_unavailable = not any(r.get('rows') for r in predictions_girls)
@@ -135,10 +108,8 @@ def regional_predictions_2026_report_page():
 def state_predictions_2026_report_page():
     year = 2026
     not_built = {"ready": False, "rows": [], "missing_regionals": [], "regionals_loaded": 0}
-    girls = _load_json(_static_data_path(
-        'state_predictions', f'state_predictions_{year}_girls.json'), dict(not_built))
-    boys = _load_json(_static_data_path(
-        'state_predictions', f'state_predictions_{year}_boys.json'), dict(not_built))
+    girls = cache_db.load_artifact(f'state_predictions_{year}_girls', dict(not_built))
+    boys = cache_db.load_artifact(f'state_predictions_{year}_boys', dict(not_built))
     updated_label = _updated_label()
 
     girls_unavailable = not girls.get('ready') or not girls.get('rows')
@@ -182,7 +153,7 @@ def regional_qualifiers_page():
         page_heading='Unofficial Regional Qualifiers',
         page_title='Unofficial Regional Qualifiers - Track Insights',
         page_description='Unofficial regional qualifier lists.',
-        page_subtitle='These lists are unofficial and do not reflect any scratches that may have been made at the sectional level.',
+        page_subtitle="Unofficial lists — scratches made at Sectionals aren't reflected.",
         coverage_unit='sectionals',
         completed_field='completed_sectionals',
         total_field='total_sectionals',
@@ -191,6 +162,7 @@ def regional_qualifiers_page():
         detail_unavailable_text='That regional is awaiting meet result data.',
         api_status_url='/api/regional-qualifiers/status',
         api_detail_url='/api/regional-qualifiers',
+        current_year=current_season(),
     )
 
 
@@ -201,7 +173,7 @@ def state_qualifiers_page():
         page_heading='Unofficial State Qualifiers',
         page_title='Unofficial State Qualifiers - Track Insights',
         page_description='Unofficial state qualifier lists.',
-        page_subtitle='These lists are unofficial and do not reflect any scratches that may have been made at the regional level.',
+        page_subtitle="Unofficial lists — scratches made at Regionals aren't reflected.",
         coverage_unit='regional meet results',
         completed_field='completed_regionals',
         total_field='total_regionals',
@@ -211,6 +183,7 @@ def state_qualifiers_page():
         pending_text='State qualifiers are pending.',
         api_status_url='/api/state-qualifiers/status',
         api_detail_url='/api/state-qualifiers',
+        current_year=current_season(),
     )
 
 
@@ -236,102 +209,24 @@ def hypothetical_result_detail():
 
 
 @main_bp.route('/school-dashboard/<int:school_id>')
-def school_dashboard(school_id):
-    school = School.query.get(school_id)
-    return render_template(
-        'school-dashboard.html',
-        school_id=school_id,
-        school_name=school.school_name if school else None,
-        school_city=school.city if school else None,
-    )
+@main_bp.route('/school-dashboard/<int:school_id>/<gender>/<season>')
+def school_dashboard(school_id, gender=None, season=None):
+    from flask import abort
+    from ..services.school_page import page_html
 
+    def render(payload, charts):
+        return render_template('school-page.html', payload=payload, school_id=school_id,
+                               chart_events=charts)
 
-@main_bp.route('/school-dashboard-v4/<int:school_id>')
-@main_bp.route('/school-dashboard-v4/<int:school_id>/<gender>/<season>')
-def school_dashboard_v4(school_id, gender=None, season=None):
-    """The V4 dashboard: one indexed lookup, then render.
-
-    No analysis happens here. Everything on the page was computed by
-    app.jobs.precompute_dashboard_v4 and is read back whole.
-
-    Gender and season are in the path rather than a query string so every view
-    is a real URL -- linkable, bookmarkable, and cacheable by the browser.
-    """
-    timings = []
-
-    def step(label, fn):
-        started = time.perf_counter()
-        try:
-            return fn()
-        finally:
-            timings.append((label, (time.perf_counter() - started) * 1000))
-
-    gender = gender or CONST.GENDER.BOYS
-    payload = step('cache lookup',
-                   lambda: dashboard_v4.load_payload(school_id, gender, season)
-                   if season else None)
-
-    if payload is None:
-        # No season asked for, or none cached under that name: fall back to the
-        # newest season this school has, so a bare URL always lands somewhere.
-        available = step('season list',
-                         lambda: dashboard_v4.season_choices(school_id, gender))
-        if available:
-            years = sorted([s for s in available if s.isdigit()], reverse=True)
-            season = years[0] if years else available[0]
-            payload = step('cache lookup',
-                           lambda: dashboard_v4.load_payload(school_id, gender, season))
-
-    # Nothing cached. In development, build it now rather than showing the
-    # "not built yet" page: a fresh clone has no cache (it ships as a release
-    # asset, not in git), and a teammate changing query code needs to see their
-    # change rather than a payload that predates it. Never on the deployed site
-    # -- see dashboard_v4.allow_live_build.
-    built_live = False
-    if payload is None and dashboard_v4.allow_live_build(current_app):
-        payload = step('live build',
-                       lambda: dashboard_v4.live_payload(school_id, gender, season))
-        built_live = payload is not None
-
-    if payload is None:
-        school = School.query.get(school_id)
-        return render_template(
-            'school-dashboard-v4.html',
-            payload=None,
-            school_id=school_id,
-            school_name=school.school_name if school else None,
-            status=dashboard_v4.cache_status(),
-            meta=dashboard_v4.cache_meta(),
-            timings=timings,
-            show_timings=_v4_show_timings(),
-            built_live=False,
-        ), (200 if school else 404)
-
-    return render_template(
-        'school-dashboard-v4.html',
-        payload=payload,
-        school_id=school_id,
-        school_name=(payload.get('school') or {}).get('name'),
-        # A live build is current by definition, so it must not inherit the
-        # cache's staleness banner -- that banner would be describing a cache
-        # this page did not read.
-        status=None if built_live else dashboard_v4.cache_status(),
-        meta=dashboard_v4.cache_meta(),
-        timings=timings,
-        show_timings=_v4_show_timings(),
-        built_live=built_live,
-    )
-
-
-def _v4_show_timings():
-    """Per-section timings, shown only when asked for.
-
-    ?debug=timing in development, never by default -- the numbers are for
-    answering "where did the time go", not for visitors.
-    """
-    if not request.args.get('debug') == 'timing':
-        return False
-    return bool(current_app.debug) or os.environ.get('TI_ALLOW_TIMING') == '1'
+    try:
+        # The finished page, cached (compressed) until Track.db or the rankings
+        # cache changes; see page_html.
+        html = page_html(school_id, gender, season, render)
+    except ValueError:
+        abort(400)
+    if html is None:
+        abort(404)
+    return html
 
 
 @main_bp.route('/interviews')

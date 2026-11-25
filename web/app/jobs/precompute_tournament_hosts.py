@@ -1,13 +1,10 @@
 """
-Fetch the sectional and regional host names from IHSAA and save them as JSON.
+Fetch the sectional and regional host names from IHSAA into dashboard_cache.db.
 
 Track.db records a tournament meet as "IHSAA Sectional 12"; the host school is
 what people recognise. IHSAA publishes the pairing on its tournament pages, so
-this job scrapes it once and writes the result to
-
-    web/app/static/data/tournament_hosts/tournament_hosts.json
-
-which common/tournament_hosts.py then reads. This is the ONLY code in the project
+this job scrapes it once and stores the result as the 'tournament_hosts'
+artifact in dashboard_cache.db, which common/tournament_hosts.py then reads. This is the ONLY code in the project
 that talks to the network, and it is deliberately here in jobs/ rather than in
 the request path -- see common/tournament_hosts.py for what that cost when it was
 the other way round.
@@ -19,7 +16,7 @@ Run it when a new season's tournament assignments are published. From web/:
 
 Being scraped, it is best effort. A round that cannot be fetched -- the page has
 moved, the site is down, the season is not published yet -- leaves whatever was
-already in the file rather than blanking it, and says so. The site falls back to
+already stored rather than blanking it, and says so. The site falls back to
 the host recorded in Track.db regardless, so a failure here is cosmetic.
 """
 import argparse
@@ -40,9 +37,6 @@ from common.tournament_hosts import (  # noqa: E402
     storage_key,
 )
 
-# The seasons worth keeping current. Older ones already have their hosts in the
-# file and in Track.db; there is nothing to re-fetch.
-DEFAULT_YEARS = [2026]
 
 FETCH_TIMEOUT_SECONDS = 20
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
@@ -127,8 +121,17 @@ def fetch_hosts(year, gender, round_name):
     return hosts
 
 
+def _current_season():
+    # Older seasons already have their hosts stored and in Track.db; only the
+    # current one (the newest year with results) is worth re-fetching.
+    from app import create_app
+    from app.queries import current_season
+    with create_app().app_context():
+        return current_season()
+
+
 def main(years=None):
-    years = years or DEFAULT_YEARS
+    years = years or [_current_season()]
     # Start from what is already saved so a round that fails to fetch keeps the
     # hosts it had, instead of being blanked by a bad afternoon at ihsaa.org.
     mapping = {key: dict(value) for key, value in load_all().items()}
@@ -146,9 +149,9 @@ def main(years=None):
                 fetched += 1
                 print("  %d meets" % len(hosts))
 
-    path = save_all(mapping)
-    print("Saved: %s  (%d fetched, %d kept from the previous build)"
-          % (path, fetched, len(failed)))
+    name = save_all(mapping)
+    print("Stored: %s  (%d fetched, %d kept from the previous build)"
+          % (name, fetched, len(failed)))
     if failed:
         print("Could not fetch: %s" % ", ".join(failed))
     return 0
@@ -157,6 +160,7 @@ def main(years=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--year', type=int, action='append', dest='years',
-                        help='season to fetch; repeatable. Defaults to %s' % DEFAULT_YEARS)
+                        help='season to fetch; repeatable. Defaults to the current season '
+                             '(the newest year with results)')
     args = parser.parse_args()
     sys.exit(main(args.years))

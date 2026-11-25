@@ -57,6 +57,13 @@ class Conversion:
         if cleaned.isalpha():
             return 0.0
 
+        # Handle feet-inches format with hyphen separator (e.g., "65-3.75")
+        hyphen_match = re.match(r"^\s*(\d+)\s*-\s*(\d+(?:\.\d+)?)\s*$", cleaned)
+        if hyphen_match:
+            feet = int(hyphen_match.group(1))
+            inches = float(hyphen_match.group(2))
+            return feet * 12 + inches
+
         match = Conversion.distance_pattern.match(cleaned)
         if not match:
             raise ValueError(f"Invalid distance format: {value!r}")

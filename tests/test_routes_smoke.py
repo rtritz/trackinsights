@@ -41,12 +41,8 @@ QUERY = {
 # Routes that legitimately answer with something other than 200 for these
 # arguments, with the reason. Anything not listed must return 200.
 EXPECTED = {
-    # The v4 cache is built from the real database, so the fixture has no
-    # payload; the page says so rather than inventing one.
-    '/school-dashboard-v4/<int:school_id>': (200,),
-    '/school-dashboard-v4/<int:school_id>/<gender>/<season>': (200,),
-    # Ranked lists come from that same cache.
-    '/api/v4/rankings/<gender>/<season>': (200, 404),
+    # Ranked lists come from dashboard_cache.db, which may not hold this season.
+    '/api/rankings/<gender>/<season>': (200, 404),
     # These need query arguments to do anything; without them they answer, but
     # a 400 is a legitimate "you did not ask me anything".
     '/api/hypothetical-rank': (200, 400),

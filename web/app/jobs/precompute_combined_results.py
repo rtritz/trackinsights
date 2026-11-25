@@ -1,36 +1,28 @@
 """
-Precompute and save the Combined Regional Results as JSON.
+Precompute the Combined Regional Results into dashboard_cache.db.
 
 Reads ACTUAL Regional meet results (Meet.meet_type='Regional') from the
-database, ranks every finisher per event across all 8 regionals, and writes
-``combined_results_{year}_{gender}.json`` for the State Qualifiers page.
+database, ranks every finisher per event across all 8 regionals, and stores
+the artifact ``combined_results_{year}_{gender}`` for the State Qualifiers page.
 
 This is distinct from ``precompute_combined_rankings.py``, which projects
-regional fields from Sectional results and writes ``combined_rankings_*``.
+regional fields from Sectional results into ``combined_rankings_*``.
 
 Run after Regional meets are scraped. From web/:
     python -m app.jobs.precompute_combined_results
 """
-import os
-import json
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-WEB_DIR = os.path.abspath(os.path.join(HERE, '..', '..'))
 
 from app import create_app, db  # noqa: E402
 from app.models import Athlete, AthleteResult, Meet, RelayResult, School  # noqa: E402
 from app.queries import (  # noqa: E402
+    current_season,
     _get_event_types_map,
     _regional_events_for_gender,
 )
 from common.standards import get_state_standard_display, meets_state_standard  # noqa: E402
-from app.jobs.artifacts import write_json_artifact  # noqa: E402
+from app.jobs.artifacts import write_artifact  # noqa: E402
 
 
-OUTPUT_DIR = os.path.join(WEB_DIR, 'app', 'static', 'data', 'regional_predictions')
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-YEARS = [2026]
 GENDERS = ["Boys", "Girls"]
 FIELD_EVENTS = {"High Jump", "Long Jump", "Triple Jump", "Shot Put", "Discus", "Pole Vault"}
 
@@ -156,20 +148,17 @@ def build_payload(gender: str, year: int) -> dict:
     }
 
 
-def main():
+def main(years=None):
     app = create_app()
     with app.app_context():
-        for year in YEARS:
+        for year in years or [current_season()]:
             for gender in GENDERS:
                 print(f"Computing combined regional results for {year} {gender}...")
                 payload = build_payload(gender, year)
-                out_path = os.path.join(
-                    OUTPUT_DIR,
-                    f"combined_results_{year}_{gender.lower()}.json",
-                )
-                write_json_artifact(out_path, payload, year=year, gender=gender)
+                name = f"combined_results_{year}_{gender.lower()}"
+                write_artifact(name, payload, year=year, gender=gender)
                 total = sum(len(e['qualifiers']) for e in payload['events'])
-                print(f"  Saved: {out_path}  (events={len(payload['events'])}, rows={total})")
+                print(f"  Stored: {name}  (events={len(payload['events'])}, rows={total})")
 
 
 if __name__ == '__main__':

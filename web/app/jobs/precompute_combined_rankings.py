@@ -1,30 +1,20 @@
 """
-Precompute and save the Combined Regional Rankings as JSON.
+Precompute the Combined Regional Rankings into dashboard_cache.db.
 
 For each (year, gender), this assembles the unofficial regional qualifier list
 from all 8 regionals into a single per-event ranked list (best-to-worst),
-de-duplicates by athlete/school, and writes the result to a JSON file the API
-can serve quickly without hitting the database.
+de-duplicates by athlete/school, and stores the result as the artifact
+``combined_rankings_{year}_{gender}``, which the API serves as is.
 
 Run this after sectional results are updated. From web/:
     python -m app.jobs.precompute_combined_rankings
 """
-import os
-import json
-
-# Ensure 'app' is importable when running this script directly
-HERE = os.path.dirname(os.path.abspath(__file__))
-WEB_DIR = os.path.abspath(os.path.join(HERE, '..', '..'))
 
 from app import create_app  # noqa: E402
-from app.queries import get_regional_qualifiers  # noqa: E402
-from app.jobs.artifacts import write_json_artifact  # noqa: E402
+from app.queries import current_season, get_regional_qualifiers  # noqa: E402
+from app.jobs.artifacts import write_artifact  # noqa: E402
 
 
-OUTPUT_DIR = os.path.join(WEB_DIR, 'app', 'static', 'data', 'regional_predictions')
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-YEARS = [2026]
 GENDERS = ["Boys", "Girls"]
 FIELD_EVENTS = {"High Jump", "Long Jump", "Triple Jump", "Shot Put", "Discus", "Pole Vault"}
 
@@ -91,10 +81,10 @@ def build_combined_payload(gender: str, year: int) -> dict:
     }
 
 
-def main(output_prefix: str = 'combined_rankings'):
+def main(output_prefix: str = 'combined_rankings', years=None):
     app = create_app()
     with app.app_context():
-        for year in YEARS:
+        for year in years or [current_season()]:
             for gender in GENDERS:
                 print(f"Computing {output_prefix} for {year} {gender}...")
                 # Bypass lru_cache so we always recompute against fresh DB state.
@@ -103,12 +93,9 @@ def main(output_prefix: str = 'combined_rankings'):
                     target.cache_clear()
 
                 payload = build_combined_payload(gender, year)
-                out_path = os.path.join(
-                    OUTPUT_DIR,
-                    f"{output_prefix}_{year}_{gender.lower()}.json",
-                )
-                write_json_artifact(out_path, payload, year=year, gender=gender)
-                print(f"  Saved: {out_path}  (events={len(payload['events'])})")
+                name = f"{output_prefix}_{year}_{gender.lower()}"
+                write_artifact(name, payload, year=year, gender=gender)
+                print(f"  Stored: {name}  (events={len(payload['events'])})")
 
 
 if __name__ == '__main__':

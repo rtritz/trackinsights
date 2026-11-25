@@ -278,117 +278,6 @@ def _estimate_relay_rank(
         "sectional_results": sectional_results,
     }
 
-def _compute_school_relay_results(school_id: int):
-    """Return school relay performances for dashboard display."""
-    rows = (
-        db.session.query(
-            RelayResult.event,
-            RelayResult.result,
-            RelayResult.result2,
-            RelayResult.place,
-            RelayResult.athlete_names,
-            Meet.meet_id,
-            Meet.host,
-            Meet.meet_type,
-            Meet.meet_num,
-            Meet.gender,
-            Meet.year,
-            Event.event_type,
-        )
-        .join(Meet, RelayResult.meet_id == Meet.meet_id)
-        .join(Event, RelayResult.event == Event.event)
-        .filter(
-            RelayResult.school_id == school_id,
-            RelayResult.result2.isnot(None),
-            Meet.year.isnot(None),
-            Meet.year >= MIN_RECORDS_YEAR,
-        )
-        .all()
-    )
-
-    statewide_rows = (
-        db.session.query(
-            RelayResult.event,
-            Meet.gender,
-            Meet.year,
-            Meet.meet_type,
-            RelayResult.school_id,
-            RelayResult.result2,
-        )
-        .join(Meet, RelayResult.meet_id == Meet.meet_id)
-        .filter(
-            RelayResult.result2.isnot(None),
-            Meet.year.isnot(None),
-            Meet.year >= MIN_RECORDS_YEAR,
-        )
-        .all()
-    )
-
-    # Dedupe by school within each (event, gender, year, meet_type) bucket:
-    # keep each school's best (lowest time) mark at that meet level so
-    # ranking reflects teams that competed at that level, not raw
-    # performance counts. Each row on the dashboard is ranked against the
-    # pool of teams that ran the event at the same meet_type that year.
-    best_by_school = {}
-    for item in statewide_rows:
-        key = (item.event, item.gender, item.year, item.meet_type, item.school_id)
-        existing = best_by_school.get(key)
-        if existing is None or item.result2 < existing:
-            best_by_school[key] = item.result2
-
-    statewide_marks = {}
-    for (event, gender, year, meet_type, _sid), mark in best_by_school.items():
-        statewide_marks.setdefault((event, gender, year, meet_type), []).append(mark)
-
-    meet_order = {"Sectional": 1, "Regional": 2, "State": 3}
-    results = []
-    for row in rows:
-        event_type = row.event_type or "Relay"
-        lineup = _extract_relay_names(row.athlete_names or "")
-        marks = statewide_marks.get((row.event, row.gender, row.year, row.meet_type), [])
-        total_marks = len(marks)
-        better_or_equal = sum(1 for mark in marks if mark <= row.result2) if total_marks else None
-        percentile = round((1 - (better_or_equal / total_marks)) * 100, 1) if total_marks else None
-        # Cap at 99.9: an athlete is included in their own pool, so they can
-        # never beat themselves (true max is (1 - 1/total) * 100 < 100).
-        if percentile is not None:
-            percentile = min(percentile, 99.9)
-        results.append(
-            {
-                "event": row.event,
-                "result": row.result or _format_result_display(row.result2, event_type),
-                "result_value": row.result2,
-                "place": row.place,
-                "athlete_names": row.athlete_names,
-                "lineup": lineup,
-                "meet_id": row.meet_id,
-                "meet_host": row.host,
-                "meet_type": row.meet_type,
-                "meet_num": row.meet_num,
-                "gender": row.gender,
-                "year": row.year,
-                "event_type": event_type,
-                "state_percentile": max(percentile, 0) if percentile is not None else None,
-                "rank": better_or_equal,
-                "total_marks": total_marks,
-                "_meet_order": meet_order.get(row.meet_type, 0),
-            }
-        )
-
-    results.sort(
-        key=lambda item: (
-            -(item.get("year") or 0),
-            -(item.get("_meet_order") or 0),
-            item.get("event") or "",
-            item.get("result_value") if item.get("result_value") is not None else float("inf"),
-        )
-    )
-
-    for item in results:
-        item.pop("_meet_order", None)
-
-    return results
-
 def _compute_cumulative_points(school_id: int):
     """
     Compute cumulative points, team rankings, and average places for a school across playoff meets from 2023+.
@@ -577,14 +466,6 @@ def _compute_cumulative_points(school_id: int):
         result[gender] = {"yearly": yearly, "grand_total": total}
 
     return result
-
-def _format_points_value(points: Optional[float]) -> Optional[str]:
-    if points is None:
-        return None
-    rounded = round(points, 1)
-    if rounded.is_integer():
-        return str(int(rounded))
-    return f"{rounded:.1f}"
 
 # Cached: one cold dashboard calls this eight times over with repeating
 # arguments -- once per season for the rank history, again per school for the

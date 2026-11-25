@@ -17,7 +17,6 @@ from common.regional_hosts import get_configured_regional_hosts
 from common.standards import get_state_standard_display, meets_state_standard
 
 from .shared import (
-    CURRENT_QUALIFIER_YEAR,
     REGIONAL_SECTIONAL_GROUPS,
     REGIONAL_TARGET_FIELD_SIZE,
     _AUTO_DEPTH,
@@ -30,6 +29,7 @@ from .shared import (
     _is_better,
     _is_valid_postseason_mark,
     _state_target_field_size,
+    current_season,
     logger,
 )
 from .formatting import (
@@ -45,23 +45,6 @@ from .meets import (
 from common.tournament_hosts import get_regional_hosts as get_precomputed_regional_hosts
 
 
-
-def _format_school_qualifier_row(row: Dict[str, Any], stage_name: str, event_name: Optional[str] = None):
-    source_label = row.get("sectional_host")
-    if row.get("sectional_num") is not None and not source_label:
-        source_label = f"{stage_name} feed {row.get('sectional_num')}"
-    return {
-        "event": row.get("event") or event_name,
-        "mark": row.get("result") or "—",
-        "place": row.get("place"),
-        "qualifier_type": row.get("qualifier_type"),
-        "source_label": source_label,
-        "school_id": row.get("school_id"),
-        "school_name": row.get("school"),
-        "athlete_id": row.get("athlete_id"),
-        "name": row.get("name") or row.get("school"),
-        "lineup": [],
-    }
 
 def _regional_events_for_gender(gender: str):
     events = [
@@ -179,10 +162,11 @@ def _regional_group_status(year: int, gender: str):
         "regionals": regionals,
     }
 
-def get_regional_qualifiers_status(gender: str, year: int = CURRENT_QUALIFIER_YEAR):
+def get_regional_qualifiers_status(gender: str, year: Optional[int] = None):
     clean_gender = (gender or "").strip().title()
     if clean_gender not in ("Boys", "Girls"):
         raise ValueError("gender must be Boys or Girls")
+    year = year or current_season()
 
     payload = _regional_group_status(year, clean_gender)
     payload["generated_at"] = str(db.session.query(func.datetime("now")).scalar())
@@ -236,10 +220,11 @@ def _state_group_status(year: int, gender: str):
         "generated_at": func.now(),
     }
 
-def get_state_qualifiers_status(gender: str, year: int = CURRENT_QUALIFIER_YEAR):
+def get_state_qualifiers_status(gender: str, year: Optional[int] = None):
     clean_gender = (gender or "").strip().title()
     if clean_gender not in ("Boys", "Girls"):
         raise ValueError("gender must be Boys or Girls")
+    year = year or current_season()
 
     payload = _state_group_status(year, clean_gender)
     payload["generated_at"] = str(db.session.query(func.datetime("now")).scalar())
@@ -607,10 +592,11 @@ def _compute_event_qualifiers(
     return sorted(formatted, key=lambda row: _qualifier_sort_key(row, lower_is_better), reverse=not lower_is_better)
 
 @lru_cache(maxsize=128)
-def get_regional_qualifiers(gender: str, regional_num: int, year: int = CURRENT_QUALIFIER_YEAR):
+def get_regional_qualifiers(gender: str, regional_num: int, year: Optional[int] = None):
     clean_gender = (gender or "").strip().title()
     if clean_gender not in ("Boys", "Girls"):
         raise ValueError("gender must be Boys or Girls")
+    year = year or current_season()
 
     if regional_num not in REGIONAL_SECTIONAL_GROUPS:
         raise ValueError("regional_num must be an integer between 1 and 8")
@@ -672,10 +658,11 @@ def get_regional_qualifiers(gender: str, regional_num: int, year: int = CURRENT_
 
     return response
 
-def get_state_qualifiers(gender: str, year: int = CURRENT_QUALIFIER_YEAR):
+def get_state_qualifiers(gender: str, year: Optional[int] = None):
     clean_gender = (gender or "").strip().title()
     if clean_gender not in ("Boys", "Girls"):
         raise ValueError("gender must be Boys or Girls")
+    year = year or current_season()
 
     status_payload = _state_group_status(year, clean_gender)
 

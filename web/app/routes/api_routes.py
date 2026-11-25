@@ -1,7 +1,10 @@
 import os
+
 from flask import jsonify, request, current_app
 from . import api_bp
+from common import cache_db
 from ..queries import (
+    current_season,
     get_athletes,
     get_athlete_by_id,
     add_athlete,
@@ -14,8 +17,6 @@ from ..queries import (
     get_sectional_event_trends,
     get_hypothetical_ranking_options,
     get_hypothetical_result_rankings,
-    get_school_dashboard_data,
-    _compute_school_percentiles,
     get_regional_qualifiers_status,
     get_regional_qualifiers,
     get_state_qualifiers_status,
@@ -23,31 +24,52 @@ from ..queries import (
 )
 
 
-def _serve_precomputed(path):
-    """Send a precomputed JSON file to the browser verbatim, or None if absent.
+def _serve_precomputed(name):
+    """Send a stored artifact's JSON to the browser as is, or None if not built.
 
-    The file IS the response -- these routes return the whole artifact, not a
-    slice of it -- so parsing it into Python and re-serializing produced bytes
-    almost identical to the ones already on disk, at 12ms per request for the
-    largest of them against 0.5ms to read and send. The jobs write these files
-    compact (app/jobs/artifacts.py) so the wire payload is no bigger for it.
-
-    Returning None rather than raising lets the caller fall through to live
-    computation, which is what happened before when the file was missing.
-
-    The parse used to double as a corruption check. That job moved to where it
-    is free: the jobs validate the payload as they serialize it and swap the
-    file into place with os.replace, so a reader sees either the whole previous
-    file or the whole new one -- never half of one.
+    The stored JSON IS the response -- these routes return the whole artifact --
+    so it is sent without parsing and re-serializing (12ms on the largest).
+    Returning None lets the caller fall through to live computation.
     """
-    try:
-        with open(path, 'rb') as handle:
-            data = handle.read()
-    except OSError:
-        return None
+    data = cache_db.artifact_json(name)
     if not data:
         return None
     return current_app.response_class(data, mimetype='application/json')
+
+
+# ---------------------------------------------------------------------------
+# Qualifier pages. They show only the current season -- the newest year with
+# results in Track.db -- so a `year` in the request is ignored.
+# ---------------------------------------------------------------------------
+
+def _qualifier_request():
+    """(gender, year) for a qualifier API request, or an error response."""
+    gender = (request.args.get('gender', 'Boys') or '').strip().title()
+    if gender not in ('Boys', 'Girls'):
+        return None, None, (jsonify({'error': 'gender must be Boys or Girls'}), 400)
+    year = current_season()
+    if year is None:
+        return None, None, (jsonify({'error': 'No results have been loaded yet.'}), 404)
+    return gender, year, None
+
+
+_REGIONAL_MEMO = {}
+
+
+def _stored_regional_qualifiers(gender, year):
+    """The stored status and 8 regional lists (precompute_regional_qualifiers),
+    decoded once per cache build; None when not built."""
+    name = 'regional_qualifiers_%d_%s' % (year, gender.lower())
+    try:
+        version = os.path.getmtime(cache_db.CACHE_DB_PATH)
+    except OSError:
+        return None
+    key = (name, version)
+    if key not in _REGIONAL_MEMO:
+        _REGIONAL_MEMO.clear()  # one build's worth at a time
+        payload = cache_db.load_artifact(name)
+        _REGIONAL_MEMO[key] = payload if isinstance(payload, dict) else None
+    return _REGIONAL_MEMO[key]
 
 
 @api_bp.route('/athletes')
@@ -246,29 +268,15 @@ def api_hypothetical_rank():
     return jsonify(data)
 
 
-@api_bp.route('/schools/<int:school_id>/dashboard')
-def api_get_school_dashboard(school_id):
-    data = get_school_dashboard_data(school_id)
-    if not data:
-        return jsonify({'error': 'not found'}), 404
-    return jsonify(data)
-
-
-@api_bp.route('/schools/<int:school_id>/percentiles')
-def api_get_school_percentiles(school_id):
-    """Return school percentiles, optionally filtered to a single year."""
-    year = request.args.get('year', type=int)
-    results = _compute_school_percentiles(school_id, year=year)
-    return jsonify(results)
-
-
 @api_bp.route('/regional-qualifiers/status')
 def api_regional_qualifiers_status():
-    """Return regional readiness status for a gender and year."""
-    gender = request.args.get('gender', 'Boys').strip()
-    year = request.args.get('year', default=2026, type=int)
-    if year is None or year < 2000:
-        return jsonify({'error': 'year must be a valid season year'}), 400
+    """Return regional readiness status for a gender, current season."""
+    gender, year, error = _qualifier_request()
+    if error:
+        return error
+    stored = _stored_regional_qualifiers(gender, year)
+    if stored and isinstance(stored.get('status'), dict):
+        return jsonify(stored['status'])
 
     try:
         payload = get_regional_qualifiers_status(gender=gender, year=year)
@@ -281,15 +289,17 @@ def api_regional_qualifiers_status():
 
 @api_bp.route('/regional-qualifiers')
 def api_regional_qualifiers():
-    """Return regional qualifier list for a specific gender, year, and regional."""
-    gender = request.args.get('gender', 'Boys').strip()
+    """Return regional qualifier list for a gender and regional, current season."""
     regional_num = request.args.get('regional_num', type=int)
-    year = request.args.get('year', default=2026, type=int)
-
     if regional_num is None:
         return jsonify({'error': 'regional_num is required'}), 400
-    if year is None or year < 2000:
-        return jsonify({'error': 'year must be a valid season year'}), 400
+    gender, year, error = _qualifier_request()
+    if error:
+        return error
+    stored = _stored_regional_qualifiers(gender, year)
+    regional = ((stored or {}).get('regionals') or {}).get(str(regional_num))
+    if isinstance(regional, dict):
+        return jsonify(regional)
 
     try:
         payload = get_regional_qualifiers(gender=gender, regional_num=regional_num, year=year)
@@ -302,11 +312,10 @@ def api_regional_qualifiers():
 
 @api_bp.route('/state-qualifiers/status')
 def api_state_qualifiers_status():
-    """Return state readiness status for a gender and year."""
-    gender = request.args.get('gender', 'Boys').strip()
-    year = request.args.get('year', default=2026, type=int)
-    if year is None or year < 2000:
-        return jsonify({'error': 'year must be a valid season year'}), 400
+    """Return state readiness status for a gender, current season."""
+    gender, year, error = _qualifier_request()
+    if error:
+        return error
 
     try:
         payload = get_state_qualifiers_status(gender=gender, year=year)
@@ -319,25 +328,17 @@ def api_state_qualifiers_status():
 
 @api_bp.route('/state-qualifiers')
 def api_state_qualifiers():
-    """Return state qualifier list for a specific gender and year, using precomputed JSON if available."""
-    gender = request.args.get('gender', 'Boys').strip().title()
-    year = request.args.get('year', default=2026, type=int)
-    if year is None or year < 2000:
-        return jsonify({'error': 'year must be a valid season year'}), 400
-    if gender not in ("Boys", "Girls"):
-        return jsonify({'error': 'gender must be Boys or Girls'}), 400
+    """Return state qualifier list for a gender, current season, from the stored data if built."""
+    gender, year, error = _qualifier_request()
+    if error:
+        return error
 
-    # Prefer precomputed JSON for speed
-    precomputed_path = os.path.join(
-        current_app.root_path,
-        'static', 'data', 'state_predictions',
-        f'state_qualifiers_{year}_{gender.lower()}.json',
-    )
-    served = _serve_precomputed(precomputed_path)
+    # Prefer the precomputed list for speed
+    served = _serve_precomputed(f'state_qualifiers_{year}_{gender.lower()}')
     if served is not None:
         return served
 
-    # Fallback to live computation if the file is missing
+    # Fall back to live computation if it has not been built
     try:
         payload = get_state_qualifiers(gender=gender, year=year)
         return jsonify(payload)
@@ -354,28 +355,20 @@ def api_regional_top_list():
     For each event, qualifiers from all 8 regionals are merged and sorted best-to-worst
     using result2 (lower is better for track events, higher for field events).
     """
-    gender = (request.args.get('gender', 'Boys') or '').strip().title()
-    year = request.args.get('year', default=2026, type=int)
     source = (request.args.get('source', 'rankings') or '').strip().lower()
     if source not in ('rankings', 'results'):
         return jsonify({'error': "source must be 'rankings' or 'results'"}), 400
-    if year is None or year < 2000:
-        return jsonify({'error': 'year must be a valid season year'}), 400
-    if gender not in ('Boys', 'Girls'):
-        return jsonify({'error': 'gender must be Boys or Girls'}), 400
+    gender, year, error = _qualifier_request()
+    if error:
+        return error
 
-    # Prefer precomputed JSON (much faster on production where SQLite I/O is slow).
-    # rankings -> combined_rankings_*.json (sectional-based projection snapshot)
-    # results  -> combined_results_*.json  (regional-based actuals)
+    # Prefer the precomputed lists (much faster on production where SQLite I/O is slow).
+    # rankings -> combined_rankings_* (sectional-based projection snapshot)
+    # results  -> combined_results_*  (regional-based actuals)
     # Generated by web/app/jobs/precompute_combined_rankings.py and
     # web/app/jobs/precompute_combined_results.py respectively.
     file_prefix = 'combined_rankings' if source == 'rankings' else 'combined_results'
-    precomputed_path = os.path.join(
-        current_app.root_path,
-        'static', 'data', 'regional_predictions',
-        f'{file_prefix}_{year}_{gender.lower()}.json',
-    )
-    served = _serve_precomputed(precomputed_path)
+    served = _serve_precomputed(f'{file_prefix}_{year}_{gender.lower()}')
     if served is not None:
         return served
 
@@ -447,17 +440,21 @@ def api_regional_top_list():
     })
 
 # ---------------------------------------------------------------------------
-# School dashboard (v4): the ranked lists behind a rank figure.
+# School page: the ranked lists behind a rank (the rank popups).
 #
 # Fetched only when a reader opens one, because they are large and shared -- the
 # statewide table alone is 394 rows, identical for every school, so it is stored
-# once per gender/season rather than embedded in each of the 414 payloads.
+# once per gender/season rather than embedded in each school's page.
 # ---------------------------------------------------------------------------
-@api_bp.route('/v4/rankings/<gender>/<season>')
-def api_v4_rankings(gender, season):
-    from ..services import dashboard_v4
+@api_bp.route('/rankings/<gender>/<season>')
+def api_rankings(gender, season):
     event = (request.args.get('event') or '').strip()
-    payload = dashboard_v4.load_rankings(gender, season, event)
+    if season == 'all-time':
+        # Every athlete's best across all seasons -- the list behind an All-Time rank.
+        from ..services.school_page import all_time_rankings
+        payload = all_time_rankings(gender, event)
+    else:
+        payload = cache_db.load_rankings(gender, season, event)
     if payload is None:
         return jsonify({'error': 'not found'}), 404
     return jsonify(payload)

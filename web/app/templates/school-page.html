@@ -1,0 +1,599 @@
+{% extends 'base.html' %}
+{% set data = payload or {} %}
+{% set school = data.get('school') or {} %}
+{% set summary = data.get('summary') or {} %}
+{% set season = data.get('season') or 'all-time' %}
+{% set gender = data.get('gender') or 'Boys' %}
+{% set all_time = data.get('is_all_time', season == 'all-time') %}
+{% set events = data.get('events') or [] %}
+{% set history = data.get('history') or [] %}
+{% set outlook = data.get('outlook') or {} %}
+{% set rank = summary.get('rank') or {} %}
+{% set top = summary.get('top_performers') or [] %}
+{% set results = (data.get('results') or {}).get('rows') or [] %}
+{% set participating = history | selectattr('result_units') | sort(attribute='year') | list %}
+{% set years = (data.get('years') or []) | sort(reverse=true) %}
+{% set sid = school.get('id', school_id) %}
+{% set school_name = school.get('name') or 'School' %}
+{% set who = school_name ~ ' ' ~ (gender | lower) %}
+{# Meet-program order (100m, 200m ... relays), used to sort lists by event. #}
+{% set event_order = {} %}{% for e in events %}{% set _ = event_order.update({e.get('name'): loop.index0}) %}{% endfor %}
+
+{% block title %}{{ school_name }} {{ gender }} - Playoff Results - Track Insights{% endblock %}
+{% block meta_description %}IHSAA track and field playoff results for {{ school.get('name') or 'this school' }}.{% endblock %}
+
+{# ====================================================================== helpers #}
+{% macro plural(n, word, many=none) %}{{ n }} {{ word if n == 1 else (many or word ~ 's') }}{% endmacro %}
+{# Stored names are often ALL CAPS; show them in title case. #}
+{% macro display_name(name) -%}
+  {%- if name and name.isupper() -%}
+    {%- set t = namespace(value=name | title) -%}
+    {#- title() would turn generational suffixes into "Iii" -#}
+    {%- for wrong, right in [(' Iii', ' III'), (' Ii', ' II'), (' Iv', ' IV')] -%}
+      {%- if t.value.endswith(wrong) %}{% set t.value = t.value[:-(wrong | length)] ~ right %}{% endif -%}
+    {%- endfor -%}
+    {{ t.value }}
+  {%- else %}{{ name }}{% endif -%}
+{%- endmacro %}
+{% macro short_event(name) %}{{ (name or 'Event') | replace(' Meters', 'm') | replace(' Hurdles', 'H') | replace(' Relay', '') | replace(' x ', '×') }}{% endmacro %}
+{# Relays have no reliable rosters, so a relay is named by its event: "4×100 Relay". #}
+{% macro relay_name(event) %}{{ short_event(event) }} Relay{% endmacro %}
+{% macro event_label(row) %}{{ relay_name(row.get('event')) if row.get('is_relay') else short_event(row.get('event') or 'Event') }}{% endmacro %}
+{% macro person(row, link=true) -%}
+  {%- if row.get('is_relay') %}{{ relay_name(row.get('event')) }}
+  {%- elif row.get('athlete_id') and link %}<a class="font-semibold text-primary no-underline transition hover:text-primary/70" href="{{ url_for('main.athlete_dashboard', athlete_id=row.get('athlete_id')) }}">{{ display_name(row.get('name')) or 'Athlete' }}</a>
+  {%- else %}{{ display_name(row.get('name')) or '—' }}{% endif -%}
+{%- endmacro %}
+{% macro top_pct(row) %}{% if row.get('percentile') is not none %}Top {{ [1, (100 * (1 - row.get('percentile'))) | round | int] | max }}% statewide{% else %}Not ranked{% endif %}{% endmacro %}
+{% macro people_phrase(a, r) -%}
+  {%- if a and r %}{{ plural(a, 'athlete') }} and {{ plural(r, 'relay') }}{% elif r %}{{ plural(r, 'relay') }}{% else %}{{ plural(a, 'athlete') }}{% endif -%}
+{%- endmacro %}
+{# Card value for "2 athletes + 1 relay": numbers large, nouns small. #}
+{% macro count_value(a, r) -%}
+  {%- set noun = 'ml-1 text-sm font-semibold text-base-content/60' -%}
+  {%- if r and not a %}{{ r }}<span class="{{ noun }}">{{ 'relay' if r == 1 else 'relays' }}</span>
+  {%- elif a %}{{ a }}<span class="{{ noun }}">{{ 'athlete' if a == 1 else 'athletes' }}</span>{% if r %}<span class="{{ noun }}">+ {{ plural(r, 'relay') }}</span>{% endif %}
+  {%- else %}0{% endif -%}
+{%- endmacro %}
+{% set chevron = '' %}{# clickable cards show it by hover state only #}
+{% set card_cls = 'rounded-xl border border-base-300 bg-white p-4 text-left' %}
+{% set click_cls = 'group relative cursor-pointer transition hover:border-primary/50 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary' %}
+{% macro card_body(label, value, detail, extra='') %}
+  <h3 class="text-xs font-bold uppercase tracking-wider text-primary">{{ label }}</h3>
+  <div class="mt-1 text-2xl font-bold leading-tight text-base-content">{{ value }}</div>
+  {% if detail %}<div class="mt-1 text-xs text-base-content/70">{{ detail }}</div>{% endif %}
+  {{ extra }}
+{% endmacro %}
+{# A stat card. With list_id it opens that list; with rank (a dict) it opens the
+   statewide rankings. Clickable cards have no label or arrow; hover and the cursor show it.
+   `extra` is optional markup under the number (the All-Time season bars). #}
+{% macro stat_card(label, value, detail='', list_id=none, rank=none, extra='') %}
+{% if list_id %}
+<button type="button" data-open-list="{{ list_id }}" aria-haspopup="dialog" class="{{ card_cls }} {{ click_cls }} flex flex-col">{{ chevron }}{{ card_body(label, value, detail, extra) }}</button>
+{% elif rank %}
+<button type="button" class="ranklink {{ card_cls }} {{ click_cls }} flex flex-col" data-event="" data-athlete="" data-rank="{{ rank.get('rank') }}" data-name="{{ school_name }}" data-season="{{ rank.get('season') }}" aria-haspopup="dialog">{{ chevron }}{{ card_body(label, value, detail, extra) }}</button>
+{% else %}
+<div class="{{ card_cls }} flex flex-col">{{ card_body(label, value, detail, extra) }}</div>
+{% endif %}
+{% endmacro %}
+{# Season-by-season mini bars for an All-Time card. points: dicts with year,
+   value (>= 0, higher is better) and label (the tooltip); best season solid. #}
+{# Scales with history: at most the latest 10 seasons, bars thin out to fit,
+   and only the first and last years are labelled (each bar has a tooltip). #}
+{% macro season_bars(points) %}
+{% set points = points[-10:] %}
+{% set top_value = (points | map(attribute='value') | max) if points else 0 %}
+{% if top_value %}
+<div class="mt-auto pt-3" aria-hidden="true">
+  <div class="flex h-10 items-end gap-[3px]">
+    {% for p in points %}
+    {% if p.pending %}
+    <div class="h-full flex-1 rounded-t-sm border border-dashed border-primary/30" title="{{ p.year }}: {{ p.label }}"></div>
+    {% else %}
+    <div class="flex-1 rounded-t-sm {{ 'bg-primary' if p.value == top_value else 'bg-primary/25' }}" style="height: {{ [4, (100 * p.value / top_value) | round | int] | max }}%" title="{{ p.year }}: {{ p.label }}"></div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  <div class="mt-1 flex justify-between text-[10px] text-base-content/50"><span>{{ points[0].year }}</span>{% if points | length > 1 %}<span>{{ points[-1].year }}</span>{% endif %}</div>
+</div>
+{% endif %}
+{% endmacro %}
+{# Sortable header cell; JS wires the click (see school-page.js). #}
+{% macro sort_th(label, type='text', initial=none) %}<th scope="col" data-sort-type="{{ type }}"{% if initial %} aria-sort="{{ initial }}"{% endif %}><button type="button" class="inline-flex items-center gap-1 font-semibold text-base-content transition hover:text-primary">{{ label }}<span class="sort-icon inline-block w-3 text-center text-[10px] text-primary" aria-hidden="true">{{ '▲' if initial == 'ascending' }}</span></button></th>{% endmacro %}
+{% macro dialog_shell(id, title) %}
+<dialog id="{{ id }}" class="modal" aria-labelledby="{{ id }}-title">
+  <div class="modal-box max-w-2xl">
+    <div class="flex items-start justify-between gap-4">
+      <h3 id="{{ id }}-title" class="text-lg font-bold text-primary">{{ title }}</h3>
+      <form method="dialog"><button class="btn btn-sm btn-ghost" aria-label="Close">✕</button></form>
+    </div>
+    <div class="mt-3 max-h-[60vh] overflow-auto">{{ caller() }}</div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endmacro %}
+{# Who placed or qualified, best place first (the service sorts by place). #}
+{% macro list_dialog(id, title, rows, show_year=false) %}
+{% call dialog_shell(id, title) %}
+<table class="table table-sm" data-sortable>
+  <thead><tr class="bg-base-200">{{ sort_th('Place', 'number', 'ascending') }}{{ sort_th('Athlete') }}{{ sort_th('Event', 'number') }}{{ sort_th('Mark', 'number') }}{% if show_year %}{{ sort_th('Year', 'number') }}{% endif %}</tr></thead>
+  <tbody>
+  {% for row in rows %}
+  <tr>
+    <td class="whitespace-nowrap font-semibold" data-sort="{{ row.get('place') if row.get('place') else '' }}">{% if row.get('place') %}{{ row.get('place') | ordinal }}{% if row.get('prelim') %} <span class="font-normal text-base-content/60">(prelim)</span>{% endif %}{% else %}—{% endif %}</td>
+    <td data-sort="{{ relay_name(row.get('event')) if row.get('is_relay') else display_name(row.get('name')) }}">{{ person(row) }}</td>
+    <td class="whitespace-nowrap" data-sort="{{ event_order.get(row.get('event'), 99) }}">{{ short_event(row.get('event')) }}</td>
+    <td class="whitespace-nowrap tabular-nums" data-sort="{{ row.get('mark_order') if row.get('mark_order') is not none else '' }}">{{ row.get('mark') or '—' }}</td>
+    {% if show_year %}<td data-sort="{{ row.get('year') or '' }}">{{ row.get('year') or '—' }}</td>{% endif %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endcall %}
+{% endmacro %}
+{# A performance card: the whole card opens that event's statewide list,
+   centred on this mark; the athlete's name still links to their page. #}
+{% macro performance(row) %}
+{% set rankable = row.get('rank') is not none %}
+<article {% if rankable %}role="button" tabindex="0" aria-haspopup="dialog" aria-label="{{ display_name(row.get('name')) if not row.get('is_relay') else relay_name(row.get('event')) }}, {{ short_event(row.get('event')) }}: {{ top_pct(row) }} — view the statewide list" class="ranklink {{ card_cls }} {{ click_cls }} flex flex-col" data-event="{{ row.get('event') }}" data-athlete="{{ row.get('athlete_id') or '' }}" data-rank="{{ row.get('all_time_rank') if all_time and row.get('all_time_rank') is not none else row.get('rank') }}" data-name="{{ row.get('name') or '' }}" data-season="{{ 'all-time' if all_time and row.get('all_time_rank') is not none else (row.get('year') or season) }}"{% else %}class="{{ card_cls }} flex flex-col"{% endif %}>
+  {% if rankable %}{{ chevron }}{% endif %}
+  {# All-Time cards lead with the all-time rank (best marks across every season);
+     season cards with that season's rank. #}
+  {% set at = all_time and row.get('all_time_rank') is not none %}
+  <p class="text-xs font-bold uppercase tracking-wider text-primary">{% if at %}Top {{ [1, (100 * (1 - row.get('all_time_percentile'))) | round | int] | max }}% all-time{% else %}{{ top_pct(row) }}{% endif %}</p>
+  <p class="mt-2 font-impact text-lg italic leading-tight text-primary">{{ person(row) }}</p>
+  <p class="mt-1 text-base font-bold text-base-content">{{ short_event(row.get('event')) }} · {{ row.get('mark') or '—' }}{% if row.get('mark_prelim') %} <span class="text-xs font-semibold text-base-content/55">prelim</span>{% endif %}</p>
+  {% if at %}<p class="mt-1 text-sm font-semibold text-base-content/80">{{ row.get('all_time_rank') | ordinal }} of {{ '{:,}'.format(row.get('all_time_total')) }} all-time</p>{% endif %}
+  <p class="mt-auto pt-2 text-xs text-base-content/70">{% if all_time and row.get('year') %}{{ row.get('year') }} · {% endif %}{{ row.get('final_stage') or 'Playoffs' }}{% if row.get('place') %} · {{ row.get('place') | ordinal }}{% if row.get('prelim') %} in prelims{% endif %}{% endif %}{% if not at and rankable and row.get('rank_total') %} · {{ row.get('rank') | ordinal }} of {{ row.get('rank_total') }}{% endif %}</p>
+</article>
+{% endmacro %}
+{% macro rank_button(row, event_name) %}
+  {%- if row.get('rank') is not none and not all_time -%}
+  <button type="button" class="ranklink font-semibold text-primary transition hover:text-primary/70" data-event="{{ event_name }}" data-athlete="{{ row.get('athlete_id') or '' }}" data-rank="{{ row.get('rank') }}" data-name="{{ row.get('name') or '' }}" aria-label="{{ row.get('rank') | ordinal }} statewide — view {{ event_name }} rankings">{{ row.get('rank') | ordinal }}</button>
+  {%- elif row.get('rank') is not none %}{{ row.get('rank') | ordinal }}{% else %}—{% endif -%}
+{% endmacro %}
+{% set section_cls = 'space-y-4 rounded-2xl border border-base-300 bg-white p-5 shadow-sm sm:p-6' %}
+{% set h2_cls = 'font-impact text-2xl italic text-primary' %}
+{% set eyebrow_cls = 'text-xs font-semibold uppercase tracking-wide text-base-content/60' %}
+{# The summary sentence: a short, large lede with the key numbers picked out. #}
+{% set lede_cls = 'font-[Georgia,Cambria,"Times_New_Roman",serif] text-lg leading-relaxed text-base-content/90 sm:text-xl' %}
+{% set hl = 'font-semibold text-primary' %}
+
+{% block content %}
+<div id="school-page" class="min-h-screen bg-base-200 px-4 pb-24 pt-24 sm:px-6 sm:pt-28" data-school-id="{{ sid|default('') }}" data-gender="{{ gender }}" data-season="{{ season }}" data-latest-season="{{ years | first if years else '' }}">
+  <div class="mx-auto max-w-6xl space-y-6">
+    {% if not payload %}
+    <div class="alert alert-warning" role="status">Dashboard data is not available yet. Please try again later.</div>
+    {% else %}
+
+    {# ================================================================ header #}
+    {# One card for "whose page" and "which view". Seasons are underlined tabs
+       (newest first, All-Time last; seasons without results for this team are
+       dimmed); Boys/Girls is a quiet switch on the right. It scrolls away
+       with the page, leaving the full screen for content. #}
+    {% set active_years = participating | map(attribute='year') | list %}
+    {% set tab = 'whitespace-nowrap border-b-2 px-3 pb-2.5 pt-3 text-sm font-semibold no-underline transition focus-visible:outline-2 focus-visible:outline-primary' %}
+    {% set tab_on = 'border-primary text-primary' %}
+    {% set tab_off = 'border-transparent text-base-content/60 hover:border-base-300 hover:text-base-content' %}
+    {% set tab_empty = 'border-transparent text-base-content/30 hover:text-base-content/60' %}
+    <header class="rounded-2xl border border-base-300 bg-white shadow-sm">
+      <div class="flex items-center gap-4 px-5 pt-5 sm:px-7 sm:pt-6">
+        <div class="min-w-0 flex-1">
+          <h1 class="truncate font-impact text-3xl font-bold italic leading-tight text-primary sm:text-4xl">{{ school_name }}</h1>
+          <div class="mt-2 flex flex-wrap items-center gap-2 text-sm text-base-content/70">
+            {% if school.get('city') %}<span>{{ school.get('city') }}</span>{% endif %}
+            {% if school.get('school_type') %}<span class="badge badge-outline badge-sm">{{ school.get('school_type') }}</span>{% endif %}
+            {% if school.get('enrollment') is not none %}<span class="badge badge-outline badge-sm">Enrollment {{ '{:,}'.format(school.get('enrollment')) if school.get('enrollment') is number else school.get('enrollment') }}</span>{% endif %}
+          </div>
+          {# Said once here, so no section has to repeat it. #}
+          <p class="mt-2 text-xs text-base-content/55">IHSAA playoff results — Sectionals, Regionals and State — since {{ years | last if years else 2023 }}.</p>
+        </div>
+        {% if school.get('logo_url') %}<img src="{{ school.get('logo_url') }}" alt="{{ school_name }} logo" class="h-16 w-16 shrink-0 object-contain sm:h-20 sm:w-20">{% endif %}
+      </div>
+      <nav class="mt-3 flex flex-wrap items-center justify-between gap-x-6 border-t border-base-200 px-3 sm:px-5" aria-label="Season and team">
+        <div class="-mb-px flex min-w-0 overflow-x-auto" role="group" aria-label="Season">
+          {% for year in years %}{% set here = not all_time and year|string == season|string %}{% set empty = year not in active_years %}
+          <a data-nav href="{{ url_for('main.school_dashboard', school_id=sid, gender=gender, season=year) }}" {% if here %}aria-current="page"{% endif %} {% if empty and not here %}title="No {{ gender | lower }} playoff results in {{ year }}"{% endif %} class="{{ tab }} {{ tab_on if here else (tab_empty if empty else tab_off) }}">{{ year }}</a>
+          {% endfor %}
+          <span class="mx-2 my-3 w-px shrink-0 bg-base-300" aria-hidden="true"></span>
+          <a data-nav href="{{ url_for('main.school_dashboard', school_id=sid, gender=gender, season='all-time') }}" {% if all_time %}aria-current="page"{% endif %} class="{{ tab }} {{ tab_on if all_time else tab_off }}">All-Time</a>
+        </div>
+        <div class="my-2 inline-flex items-center rounded-lg border border-base-300 bg-base-200/60 p-0.5" role="group" aria-label="Team">
+          {% for choice in ['Boys', 'Girls'] %}
+          <a data-nav href="{{ url_for('main.school_dashboard', school_id=sid, gender=choice, season=season) }}" {% if choice == gender %}aria-current="page"{% endif %} class="rounded-md px-3.5 py-1 text-sm no-underline transition focus-visible:outline-2 focus-visible:outline-primary {{ 'bg-white font-semibold text-primary shadow-sm' if choice == gender else 'font-medium text-base-content/60 hover:text-base-content' }}">{{ choice }}</a>
+          {% endfor %}
+        </div>
+      </nav>
+    </header>
+
+
+    {% if summary.get('rank_cache_missing') or (not all_time and not rank and summary.get('ranked_schools') is none) %}
+    <div class="alert alert-warning" role="status">Statewide rankings for this season aren't available yet. Results below are complete; rank comparisons are not.</div>
+    {% elif all_time and (data.get('data') or {}).get('program_missing_years') %}
+    <div class="alert alert-warning" role="status">Statewide rankings aren't available for {{ (data.get('data') or {}).get('program_missing_years') | join(', ') }}, so the season-by-season ranks are incomplete.</div>
+    {% endif %}
+
+    {# ======================================================= postseason summary #}
+    {% set s_pl = summary.get('sectional_placer_athletes', 0) or 0 %}{% set s_pl_r = summary.get('sectional_placer_relays', 0) or 0 %}{% set s_ch = summary.get('sectional_champions', 0) or 0 %}
+    {% set r_q = summary.get('regional_qualifier_athletes', 0) or 0 %}{% set r_q_r = summary.get('regional_qualifier_relays', 0) or 0 %}{% set r_pl = summary.get('regional_placers', 0) or 0 %}
+    {% set st_q = summary.get('state_qualifier_athletes', 0) or 0 %}{% set st_q_r = summary.get('state_qualifier_relays', 0) or 0 %}{% set st_pl = summary.get('state_placers', 0) or 0 %}{% set st_ch = summary.get('state_champions', 0) or 0 %}
+    {% set lists = summary.get('qualifier_details') or {} %}
+    {# Rounds not run anywhere in the state yet this season (e.g. right after Sectionals). #}
+    {% set pending = summary.get('pending') or [] %}
+    {% set pending_value %}<span class="text-base-content/45">Pending</span>{% endset %}
+    {% set best = namespace(rank=none, year=none, of=none) %}
+    {% for row in history %}{% set v = (row.get('rank') or {}).get('rank') %}{% if v is not none and v > 0 and (best.rank is none or v < best.rank) %}{% set best.rank = v %}{% set best.year = row.get('year') %}{% set best.of = row.get('ranked_schools') %}{% endif %}{% endfor %}
+
+    <section aria-labelledby="postseason-heading" class="{{ section_cls }}">
+      <h2 id="postseason-heading" class="{{ h2_cls }}">{% if all_time %}All-Time Playoffs{% else %}{{ season }} Playoffs{% endif %}</h2>
+
+      {% if all_time %}
+      {# No paragraph here: the cards carry the story, each with a bar per
+         season so the totals show their trend at a glance. #}
+      {% set by_year = history | sort(attribute='year') | list %}
+      {% set sect_bars, reg_bars, state_bars = [], [], [] %}
+      {% for h in by_year %}
+        {% for bars, a, r, word, stage in [(sect_bars, h.get('sectional_placer_athletes', 0), h.get('sectional_placer_relays', 0), 'placed', 'Sectional'), (reg_bars, h.get('regional_qualifier_athletes', 0), h.get('regional_qualifier_relays', 0), 'qualified', 'Regional'), (state_bars, h.get('state_qualifier_athletes', 0), h.get('state_qualifier_relays', 0), 'qualified', 'State')] %}
+          {% set waiting = stage in (h.get('pending') or []) %}
+          {% set _ = bars.append(dict(year=h.get('year'), value=(a or 0) + (r or 0), pending=waiting, label=((stage ~ 's' if stage != 'State' else stage) ~ ' results not in yet') if waiting else (people_phrase(a or 0, r or 0) ~ ' ' ~ word))) %}
+        {% endfor %}
+      {% endfor %}
+      {# Statewide standing has its own chart below, so three cards here. #}
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {{ stat_card('Sectional placers', count_value(s_pl, s_pl_r), plural(s_ch, 'event win') if s_ch else '', list_id='list-Sectional' if lists.get('Sectional'), extra=season_bars(sect_bars)) }}
+        {{ stat_card('Regional qualifiers', count_value(r_q, r_q_r), plural(r_pl, 'top-8 finish', 'top-8 finishes') if r_pl else '', list_id='list-Regional' if lists.get('Regional'), extra=season_bars(reg_bars)) }}
+        {{ stat_card('State qualifiers', count_value(st_q, st_q_r), (plural(st_pl, 'top-9 finish', 'top-9 finishes') ~ (' · ' ~ plural(st_ch, 'title') if st_ch else '')) if st_pl else '', list_id='list-State' if lists.get('State'), extra=season_bars(state_bars)) }}
+      </div>
+
+      {% else %}
+      {% set sectional = summary.get('sectional_team') or {} %}
+      {% set regional_team = summary.get('regional_team') or {} %}
+      {% set state_team = summary.get('state_team') or {} %}
+      {% set s_any = s_pl or s_pl_r %}{% set r_any = r_q or r_q_r %}{% set st_any = st_q or st_q_r %}
+      <p class="{{ lede_cls }}">
+        {% if 'Sectional' in pending %}{{ season }} playoff results are pending.
+        {% elif sectional.get('rank') or s_any or r_any %}
+        {{ who }}
+        {% if sectional.get('rank') == 1 %}<span class="{{ hl }}">won Sectionals</span>{% elif sectional.get('rank') %}placed <span class="{{ hl }}">{{ sectional.get('rank') | ordinal }}{% if sectional.get('total_teams') %} of {{ sectional.get('total_teams') }}{% endif %}</span> at Sectionals{% else %}competed at Sectionals{% endif %}
+        {%- if s_any %}, where <span class="{{ hl }}">{{ people_phrase(s_pl, s_pl_r) }}</span> placed{% endif %}.
+        {% if 'Regional' in pending %}Regional results aren't in yet.
+        {% elif r_any %}<span class="{{ hl }}">{{ people_phrase(r_q, r_q_r) }}</span> advanced to Regionals{% if 'State' in pending %}; State results aren't in yet.{% elif st_any %}, and <span class="{{ hl }}">{{ people_phrase(st_q, st_q_r) }}</span> reached State{% if st_pl %} with <span class="{{ hl }}">{{ plural(st_pl, 'top-9 finish', 'top-9 finishes') }}</span>{% endif %}.{% else %}; none reached State.{% endif %}
+        {% else %}No one advanced to Regionals.{% endif %}
+        {% if state_team.get('rank') == 1 %} The team won the <span class="{{ hl }}">State title</span>.{% elif state_team.get('rank') == 2 %} The team was <span class="{{ hl }}">State runner-up</span>.{% elif regional_team.get('rank') == 1 %} The team <span class="{{ hl }}">won its Regional</span>.{% endif %}
+        {% else %}{{ who }} have no recorded playoff results for {{ season }}.{% endif %}
+      </p>
+      <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {% set rank_value %}{% if rank.get('rank') is not none %}{{ rank.get('rank') | ordinal }}{% if summary.get('ranked_schools') is not none %}<span class="ml-1 text-sm font-semibold text-base-content/60">of {{ summary.get('ranked_schools') }}</span>{% endif %}{% else %}—{% endif %}{% endset %}
+        {% if 'Sectional' in pending %}{{ stat_card('Statewide rank', pending_value, 'Results not in yet') }}
+        {% else %}{{ stat_card('Statewide rank', rank_value, 'Indiana programs' if rank.get('rank') is not none else '', rank=dict(rank=rank.get('rank'), season=season) if rank.get('rank') is not none) }}{% endif %}
+        {% set sect_value %}{{ sectional.get('rank') | ordinal if sectional.get('rank') is not none else '—' }}{% if sectional.get('total_teams') is not none %}<span class="ml-1 text-sm font-semibold text-base-content/60">of {{ sectional.get('total_teams') }}</span>{% endif %}{% endset %}
+        {% set sect_detail = [] %}
+        {% if sectional.get('points') is not none %}{% set _ = sect_detail.append('{:g}'.format(sectional.get('points')) ~ ' pts') %}{% endif %}
+        {% if 'Sectional' in pending %}{{ stat_card('Sectional finish', pending_value, 'Results not in yet') }}
+        {% else %}{{ stat_card('Sectional finish', sect_value, sect_detail | join(' · '), list_id='list-Sectional' if lists.get('Sectional')) }}{% endif %}
+        {% if 'Regional' in pending %}{{ stat_card('Regional qualifiers', pending_value, 'Results not in yet') }}
+        {% else %}{{ stat_card('Regional qualifiers', count_value(r_q, r_q_r), plural(r_pl, 'top-8 finish', 'top-8 finishes') if r_pl else ('' if r_any else 'None this season'), list_id='list-Regional' if lists.get('Regional')) }}{% endif %}
+        {% if 'State' in pending %}{{ stat_card('State qualifiers', pending_value, 'Results not in yet') }}
+        {% else %}{{ stat_card('State qualifiers', count_value(st_q, st_q_r), plural(st_pl, 'top-9 finish', 'top-9 finishes') if st_pl else ('' if st_any else 'None this season'), list_id='list-State' if lists.get('State')) }}{% endif %}
+      </div>
+      {% endif %}
+
+      {% for stage, title in [('Sectional', 'Sectional placers'), ('Regional', 'Regional qualifiers'), ('State', 'State qualifiers')] %}
+      {% if lists.get(stage) %}{{ list_dialog('list-' ~ stage, (('All-Time ' if all_time else season ~ ' ') ~ (title | title)), lists.get(stage), all_time) }}{% endif %}
+      {% endfor %}
+    </section>
+
+    {# ================================================ all-time: statewide rank #}
+    {% if all_time %}
+    {% set ranked = [] %}
+    {% for h in history | sort(attribute='year') %}
+      {% set hr = (h.get('rank') or {}).get('rank') %}{% set of = h.get('ranked_schools') %}
+      {% set sz = h.get('size_rank') or {} %}
+      {% if hr and of %}{% set _ = ranked.append(dict(year=h.get('year'), rank=hr, of=of, p=1 - (hr - 1) / of,
+            top=[1, (100 * (hr - 1) / of) | round | int] | max,
+            g_rank=sz.get('rank'), g_of=sz.get('of'), group=sz.get('group'), split=sz.get('split'),
+            url=url_for('main.school_dashboard', school_id=sid, gender=gender, season=h.get('year')))) %}{% endif %}
+    {% endfor %}
+    {% if ranked %}
+    <section aria-labelledby="standing-heading" class="{{ section_cls }}">
+      {# Rank among all programs, or among same-size schools (split at each
+         season's median enrollment, as in the rankings popup). The switch offers
+         the school's own group, named from the latest season. #}
+      {% set own_group = (ranked | map(attribute='group') | select | list | last) if ranked else none %}
+      {% set latest_split = (ranked | map(attribute='split') | select | list | last) if ranked else none %}
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="standing-heading" class="{{ h2_cls }}">Statewide Rank by Season</h2>
+          <p class="mt-1 text-sm text-base-content/70">Where the program ranked among Indiana programs. Closer to 1st is better.</p>
+        </div>
+        {% if own_group %}
+        <div class="flex flex-col items-end gap-1">
+          <div class="inline-flex items-center rounded-lg border border-base-300 bg-base-200/60 p-0.5" role="group" aria-label="Compare with">
+            <button type="button" data-standing-scope="all" aria-pressed="true" class="rounded-md bg-white px-3 py-1 text-sm font-semibold text-primary shadow-sm transition">All schools</button>
+            <button type="button" data-standing-scope="group" aria-pressed="false" class="rounded-md px-3 py-1 text-sm font-medium text-base-content/60 transition hover:text-base-content">{{ own_group | capitalize }} schools</button>
+          </div>
+          <p class="text-xs text-base-content/55">{{ own_group | capitalize }} schools: enrollment {{ 'under ' ~ '{:,}'.format(latest_split) if own_group == 'small' else '{:,}'.format(latest_split) ~ ' or more' }} (the median)</p>
+        </div>
+        {% endif %}
+      </div>
+      {# Drawn by school-page.js at the container's pixel width
+         (12px text at any size). Up = better: the axis is "Top X%". #}
+      <figure class="w-full" aria-label="Statewide rank by season">
+        <div data-standing-chart class="w-full"></div>
+        <script type="application/json" data-standing-points>{{ ranked | tojson }}</script>
+        <noscript><ul class="text-sm">{% for pt in ranked %}<li>{{ pt.year }}: {{ pt.rank | ordinal }} of {{ pt.of }} (top {{ pt.top }}%)</li>{% endfor %}</ul></noscript>
+      </figure>
+    </section>
+    {% endif %}
+    {% endif %}
+
+    {# Before this team's first results of the season there are no marks to rank
+       or compare, and "no entries this season" would read as a fact, so the
+       season's detail waits along with the summary above. #}
+    {% if 'Sectional' not in pending %}
+    {# ======================================================= best performances #}
+    <section aria-labelledby="top-heading" class="{{ section_cls }}">
+      <div>
+        <h2 id="top-heading" class="{{ h2_cls }}">{% if all_time %}Top All-Time Marks{% else %}Top Statewide Marks{% endif %}</h2>
+        <p class="mt-1 text-sm text-base-content/70">{% if all_time %}{{ school_name }}'s best marks, ranked against every Indiana athlete across all seasons.{% else %}{{ school_name }}'s marks that rank highest in the state this season.{% endif %} Select one for the full list.</p>
+      </div>
+      {% if top %}
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{% for row in top[:4] %}{{ performance(row) }}{% endfor %}</div>
+      {% if top|length > 4 %}
+      <details class="group">
+        <summary class="list-none text-sm font-semibold text-primary transition hover:text-primary/70"><span class="group-open:hidden">Show {{ top[4:12]|length }} more</span><span class="hidden group-open:inline">Show fewer</span></summary>
+        <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{% for row in top[4:12] %}{{ performance(row) }}{% endfor %}</div>
+      </details>
+      {% endif %}
+      {% else %}<p class="text-sm text-base-content/70">No ranked performances are available for this selection.</p>{% endif %}
+    </section>
+
+    {# ============================================================ comparison #}
+    {% if not all_time %}
+    <section aria-labelledby="compare-heading" class="{{ section_cls }}">
+      <div>
+        <h2 id="compare-heading" class="{{ h2_cls }}">Results by Event</h2>
+        <p class="mt-1 max-w-3xl text-sm text-base-content/70">Every Indiana athlete's best {{ season }} playoff mark. Shading shows the marks that made the Regional or State cut.</p>
+      </div>
+      {% set entered = [] %}{% for event in events %}{% if results | selectattr('event', 'equalto', event.get('name')) | rejectattr('entry_type', 'equalto', 'none') | list %}{% set _ = entered.append(loop.index0) %}{% endif %}{% endfor %}
+      {% set selected = (entered | first) if entered else (0 if events else none) %}
+      {# The event picker sits in its own tinted panel: it reads as the control
+         for the chart below without a dividing rule. Dashed = no entries. #}
+      <div class="space-y-2 rounded-xl bg-base-200/30 p-3" role="group" aria-label="Choose an event">
+        {% for label, groups in [('Track', ['Sprints', 'Distance', 'Hurdles', 'Running', 'Relays', 'Relay']), ('Field', ['Jumps', 'Throws', 'Field'])] %}
+        {% set group_events = [] %}{% for event in events %}{% if event.get('group') in groups %}{% set _ = group_events.append(loop.index0) %}{% endif %}{% endfor %}
+        {% if group_events %}
+        {% set divider = namespace(done=false, seen_running=false) %}
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="w-full text-xs font-semibold uppercase tracking-wide text-base-content/60 sm:w-12">{{ label }}</span>
+          {% for index in group_events %}{% set event = events[index] %}
+          {% set is_relay = event.get('group') in ['Relays', 'Relay'] %}
+          {% if is_relay and divider.seen_running and not divider.done %}<span class="mx-2 h-7 w-0.5 rounded-full bg-base-content/35" aria-hidden="true"></span>{% set divider.done = true %}{% endif %}
+          {% if not is_relay %}{% set divider.seen_running = true %}{% endif %}
+          {% set has = index in entered %}
+          <button type="button" class="btn btn-sm {{ 'btn-primary' if selected == index else 'btn-ghost border-base-300 bg-white' }} {{ '' if has else 'border-dashed' }} {{ 'text-base-content/55' if not has and selected != index }}" data-event-index="{{ index }}" {% if not has %}data-empty{% endif %} aria-pressed="{{ 'true' if selected == index else 'false' }}" aria-controls="event-panel-{{ index }}" title="{{ event.get('name') }}{% if not has %} — no {{ school_name }} entries{% endif %}">{{ short_event(event.get('label') or event.get('name')) }}</button>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+
+      {% for event in events %}{% set index = loop.index0 %}
+      <div id="event-panel-{{ index }}" data-event-panel="{{ index }}" {% if index != selected %}hidden{% endif %}>
+        {% set dist = event.get('distribution') or {} %}
+        <h3 class="sr-only">{{ event.get('label') or event.get('name') or 'Event' }}</h3>
+        {% if dist.get('missing_years') %}<p class="text-sm text-warning-content/80" role="status">Statewide results for {{ dist.get('missing_years') | join(', ') }} aren't loaded yet, so this chart is incomplete.</p>{% elif dist.get('skipped_rows') %}<p class="text-sm text-base-content/60" role="status">A few statewide marks couldn't be read and are left out of this chart.</p>{% endif %}
+        <div data-distribution class="mt-2"></div>
+        <noscript><p class="mt-3 text-sm">Enable JavaScript to view the distribution chart.</p></noscript>
+        {% set event_rows = results | selectattr('event', 'equalto', event.get('name')) | rejectattr('entry_type', 'equalto', 'none') | list %}
+        {% if event_rows %}
+        {# Steady column widths, so the space falls evenly between columns
+           rather than in one gap; the rank (a number) sits on the right edge. #}
+        <div class="mt-4 w-full overflow-x-auto rounded-xl border border-base-300">
+          <table class="table w-full min-w-[640px] table-fixed text-sm">
+            <colgroup><col class="w-[28%]"><col class="w-[18%]"><col class="w-[18%]"><col class="w-[18%]"><col class="w-[18%]"></colgroup>
+            <thead><tr class="bg-base-200/60 text-sm uppercase tracking-wide text-base-content/60"><th scope="col">{{ 'Team' if event.get('group') in ['Relays', 'Relay'] else 'Athlete' }}</th><th scope="col" class="whitespace-nowrap">Sectional</th>{% for stage in ['Regional', 'State'] %}<th scope="col" class="whitespace-nowrap">{{ stage }}{% if stage in pending %}<span class="ml-1 font-normal normal-case tracking-normal text-base-content/45">· pending</span>{% endif %}</th>{% endfor %}<th scope="col" class="whitespace-nowrap">Statewide Rank</th></tr></thead>
+            <tbody>
+            {% for row in event_rows %}
+            <tr>
+              <td class="truncate">{{ person(dict(row, is_relay=row.get('entry_type') == 'relay')) }}{% if row.get('grade') %}<span class="ml-1.5 text-xs text-base-content/50">{{ row.get('grade') }}</span>{% endif %}</td>
+              {% for stage in ['Sectional', 'Regional', 'State'] %}
+              {% set cell = (row.get('stages') or {}).get(stage) %}
+              {% set has_gap = stage == row.get('gap_stage') and row.get('gap_display') is not none %}
+              {% set near = has_gap and row.get('gap_value') is not none and row.get('cutoff_value') and 0 <= row.get('gap_value') / row.get('cutoff_value') <= 0.0500000001 %}
+              <td>
+                {% if cell %}<span class="whitespace-nowrap font-semibold tabular-nums">{{ cell.get('mark_display') or '—' }}</span>{% if cell.get('place') %}<span class="whitespace-nowrap text-xs text-base-content/55"> · {{ cell.get('place') | ordinal }}{% if cell.get('round') == 'Prelim' %} in prelims{% endif %}</span>{% endif %}
+                {% elif not has_gap %}<span class="text-base-content/35">—</span>{% endif %}
+                {% if has_gap %}
+                <span class="{{ 'ml-1.5' if cell }} inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-semibold {{ 'bg-warning/30 text-base-content' if near else 'bg-base-200 text-base-content/70' }}" title="{{ row.get('gap_display') }} short of the {{ row.get('gap_stage') }} qualifying cut{% if row.get('cutoff_display') %} ({{ row.get('cutoff_display') }}){% endif %}{% if near %} — highlighted: within 5% of it{% endif %}">{{ row.get('gap_display') }} short</span>
+                {% endif %}
+              </td>
+              {% endfor %}
+              <td>
+                {# A "Top X%" chip marks only the strong results (top 25% statewide),
+                   so its colour points at the standouts. #}
+                <span>{{ rank_button(row, event.get('name') or '') }}</span>{% if row.get('rank_total') %}<span class="whitespace-nowrap text-xs text-base-content/55"> of {{ row.get('rank_total') }}</span>
+                {%- set top = [1, (100 * (row.get('rank') - 1) / row.get('rank_total')) | round | int] | max if row.get('rank') is not none else none %}
+                {%- if top is not none and top <= 25 %} <span class="ml-1 inline-block whitespace-nowrap rounded bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">Top {{ top }}%</span>{% endif %}{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="mt-4 rounded-xl border border-dashed border-base-300 px-4 py-3 text-sm text-base-content/60">{{ school_name }} had no {{ gender|lower }} entries in the {{ event.get('label') or event.get('name') }} this season.</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </section>
+    {% endif %}
+    {% endif %}
+
+    {# ================================================================ outlook #}
+    {% if not all_time and data.get('latest_year') is not none and season|string == data.get('latest_year')|string and outlook.get('year') == data.get('latest_year') %}
+    {% set roster = outlook.get('roster') or [] %}
+    {% set returners = roster | selectattr('returning', 'sameas', true) | list %}
+    {% set graduating = roster | selectattr('returning', 'sameas', false) | list %}
+    <section aria-labelledby="outlook-heading" class="{{ section_cls }}">
+      <div>
+        <h2 id="outlook-heading" class="{{ h2_cls }}">{{ outlook.get('year') + 1 }} Returners</h2>
+        <p class="mt-1 text-sm text-base-content/70">Who from this season's playoffs is back next year.</p>
+        {% if outlook.get('unknown_count') %}<p class="mt-1 text-sm text-base-content/60">Grade is unknown for {{ plural(outlook.get('unknown_count'), 'athlete') }}, so they are not counted as returning or graduating.</p>{% endif %}
+      </div>
+      {# Four cards like the summary: a count, a short name preview, the full list on click. #}
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {% for key, label, people in [('returning', 'From Sectionals', returners), ('regional', 'From Regionals', outlook.get('regional_returners') or []), ('state', 'From State', outlook.get('state_returners') or []), ('graduating', 'Graduating', graduating)] %}
+        {# "X of Y": returning out of everyone in that group this season. #}
+        {% set group_total = (roster | length) if key == 'returning' else ((roster | selectattr('regional_events') | list | length) if key == 'regional' else ((roster | selectattr('state_events') | list | length) if key == 'state' else none)) %}
+        {% set value %}{{ people | length }}{% if group_total %}<span class="ml-1 text-sm font-semibold text-base-content/60">of {{ group_total }}</span> ({{ (100 * (people | length) / group_total) | round | int }}%){% endif %}{% endset %}
+        {% set preview %}{% if people %}<span class="text-base-content/80">{% for athlete in people[:3] %}{{ display_name(athlete.get('name')) }}{% if not loop.last %}, {% endif %}{% endfor %}</span>{% if people|length > 3 %} <span class="text-base-content/50">+{{ people|length - 3 }} more</span>{% endif %}{% else %}None{% endif %}{% endset %}
+        {% set waiting = (key == 'regional' and 'Regional' in pending) or (key == 'state' and 'State' in pending) %}
+        {% if waiting %}
+        <div class="{{ card_cls }} flex flex-col">{{ card_body(label, pending_value, 'Results not in yet') }}</div>
+        {% elif people %}
+        <button type="button" data-open-list="outlook-{{ key }}" aria-haspopup="dialog" class="{{ card_cls }} {{ click_cls }} flex flex-col">{{ chevron }}{{ card_body(label, value, preview) }}</button>
+        {% call dialog_shell('outlook-' ~ key, (outlook.get('year') + 1) ~ (' · Graduating' if key == 'graduating' else ' Returners · ' ~ (label | title))) %}
+        <table class="table table-sm" data-sortable>
+          <thead><tr class="bg-base-200">{{ sort_th('Athlete', 'text', 'ascending') }}{{ sort_th('Grade', 'number') }}{{ sort_th('Furthest', 'number') }}{{ sort_th('Events', 'number') }}</tr></thead>
+          <tbody>
+          {% for athlete in people %}
+          {% set evs = athlete.get('events') or [] %}
+          {# Events in meet-program order; the first one's position is the sort key. #}
+          {% set ordered = [] %}{% set first = namespace(i='') %}
+          {% for e in events %}{% if e.get('name') in evs %}{% if first.i == '' %}{% set first.i = loop.index0 %}{% endif %}{% set _ = ordered.append(short_event(e.get('name'))) %}{% endif %}{% endfor %}
+          <tr>
+            <td data-sort="{{ display_name(athlete.get('name')) }}">{{ person(athlete) }}</td>
+            <td data-sort="{{ {'FR': 9, 'SO': 10, 'JR': 11, 'SR': 12}.get(athlete.get('grade'), '') }}">{{ athlete.get('grade') or '—' }}</td>
+            <td data-sort="{{ {'Sectional': 1, 'Regional': 2, 'State': 3}.get(athlete.get('furthest'), '') }}">{{ athlete.get('furthest') or '—' }}</td>
+            <td data-sort="{{ first.i }}">{{ ordered | join(', ') if ordered else '—' }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% endcall %}
+        {% else %}
+        <div class="{{ card_cls }} flex flex-col">{{ card_body(label, value, preview) }}</div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if all_time %}
+    {# ============================================== all-time: relay progression #}
+    {# One card per relay (teams are tracked as school relays; rosters are not
+       reliable). The program best leads; then each season newest first with
+       its mark, a stage tag and the statewide standing. Seasons add rows, not
+       columns; past five, the rest fold behind "Show earlier". #}
+    {% set relay_events = events | selectattr('group', 'in', ['Relays', 'Relay']) | list %}
+    {% set relay_rows = (data.get('performances') or []) | selectattr('is_relay') | list %}
+    {% if relay_rows %}
+    {% set relay_seasons = participating | map(attribute='year') | sort(reverse=true) | list %}
+    <section aria-labelledby="relays-heading" class="{{ section_cls }}">
+      <div>
+        <h2 id="relays-heading" class="{{ h2_cls }}">Relays by Season</h2>
+        <p class="mt-1 text-sm text-base-content/70">Each relay's best mark by season. Red marks the program best.</p>
+      </div>
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {% for ev in relay_events %}
+        {% set mine = relay_rows | selectattr('event', 'equalto', ev.get('name')) | list %}
+        {% set fastest = (mine | sort(attribute='value') | first) if mine else none %}
+        <article class="flex flex-col rounded-xl border border-base-300 bg-white" data-relay-card>
+          <header class="rounded-t-xl border-b border-base-300 bg-base-200/40 px-4 py-3">
+            <h3 class="text-sm font-bold uppercase tracking-wide text-base-content">{{ relay_name(ev.get('name')) }}</h3>
+          </header>
+          <ul class="divide-y divide-base-200">
+            {% for y in relay_seasons %}
+            {% set cell = mine | selectattr('year', 'equalto', y) | first %}
+            {% set is_best = cell and fastest and cell.get('value') == fastest.get('value') %}
+            <li class="flex items-center gap-3 px-4 py-2.5 {{ 'bg-primary/10 font-bold' if is_best }} {{ 'hidden' if loop.index > 5 }}" {% if loop.index > 5 %}data-earlier-row{% endif %}{% if is_best %} title="Program best"{% endif %}>
+              <span class="w-11 shrink-0 text-sm text-base-content/70">{{ y }}</span>
+              {% if cell %}
+              <span class="w-16 shrink-0 tabular-nums {{ 'font-bold text-primary' if is_best else 'text-base-content' }}">{{ cell.get('mark') }}</span>
+              <span class="whitespace-nowrap text-sm text-base-content/70">{{ cell.get('final_stage') }}{% if cell.get('place') %} · {{ cell.get('place') | ordinal }}{% endif %}</span>
+              {% if cell.get('percentile') is not none %}<span class="ml-auto whitespace-nowrap text-xs text-base-content/50">{{ top_pct(cell) | replace(' statewide', '') }}</span>{% endif %}
+              {% else %}<span class="text-sm text-base-content/35">Did not compete</span>{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+        </article>
+        {% endfor %}
+      </div>
+      {% if relay_seasons | length > 5 %}
+      <button type="button" class="text-sm font-semibold text-primary transition hover:text-primary/70" data-show-earlier aria-expanded="false">Show {{ plural(relay_seasons[5:] | length, 'earlier season') }}</button>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    {# ======================================================= all-time: record book #}
+    {# One card per school record -- a small honor for the athlete. A faint
+       event-type mark sits behind each card (stopwatch, jump arc, shot, baton).
+       Single-holder cards link to the athlete; relay and tied cards do not
+       (tied names link individually). #}
+    {% set group_of = {} %}{% for e in events %}{% set _ = group_of.update({e.get('name'): e.get('group')}) %}{% endfor %}
+    {% set record_art = {
+      'clock': '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.6 2.2M9.5 3h5M12 3v3M18.2 7.3l1.3-1.3"/>',
+      'jump': '<path d="M2.5 19.5C6 11 11 7.5 21 8.5"/><path d="M17.5 5.5l3.5 3-3.6 2.6"/><path d="M2 21.5h7"/>',
+      'throw': '<circle cx="7.5" cy="16.5" r="4.5"/><path d="M11.5 12.5C14 7.5 17 5 21.5 4.5"/><path d="M18 3.5l3.5 1-1.4 3.4"/>',
+      'baton': '<rect x="3" y="10" width="18" height="4.5" rx="2.25" transform="rotate(-28 12 12.25)"/><path d="M4.5 19.5l2.5-1.3M17 6.3l2.5-1.3"/>',
+    } %}
+    <section aria-labelledby="bests-heading" class="{{ section_cls }}">
+      <div>
+        <h2 id="bests-heading" class="{{ h2_cls }}">Program Records</h2>
+        <p class="mt-1 text-sm text-base-content/70">The school's best mark in each event.</p>
+      </div>
+      {% for label, groups, art in [('Sprints & Hurdles', ['Sprints', 'Hurdles'], 'clock'), ('Distance', ['Distance'], 'clock'), ('Jumps', ['Jumps'], 'jump'), ('Throws', ['Throws'], 'throw'), ('Relays', ['Relays', 'Relay'], 'baton')] %}
+      {% set group_bests = [] %}{% for b in data.get('bests') or [] %}{% if group_of.get(b.get('event')) in groups %}{% set _ = group_bests.append(b) %}{% endif %}{% endfor %}
+      {% if group_bests %}
+      <div class="pt-3">
+        <h3 class="mb-3 flex items-center gap-3 font-impact text-xl italic text-primary">{{ label }}<span class="h-px flex-1 bg-primary/20"></span></h3>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {% for b in group_bests %}{% set entries = b.get('entries') or [] %}
+          {% set relay = art == 'baton' %}
+          {% set single = entries | length == 1 and not relay and entries[0].get('athlete_id') %}
+          {% if entries %}
+          {% set inner %}
+            {# A small award ribbon in the corner. #}
+            <svg class="pointer-events-none absolute right-2 top-0 h-6 w-[1.1rem] drop-shadow-sm" viewBox="0 0 20 28" aria-hidden="true"><path d="M0 0h20v28l-10-6-10 6z" fill="var(--color-primary)"/><path d="M10 6.2l1.6 3.3 3.6.5-2.6 2.5.6 3.6-3.2-1.7-3.2 1.7.6-3.6-2.6-2.5 3.6-.5z" fill="#fff"/></svg>
+            <p class="relative pr-6 text-xs font-bold uppercase tracking-wide text-primary">{{ relay_name(b.get('event')) if relay else b.get('event') }}{% if entries | length > 1 %} <span class="font-semibold normal-case text-base-content/50">· tie</span>{% endif %}</p>
+            {% for row in entries %}
+            <div class="relative mt-1.5 pr-5">
+              <p class="font-impact text-lg italic leading-tight text-primary">{% if relay %}{{ row.get('year') }} Team{% elif single %}{{ display_name(row.get('name')) }}{% else %}{{ person(row) }}{% endif %}</p>
+              <p class="text-[11px] text-base-content/60">{{ row.get('year') }}{% if row.get('grade') and not relay %} · {{ row.get('grade') }}{% endif %}{% if row.get('stage') %} · set at {{ row.get('stage') }}{% endif %}</p>
+            </div>
+            {% endfor %}
+            <p class="relative mt-auto pt-1.5 text-xl font-bold tabular-nums text-base-content">{{ entries[0].get('mark') }}</p>
+          {% endset %}
+          {% set card = 'relative flex flex-col overflow-hidden rounded-xl border border-base-300 border-t-2 border-t-primary bg-white p-3.5 shadow-sm' %}
+          {% if single %}
+          <a href="{{ url_for('main.athlete_dashboard', athlete_id=entries[0].get('athlete_id')) }}" class="{{ card }} no-underline transition hover:border-primary/50 hover:shadow-md" aria-label="{{ b.get('event') }} record: {{ display_name(entries[0].get('name')) }}, {{ entries[0].get('mark') }}">{{ inner }}</a>
+          {% else %}
+          <article class="{{ card }}">{{ inner }}</article>
+          {% endif %}
+          {% else %}
+          <article class="flex flex-col rounded-xl border border-dashed border-base-300 p-4">
+            <p class="text-xs font-bold uppercase tracking-wide text-base-content/50">{{ b.get('event') }}</p>
+            <p class="mt-auto pt-3 text-sm text-base-content/50">No playoff mark yet — this record is open.</p>
+          </article>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    <script id="school-page-events" type="application/json">{{ (chart_events or []) | tojson }}</script>
+    {# Chrome/Edge: fetch a season or team page as soon as the pointer rests on
+       its link, so the click usually lands on an already-loaded page. Other
+       browsers ignore this. #}
+    <script type="speculationrules">{"prefetch": [{"where": {"selector_matches": "a[data-nav]"}, "eagerness": "moderate"}]}</script>
+    {% endif %}
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/school-page-distribution.js') }}?v={{ asset_version('js/school-page-distribution.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/school-page-rank-popup.js') }}?v={{ asset_version('js/school-page-rank-popup.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/school-page.js') }}?v={{ asset_version('js/school-page.js') }}" defer></script>
+{% endblock %}

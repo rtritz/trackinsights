@@ -26,8 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
     = window.EventJump;
 
   const params = new URLSearchParams(window.location.search);
-  const parsedYear = Number.parseInt(params.get('year') || '2026', 10);
-  const selectedYear = Number.isInteger(parsedYear) && parsedYear >= 2000 ? parsedYear : 2026;
+  // Only the current season (the newest year with results) is shown.
+  const selectedYear = pageConfig.currentYear;
 
   const initialView = (params.get('view') === 'combined') ? 'combined' : 'qualifiers';
 
@@ -42,7 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
     combinedCache: {},
   };
 
-  const yearSelect = document.getElementById('year-select');
   const genderGroup = document.getElementById('gender-group');
   const statusLine = document.getElementById('status-line');
   // Removed loading indicators
@@ -51,24 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const detailContent = document.getElementById('detail-content');
   const topListBtn = document.getElementById('top-list-btn');
   const genders = ['Boys', 'Girls'];
-
-  yearSelect.value = String(state.year);
-
-  yearSelect.addEventListener('change', () => {
-  const nextYear = Number.parseInt(yearSelect.value, 10);
-    if (!Number.isInteger(nextYear) || nextYear < 2000) {
-      yearSelect.value = String(state.year);
-      return;
-    }
-
-    state.year = nextYear;
-    state.autoSwitchTried = false;
-    state.combinedCache = {};
-  const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set('year', String(state.year));
-    window.history.replaceState({}, '', nextUrl.toString());
-    fetchStatus();
-  });
 
   function setBanner(text, tone = 'info') {
     if (!text) {
@@ -93,7 +74,11 @@ document.addEventListener('DOMContentLoaded', () => {
     genders.forEach((gender) => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = `btn btn-sm rounded-full ${gender === state.gender ? 'btn-primary' : 'btn-outline'}`;
+      // Same switch as the school page's Boys/Girls control.
+      const on = gender === state.gender;
+      btn.className = 'rounded-md px-3.5 py-1 text-sm transition focus-visible:outline-2 focus-visible:outline-primary '
+        + (on ? 'bg-white font-semibold text-primary shadow-sm' : 'font-medium text-base-content/60 hover:text-base-content');
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
       btn.textContent = gender;
       btn.addEventListener('click', () => {
         if (state.gender === gender) return;
@@ -141,17 +126,16 @@ document.addEventListener('DOMContentLoaded', () => {
     detailContent.innerHTML = '';
 
     events.forEach((eventBlock, index) => {
-      // Insert header above the 100 Meters event only, for Boys or Girls 2026 qualifiers view
+      // Insert header above the 100 Meters event only, for the qualifiers view
       if (
         index === 0 &&
         eventBlock.event === '100 Meters' &&
-        state.year === 2026 &&
         (state.gender === 'Boys' || state.gender === 'Girls') &&
         state.view === 'qualifiers'
       ) {
         const qualifiersHeader = document.createElement('h2');
         qualifiersHeader.className = 'text-base sm:text-lg font-semibold text-primary mb-2 text-left';
-        qualifiersHeader.textContent = `2026 ${state.gender} Unofficial State Qualifiers`;
+        qualifiersHeader.textContent = `${state.year} ${state.gender} Unofficial State Qualifiers`;
         detailContent.appendChild(qualifiersHeader);
       }
 
@@ -452,17 +436,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     events.forEach((eventBlock, index) => {
 
-      // Insert header above the 100 Meters event only, for Boys or Girls 2026 combined view
+      // Insert header above the 100 Meters event only, for the combined view
       if (
         index === 0 &&
         eventBlock.event === '100 Meters' &&
-        state.year === 2026 &&
         (state.gender === 'Boys' || state.gender === 'Girls') &&
         state.view === 'combined'
       ) {
         const combinedHeader = document.createElement('h2');
         combinedHeader.className = 'text-base sm:text-lg font-semibold text-primary mb-2 text-left';
-        combinedHeader.textContent = `2026 ${state.gender} Combined Regional Results`;
+        combinedHeader.textContent = `${state.year} ${state.gender} Combined Regional Results`;
         detailContent.appendChild(combinedHeader);
       }
 

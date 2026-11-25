@@ -32,3 +32,12 @@ Websites I like:
 juice.agency
 
 */
+/* Tailwind v4's preflight gives buttons the default arrow cursor. Anything
+   clickable on this site should show the hand, so restore it site-wide. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary {
+    cursor: pointer;
+  }
+}

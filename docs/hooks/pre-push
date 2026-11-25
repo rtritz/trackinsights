@@ -1,7 +1,7 @@
 #!/bin/bash
 # Publish the dashboard cache when a branch is pushed and the cache has changed.
 #
-# dashboard_cache.db is generated, ~12MB, and not in git -- it travels as a
+# dashboard_cache.db is generated, large, and not in git -- it travels as a
 # GitHub Release asset (see docs/publish.sh). Without this hook, publishing is a
 # separate command you have to remember after every data update, and forgetting
 # it means the server clones new results next to an old cache.

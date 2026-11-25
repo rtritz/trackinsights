@@ -35,8 +35,8 @@ looks up an answer that already exists.
       |
       |   you run: python -m app.jobs.build_all
       v
-  dashboard_cache.db        prepared answers, one row per school/season
-  static/data/*.json        prepared answers for the prediction pages
+  dashboard_cache.db        prepared answers: every school page, the statewide
+                            rankings, and the data behind the report pages
       |
       |   a visitor opens a page
       v
@@ -47,9 +47,8 @@ Two consequences worth remembering:
 
 - **After you change the data, you must rebuild.** Otherwise the site keeps
   showing the old answers. See §6.
-- **Generated files are not edited by hand.** `dashboard_cache.db` and the JSON
-  under `static/data/` are outputs. Editing them is pointless; the next rebuild
-  overwrites your changes.
+- **Generated files are not edited by hand.** `dashboard_cache.db` is an
+  output. Editing it is pointless; the next rebuild overwrites your changes.
 
 ---
 
@@ -84,7 +83,6 @@ trackinsights/
 │           ├── js/
 │           ├── images/
 │           ├── reports/        Generated PDFs
-│           └── data/           GENERATED JSON. Do not edit.
 │
 │
 │   templates/ and static/ live inside app/ because that is where Flask looks
@@ -111,6 +109,7 @@ trackinsights/
 | A database table | `web/app/models.py` |
 | A prediction model | `web/app/analytics/` |
 | How precomputed data is built | `web/app/jobs/` |
+| Where precomputed data is stored | `common/cache_db.py` (the tables in `dashboard_cache.db`) |
 | Something used by scripts too | `common/` |
 
 ### Inside `queries/`
@@ -186,10 +185,36 @@ out of date. Rebuild them:
 
 ```bash
 cd web
-python -m app.jobs.build_all        # ~10 minutes
+python -m app.jobs.build_all        # current season, ~2-3 minutes
+python -m app.jobs.build_all --all  # every season
 ```
 
-Then commit the changed files under `web/data/` and `web/app/static/data/`.
+Then commit `web/data/Track.db` and publish the cache (§10).
+
+**The current season is the newest year with results in `Track.db`.** Nothing
+to set: loading the first 2027 result (either gender) makes 2027 current. A
+plain `build_all` builds, for both genders:
+
+- the current season's school pages and statewide rankings, plus every
+  school's All-Time page. Older seasons' pages are left alone: the parts of a
+  page that cover every season (the season picker and bars, program records,
+  returners) are read from the All-Time page, so they stay current;
+- the qualifier pages' data (regional qualifiers, combined regional rankings
+  and results, state qualifiers) for the current season only. Those pages show
+  only the current season, so older seasons' data is removed.
+
+A round no team of that gender has run yet shows as **Pending**, never as zero
+-- e.g. boys pages between the girls' and boys' sectionals.
+
+**During the postseason** results arrive six times (each gender's sectional,
+regional and state). Each time:
+
+1. Run the scraper notebook (`standalone/notebooks/MS Scrapper.ipynb`). Its
+   last cell runs `build_all`, which also fetches the season's host names
+   from ihsaa.org.
+2. Check the results and a couple of pages on your local server.
+3. Commit `web/data/Track.db` and push (the push hook publishes the cache).
+4. Deploy.
 
 To check whether a rebuild is needed:
 
@@ -201,6 +226,27 @@ The dashboard notices this itself: it stores a fingerprint of the database it
 was built from, and shows a warning banner on the page when they no longer
 match. You do not have to remember — but the banner is visible to visitors, so
 do not leave it showing.
+
+### Updating statewide ranking lists for selected seasons
+
+Program rankings and individual and relay event rankings are precomputed
+together. From `web/`, run `python -m app.jobs.precompute_rankings` and enter a
+year such as `2026` or an inclusive range such as `2023-2026` when prompted.
+For automation, pass the same year or range as an argument, for example
+`python -m app.jobs.precompute_rankings 2026`.
+
+This replaces both boys' and girls' ranking lists only for the selected seasons;
+other seasons' lists are preserved. It can initialize the ranking tables if the
+cache does not yet exist. The update is transactional: a failed build or write
+does not replace existing rankings.
+
+**This is a rankings-only update.** Dashboard page payloads contain their own
+rank values and other data, and are not refreshed by this job. They can still
+show old numbers or be missing even when their leaderboard has been updated.
+The dashboard's freshness stamp is deliberately not changed. Run the full
+dashboard rebuild or `build_all` to refresh page payloads and other artifacts
+(`--season YYYY` after correcting an older season). The cache is not in git;
+publish the updated cache release asset as described in §10 when deploying.
 
 ---
 
@@ -216,12 +262,10 @@ npx @tailwindcss/cli -i ./app/static/css/input.css \
                      -o ./app/static/css/output.css --minify
 ```
 
-`school-dashboard-v4.css` is ordinary hand-written CSS and is safe to edit.
-
 ### JavaScript lives in its own file
 
 Each page's JavaScript is in `static/js/`, named after the template it belongs
-to: `school-dashboard.html` -> `js/school-dashboard.js`. Do not put JavaScript
+to: `school-page.html` -> `js/school-page.js`. Do not put JavaScript
 back inside a `<script>` tag in a template -- it loses syntax checking, cannot be
 cached by the browser, and hides the code from anyone reading the directory.
 
@@ -250,13 +294,9 @@ even inside your own scoped block — this has caused two real bugs. Check
 
 - **`Track.db` is the real data.** It is tracked in git, so a bad write is
   recoverable — but check with whoever maintains the data before changing it.
-- **Do not hand-edit generated files**: `dashboard_cache.db`, anything under
-  `static/data/`, or `output.css`.
+- **Do not hand-edit generated files**: `dashboard_cache.db` or `output.css`.
 - **Do not put secrets in the code.** `config.py` reads them from the
   environment; keep it that way.
-- **There are two school dashboards.** `/school-dashboard/<id>` is the live one.
-  `/school-dashboard-v4/<id>` is a prototype of a faster architecture. Both work;
-  ask before changing which one is the default.
 
 ---
 
@@ -280,33 +320,44 @@ notebook. Absence of an import is not proof it is dead.
 
 ---
 
-## 9a. Working on this without the cache
+## 9a. Getting the cache
 
-`dashboard_cache.db` is not in git -- it ships as a release asset -- so a fresh
-clone does not have one. That is fine: **in development the dashboard builds
-itself.** Clone, run, and the pages work.
+`dashboard_cache.db` is not in git -- it ships as a release asset (§10) -- so a
+fresh clone or a newly pulled branch does not have it. Get the published one
+with one command:
 
-    first school in a process   ~2s   (it builds the statewide ranking tables)
-    every school after that     ~0.2s (those tables are cached)
+```bash
+cd web
+python -m app.jobs.get_cache
+```
 
-The page says so, with a banner, because a live page and a cached one look
-identical and the difference matters when you are judging speed.
+Run it after you clone, and again whenever the data has been republished
+(someone tells you, or the rank popups look out of date). It is safe to re-run:
+the download is checked before it replaces your copy, so a failed download
+leaves the old one in place. It ends by saying whether the cache matches your
+`Track.db`; if it does not (you pulled newer results than were published, or
+edited `Track.db`), run `python -m app.jobs.build_all` instead.
 
-This never happens on the deployed site. The cache exists because this analysis
-took seconds per page and PythonAnywhere measured 15-25x slower than a
-development machine, so a fallback that switched itself on in production would
-restore exactly the problem V4 removed -- silently, under load, one worker at a
-time. It is gated on debug mode, or `TI_LIVE_DASHBOARD=1` for running a
-production-shaped config locally. `tests/test_dashboard_v4.py` holds that line.
+**What needs the cache, and what does not:**
 
-If you would rather have the real thing locally -- to see what a visitor sees,
-at the speed they see it -- download the published cache:
+| Without the cache | With it |
+|---|---|
+| School pages work: in development they build themselves (debug mode, or `TI_LIVE_DASHBOARD=1`), so code and template changes show on refresh | Same -- development still builds school pages live |
+| Rank popups are empty | Rank popups list the statewide rankings |
+| Report pages say "not available yet"; qualifier lists are computed live (slow) | Report pages and qualifier lists load instantly |
 
-    curl -fsSL -o web/data/dashboard_cache.db       https://github.com/rtritz/trackinsights/releases/download/cache-latest/dashboard_cache.db
+So you do not need it to develop, run the tests, or change query or template
+code. You do need it to try the rank popups or the report pages.
 
-You do not need it to develop, run the tests, or change query code. In fact a
-cache actively gets in the way there: it is a payload built before your change,
-so your edits would not show up. The live build is the better default.
+**Do not commit the cache.** It is ~36MB, rewritten on every rebuild and growing
+each season; committed, every rebuild would add a full copy to everyone's clone
+forever, and two branches that rebuilt it could not be merged. `.gitignore`
+keeps it out.
+
+The deployed site reads stored pages from the cache. It exists because this
+analysis took seconds per page and PythonAnywhere measured 15-25x slower than a
+development machine. A page missing from the cache is still built live there,
+slowly, rather than failing.
 
 ---
 
@@ -317,10 +368,10 @@ fresh clone, because the deployed layout is flatter than the repo: everything
 inside `web/` is copied up to the top, so `~/mysite/` holds `app/`, `config.py`,
 `wsgi.py` and `data/` directly, with `common/` beside them.
 
-**Two artifacts, two channels.** `Track.db` is source data and travels in git.
-`dashboard_cache.db` is *generated* from it, weighs ~12MB, and is rewritten whole
-on every rebuild -- tracking it added a fresh 12MB blob to history every time
-results were updated. It ships as a GitHub Release asset instead, which the
+**Two files, two channels.** `Track.db` is source data and travels in git.
+`dashboard_cache.db` is *generated* from it (`common/cache_db.py` describes its
+tables), weighs ~36MB, and is rewritten on every rebuild -- tracking it would add
+a fresh copy to history every time results were updated. It ships as a GitHub Release asset instead, which the
 deploy downloads. Releases sit outside the git object graph, so replacing the
 asset costs nothing in clone size.
 
@@ -329,7 +380,7 @@ So publishing an update is two steps, not one:
 ```bash
 # 1. Rebuild, then commit the things that belong in git.
 cd web && python -m app.jobs.build_all
-cd .. && git add web/data/Track.db web/app/static/data && git commit && git push
+cd .. && git add web/data/Track.db && git commit && git push
 
 # 2. Publish the cache. Creates the release if it is missing, replaces the
 #    asset if it is not, and refuses to publish a cache that does not match
@@ -396,11 +447,11 @@ Every precomputed artifact records a fingerprint of the data it was built from,
 and `--check` recomputes that fingerprint and compares. It is the one mechanism
 that answers *did the results change without the precompute being re-run?*
 
-**The JSON files are fingerprinted per season, not on the whole database.** Each
-one covers a single year and gender, so its stamp covers only that season's
-meets, results, relays, the athletes and schools appearing in them, and that
-year's enrollments. `static/data/manifest.json` records the scope alongside the
-hash.
+**The report data is fingerprinted per season, not on the whole database.**
+Each report (the cache's `artifacts` table) covers a single year and gender, so
+its stamp covers only that season's meets, results, relays, the athletes and
+schools appearing in them, and that year's enrollments. The row records the
+scope alongside the hash.
 
 That scoping is what makes the check usable during a postseason. A whole-file
 hash of Track.db answers "did anything change?", which during two weeks of
@@ -410,23 +461,23 @@ Scoped, you get the answer worth having:
 
 | what you did | what gets flagged |
 |---|---|
-| Loaded 2027 sectional results | the 2027 JSON files. 2026 untouched. |
-| Corrected a 2026 mark | the 2026 JSON files for that gender. 2027 untouched. |
-| Renamed a school that ran in 2026 | the 2026 files. |
+| Loaded 2027 sectional results | the 2027 reports. 2026 untouched. |
+| Corrected a 2026 mark | the 2026 reports for that gender. 2027 untouched. |
+| Renamed a school that ran in 2026 | the 2026 reports. |
 | Added a 2027 athlete at a new school | nothing from 2026. |
 
-So keeping old seasons' files costs nothing in noise. They stay serveable, and
+So keeping old seasons' reports costs nothing in noise. They stay serveable, and
 they only speak up when that season's data genuinely moves -- which is exactly
 when you do want to rebuild them.
 
-**`dashboard_cache.db` is the exception, and deliberately so.** A school
-dashboard shows every season at once and its statewide ranking shifts when any
+**The rankings and school pages are the exception, and deliberately so.** A
+school page shows every season at once and its statewide ranking shifts when any
 season shifts, so a new 2027 result really does make the 2026 view of it stale.
-It keeps a whole-file hash, which means *any* results change asks for a
-dashboard rebuild. That is correct, not noise -- but it is the reason a deploy
-mid-postseason will usually want the dashboards rebuilt too.
+They keep a whole-file hash, which means *any* results change asks for a
+rebuild. That is correct, not noise -- but it is the reason a deploy
+mid-postseason will usually want `build_all` run first.
 
-`tournament_hosts.json` is exempt entirely: it comes from ihsaa.org, not from
+The tournament hosts are exempt entirely: they come from ihsaa.org, not from
 Track.db.
 
 ### When you need to deploy anyway

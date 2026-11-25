@@ -30,9 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const { eventSlug, shortEventLabel, initEventJump, resetEventJump }
     = window.EventJump;
 
-  const params = new URLSearchParams(window.location.search);
-  const parsedYear = Number.parseInt(params.get('year') || '2026', 10);
-  const selectedYear = Number.isInteger(parsedYear) && parsedYear >= 2000 ? parsedYear : 2026;
+  // Only the current season (the newest year with results) is shown.
+  const selectedYear = pageConfig.currentYear;
 
   const state = {
     year: selectedYear,
@@ -42,7 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
     detailRequestId: 0,
   };
 
-  const yearSelect = document.getElementById('year-select');
   const genderGroup = document.getElementById('gender-group');
   const statusGrid = document.getElementById('status-grid');
   const detailSection = document.getElementById('detail-section');
@@ -52,26 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const detailContent = document.getElementById('detail-content');
 
   const genders = ['Boys', 'Girls'];
-
-  yearSelect.value = String(state.year);
-
-  yearSelect.addEventListener('change', () => {
-  const nextYear = Number.parseInt(yearSelect.value, 10);
-    if (!Number.isInteger(nextYear) || nextYear < 2000) {
-      yearSelect.value = String(state.year);
-      return;
-    }
-
-    state.year = nextYear;
-    state.selectedRegional = null;
-    clearDetailTable();
-
-  const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set('year', String(state.year));
-    window.history.replaceState({}, '', nextUrl.toString());
-
-    fetchStatus();
-  });
 
   function setLoading(isLoading) {
     detailLoading.classList.toggle('hidden', !isLoading);
@@ -111,7 +89,11 @@ document.addEventListener('DOMContentLoaded', () => {
     genders.forEach((gender) => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = `btn btn-sm rounded-full ${gender === state.gender ? 'btn-primary' : 'btn-outline'}`;
+      // Same switch as the school page's Boys/Girls control.
+      const on = gender === state.gender;
+      btn.className = 'rounded-md px-3.5 py-1 text-sm transition focus-visible:outline-2 focus-visible:outline-primary '
+        + (on ? 'bg-white font-semibold text-primary shadow-sm' : 'font-medium text-base-content/60 hover:text-base-content');
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
       btn.textContent = gender;
       btn.addEventListener('click', () => {
         if (state.gender === gender) return;

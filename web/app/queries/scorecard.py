@@ -47,7 +47,8 @@ def _event_ranked_rows(gender: str, year: int):
     100m), not against school bests (375). That is the honest denominator for a
     person: a school best is a school's number, an athlete's mark is theirs.
 
-    One best mark per athlete per event, so an athlete who ran the same event at
+    One best mark per athlete per event, from any round (prelim or final), so
+    an athlete who ran the same event at
     sectional, regional and state appears once at their fastest.
 
     The ranking used to happen inside _event_mark_ranks, which
@@ -56,7 +57,8 @@ def _event_ranked_rows(gender: str, year: int):
     from the same result.
     """
     best: Dict[Tuple[int, str], Dict[str, Any]] = {}
-    for row in _resolve_postseason_individual_rows(gender=gender, year=year):
+    # Best mark from any round: a prelim is a mark the athlete ran.
+    for row in _resolve_postseason_individual_rows(gender=gender, year=year, best_of_rounds=True):
         if not _is_valid_postseason_mark(row["result_value"], row["event_type"]):
             continue
         key = (row["athlete_id"], row["event"])

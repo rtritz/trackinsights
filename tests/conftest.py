@@ -34,7 +34,6 @@ def _clear_query_caches():
     for func in (
         queries._get_event_types_map,
         queries._build_statewide_program_rankings,
-        queries.get_school_qualifiers,
         queries.get_regional_qualifiers,
         queries._schools_with_logos,
     ):
