@@ -9,13 +9,10 @@ description = "Shared library for the Track Insights web app and standalone data
 requires-python = ">=3.10"
 dependencies = [
     "pandas",
-]
-
-[project.optional-dependencies]
-web = [
     "Flask",
     "Flask-SQLAlchemy",
 ]
+
 standalone = [
     "requests",
     "beautifulsoup4",
