@@ -39,4 +39,4 @@ dev = [
 packages = ["common"]
 
 [tool.vercel]
-entrypoint = "web/wsgi.py"
+entrypoint = "web.wsgi:app"
