@@ -7,8 +7,11 @@ name = "trackinsights-common"
 version = "0.1.0"
 description = "Shared library for the Track Insights web app and standalone data-processing programs."
 requires-python = ">=3.10"
+
 dependencies = [
     "pandas",
+    "Flask",
+    "Flask-SQLAlchemy",
 ]
 
 [project.optional-dependencies]
