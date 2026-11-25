@@ -34,3 +34,6 @@ dev = [
 
 [tool.setuptools]
 packages = ["common"]
+
+[tool.vercel]
+entrypoint = "web.wsgi:app"
