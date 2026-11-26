@@ -62,7 +62,7 @@
     });
 
 
-    // Statewide Rank by Season: a line where up is better. The vertical axis is
+    // Team Rank by Season: a line where up is better. The vertical axis is
     // standing ("Top X%"), so rising means improving; each point is labelled
     // with its rank and its percentile. Drawn at the container's pixel width
     // so the labels are a true 12px.
@@ -105,7 +105,7 @@
         const n = series.length;
         const x = i => left + (n === 1 ? plotW / 2 : inset + i * (plotW - 2 * inset) / (n - 1));
         const y = p => top + (1 - p) * plotH;
-        const svg = el('svg', { viewBox: `0 0 ${width} ${height}`, width, height, class: 'block text-base-content', 'font-size': 12, role: 'img', 'aria-label': 'Statewide rank by season' });
+        const svg = el('svg', { viewBox: `0 0 ${width} ${height}`, width, height, class: 'block text-base-content', 'font-size': 12, role: 'img', 'aria-label': 'Team rank by season' });
         // Two halves, shaded, so "which half of the state?" reads at a glance:
         // a faint maroon top half and a faint grey bottom half, labelled at the right.
         svg.append(el('rect', { x: left, y: y(1), width: plotW, height: y(0.5) - y(1), fill: 'var(--color-primary)', 'fill-opacity': 0.05 }));

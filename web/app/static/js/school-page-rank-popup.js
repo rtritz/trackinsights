@@ -105,7 +105,21 @@
         const status = element('p', 'text-sm text-base-content/70');
         status.setAttribute('role', 'status');
         const body = element('div', 'overflow-auto max-h-[60vh] border border-base-200 rounded-lg');
-        card.append(header, controls, sizeNote, status, body);
+        // Team rankings only: how the team score is built, folded away until
+        // asked for. Mirrors queries/program_rankings.py; change both together.
+        const explain = element('details', 'hidden rounded-lg border border-base-200 bg-base-200/40 px-3 py-2 text-xs text-base-content/75');
+        const explainSummary = element('summary', 'cursor-pointer font-semibold text-base-content/70 hover:text-primary', 'How the team score works');
+        // Plain-language summary: a simulated meet, then points, then the team score.
+        const intro = element('p', 'mt-2 leading-relaxed', 'We simulate a statewide meet using every athlete’s and relay’s best playoff mark.');
+        const point = (label, text) => {
+            const line = element('p', 'mt-1.5 leading-relaxed');
+            line.append(element('span', 'font-semibold text-base-content', `${label}: `), document.createTextNode(text));
+            return line;
+        };
+        explain.append(explainSummary, intro,
+            point('Points', 'Everyone scores. First place earns 100 points, last place earns 0, and everyone else is in between based on their finishing position.'),
+            point('Team score', 'We total up each team’s points across all events. The highest total ranks 1st.'));
+        card.append(header, explain, controls, sizeNote, status, body);
         dialog.appendChild(card);
         root.appendChild(dialog);
 
@@ -332,6 +346,37 @@
             return splits.get(season);
         }
 
+        // "1600 Meters" -> "1600m", "110 Hurdles" -> "110m Hurdles", "4 x 400 Relay" -> "4×400 Relay".
+        function shortEvent(name) {
+            return String(name || '').replace(/^(\d+) Meters$/, '$1m').replace(/^(\d+) Hurdles$/, '$1m Hurdles')
+                .replace(/ x /g, '×');
+        }
+
+        // An event list says what it is (the title) and how it is built (the
+        // subtitle): the season's playoffs, one best mark per athlete or relay.
+        // Composed here rather than stored, so the wording needs no cache rebuild.
+        function listHeading(payload, eventName, season) {
+            const gender = options.gender || '';
+            if (payload.kind === 'program') {
+                const teams = (payload.rows || []).length;
+                return [
+                    `${gender} Team · Statewide Rankings`.trim(),
+                    `${season === 'all-time' ? '' : season + ' '}playoffs · every Indiana team scored across all events · ${teams.toLocaleString()} ${teams === 1 ? 'team' : 'teams'}`,
+                ];
+            }
+            if (payload.kind !== 'event') return [payload.title, payload.subtitle];
+            const allTime = season === 'all-time';
+            const relay = /relay/i.test(eventName) || (payload.columns || []).includes('Relay');
+            const count = (payload.rows || []).length;
+            const span = allTime ? ((String(payload.subtitle || '').match(/\d{4}\s*[–-]\s*\d{4}/) || [''])[0].replace(/\s*[–-]\s*/, '–')) : season;
+            const noun = relay ? (count === 1 ? 'relay' : 'relays') : (count === 1 ? 'athlete' : 'athletes');
+            const unit = relay ? 'each relay’s' : 'each athlete’s';
+            return [
+                `${gender} ${shortEvent(eventName)} · ${allTime ? 'All-Time ' : ''}Statewide Rankings`.trim(),
+                `${span ? span + ' ' : ''}playoffs · ${unit} best mark from Sectionals, Regionals or State · ${count.toLocaleString()} ${noun}`,
+            ];
+        }
+
         async function show(trigger) {
             const eventName = trigger.dataset.event || '';
             const season = trigger.dataset.season || options.season;
@@ -344,6 +389,7 @@
             size = '';
             title.textContent = eventName || 'Statewide Program Rankings';
             subtitle.textContent = 'Loading…';
+            explain.classList.add('hidden');
             status.textContent = '';
             body.replaceChildren();
             jump.disabled = true;
@@ -355,8 +401,11 @@
                 if (request !== generation || !dialog.open) return;
                 current = Object.assign({ season }, payload);
                 split = seasonSplit;
-                title.textContent = payload.title || title.textContent;
-                subtitle.textContent = payload.subtitle || '';
+                explain.classList.toggle('hidden', payload.kind !== 'program');
+                explain.open = false;
+                const [titleText, subtitleText] = listHeading(payload, eventName, season);
+                title.textContent = titleText || title.textContent;
+                subtitle.textContent = subtitleText || '';
                 renderChips();
                 renderList();
             } catch (error) {

@@ -192,7 +192,7 @@ def test_rounds_with_no_results_statewide_show_as_pending_not_zero(app, client):
     assert payload['summary']['pending'] == ['Regional', 'State']
     assert service.build_payload(1, 'Boys', '2024')['summary']['pending'] == []
     page = client.get('/school-dashboard/1/Boys/2025').get_data(as_text=True)
-    assert page.count('Results not in yet') >= 2 and "Regional results aren't in yet." in page
+    assert page.count('Results not in yet') >= 2 and 'Regional results are pending.' in page
     assert 'None this season' not in page
 
 
@@ -680,3 +680,17 @@ def test_stored_pages_of_another_format_or_missing_build_live(app, tmp_path, mon
     monkeypatch.setattr(service, 'PAGE_FORMAT', 'next')      # payload shape changed in code
     assert 'marker' not in service.page_data(1, 'Boys', '2024')[0]
     assert service.page_data(1, 'Girls', '2024')[0]['gender'] == 'Girls'   # never stored: built live
+
+
+def test_pr_is_a_playoff_best_that_beats_every_earlier_mark():
+    from app.services.school_page import _mark_prs
+    def row(year, stage, value, event='100 Meters', kind='Track'):
+        return dict(athlete_id=7, event=event, event_type=kind, year=year, meet_type=stage,
+                    best_value=value, is_relay=False)
+    sec, reg, state = row(2026, 'Sectional', 11.0), row(2026, 'Regional', 10.9), row(2026, 'State', 10.95)
+    jump1, jump2 = row(2025, 'Sectional', 5.0, 'Long Jump', 'Field'), row(2026, 'Sectional', 5.2, 'Long Jump', 'Field')
+    _mark_prs([state, reg, sec, jump2, jump1])
+    assert not sec.get('pr')                      # first mark: nothing to beat
+    assert reg['pr'] and reg['pr_mark'] == '10.90'
+    assert not state.get('pr')                    # slower than Regionals
+    assert jump2['pr'] and not jump1.get('pr')    # field events: farther is better

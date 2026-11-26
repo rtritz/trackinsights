@@ -72,7 +72,8 @@ Nested shapes and rules:
     qualifying cutoff; a mark at State has no gap. Missing or ambiguous source data leaves gaps
     unavailable. Each year is independent.
 * qualifier_details maps Regional and State to rows with year, event,
-    athlete_id, name, is_relay, mark, place, prelim and placer. Roster rows have
+    athlete_id, name, is_relay, mark, place, prelim, placer, pr and pr_mark
+    (a playoff personal best set at that meet; see _mark_prs). Roster rows have
     athlete_id, name, grade, returning (True/False/None), regional_events and
     state_events. Returner/graduating lists contain the same roster row shape.
 * data.event_cache_issues rows have year, event, missing and skipped_rows;
@@ -225,8 +226,37 @@ def _school_rows(school_id, gender):
                          meet_num=meet.meet_num, result_type='Final', result=result.result,
                          result_value=result.result2, place=result.place, is_relay=True,
                          best_value=result.result2, best_round='Final'))
+    _mark_prs(rows)
     order = {'FR': 0, 'SO': 1, 'JR': 2, 'SR': 3}
     return rows, {key: max(value, key=order.get) for key, value in grades.items()}
+
+
+_STAGE_ORDER = {'Sectional': 0, 'Regional': 1, 'State': 2}
+
+
+def _mark_prs(rows):
+    """Flag each individual meet row whose best mark beat every earlier playoff
+    mark the athlete had in that event (pr=True, pr_mark="11.39").
+
+    Playoff results are the only marks recorded, so a PR here means a playoff
+    personal best -- the same meaning as the athlete page's personal bests.
+    An athlete's first recorded mark is not a PR: there is nothing to beat.
+    """
+    by_athlete_event = defaultdict(list)
+    for row in rows:
+        if not row['is_relay'] and row.get('best_value') is not None:
+            by_athlete_event[(row['athlete_id'], row['event'])].append(row)
+    for entries in by_athlete_event.values():
+        entries.sort(key=lambda r: (r['year'], _STAGE_ORDER.get(r['meet_type'], 9)))
+        best = None
+        for row in entries:
+            field = row['event_type'] == 'Field'
+            value = row['best_value']
+            better = best is None or (value > best if field else value < best)
+            if better and best is not None:
+                row.update(pr=True, pr_mark=_format_result_display(value, 'Field' if field else 'Track'))
+            if better:
+                best = value
 
 
 def chart_events(events):
@@ -558,9 +588,13 @@ def _season_summary(school_id, year, rows, ranking, with_teams=True):
     for stage, source in (('Sectional', matching('Sectional', 8)), ('Regional', matching('Regional')),
                           ('State', matching('State'))):
         details[stage] = [dict(year=r['year'], event=r['event'], athlete_id=r['athlete_id'],
-                               name=r['name'], is_relay=r['is_relay'], mark=r['result'],
+                               name=r['name'], is_relay=r['is_relay'],
+                               # One format for every mark (raw field marks mix 22'10.5", 23-0.25 ...).
+                               mark=_format_result_display(r['result_value'], 'Field' if r['event_type'] == 'Field' else 'Track')
+                               if _valid(r['result_value'], r['event_type'] == 'Field') else r['result'],
                                place=r['place'], prelim=r['result_type'] == 'Prelim',
                                placer=_placer(r, 9 if stage == 'State' else 8),
+                               pr=bool(r.get('pr')), pr_mark=r.get('pr_mark'),
                                # Sort key for the mark column: lower is always better.
                                mark_order=(-r['result_value'] if r['event_type'] == 'Field' else r['result_value'])
                                if _valid(r['result_value'], r['event_type'] == 'Field') else None)
