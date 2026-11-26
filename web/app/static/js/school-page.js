@@ -23,6 +23,18 @@
         update();
     });
 
+    // Season write-up: "Read more" reveals the honors list inline.
+    root.querySelectorAll('[data-more-toggle]').forEach(button => {
+        const more = document.getElementById(button.getAttribute('aria-controls'));
+        if (!more) return;
+        button.addEventListener('click', () => {
+            const open = more.hidden;
+            more.hidden = !open;
+            button.setAttribute('aria-expanded', String(open));
+            button.textContent = open ? 'Show less' : 'Read more';
+        });
+    });
+
     // Stage and outlook cards open their server-rendered list.
     root.querySelectorAll('[data-open-list]').forEach(card => {
         card.addEventListener('click', () => {
