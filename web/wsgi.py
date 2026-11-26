@@ -20,10 +20,15 @@ Python would not know which one `import app` meant.
 import sys
 from pathlib import Path
 
+# PythonAnywhere starts from inside web/ (deploy.sh copies its contents into
+# ~/mysite, so there is no web/ folder there); Vercel starts from the repo root
+# and loads this file as web.wsgi. Putting web/ on the path lets the same
+# `from app import ...` work for both. Do not write `from web.app import ...`:
+# that only works from the repo root and takes PythonAnywhere down.
 WEB_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(WEB_DIR))
 
-from web.app import create_app
+from app import create_app
 
 app = create_app()
 
