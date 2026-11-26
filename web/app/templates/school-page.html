@@ -491,7 +491,7 @@
         {# Steady column widths, so the space falls evenly between columns.
            Every data cell reads the same way: the main value on top at one
            size, smaller gray detail (place, field size) on a second line. #}
-        <div class="mt-4 w-full overflow-x-auto rounded-xl border border-base-300">
+        <div data-scroll-edge class="group/scroll mt-4 w-full overflow-x-auto rounded-xl border border-base-300">
           <table class="table w-full min-w-[640px] table-fixed text-sm">
             <colgroup><col class="w-[28%]"><col class="w-[18%]"><col class="w-[18%]"><col class="w-[18%]"><col class="w-[18%]"></colgroup>
             {# On a phone the table scrolls sideways; the name column stays
@@ -501,7 +501,9 @@
             {% set pin = 'sticky left-0 z-10' %}
             {# A faint dashed edge on the pinned name cells only (not the header),
                inset from the row lines so it reads as a soft divider. #}
-            {% set pin_edge = "after:pointer-events-none after:absolute after:inset-y-2 after:right-0 after:border-r after:border-dashed after:border-base-300 after:content-['']" %}
+            {# Shown only while the table is scrolled sideways (school-page.js
+               sets data-scrolled), when the marks slide under the names. #}
+            {% set pin_edge = "after:pointer-events-none after:absolute after:inset-y-2 after:right-0 after:hidden after:border-r after:border-dashed after:border-base-300 after:content-[''] group-data-[scrolled]/scroll:after:block" %}
             <thead><tr class="border-b border-base-300 {{ head_bg }} text-sm uppercase tracking-wide text-base-content/60"><th scope="col" class="{{ pin }} {{ head_bg }}">{{ 'Team' if event.get('group') in ['Relays', 'Relay'] else 'Athlete' }}</th><th scope="col" class="whitespace-nowrap text-center">Sectional</th>{% for stage in ['Regional', 'State'] %}<th scope="col" class="whitespace-nowrap text-center">{{ stage }}{% if stage in pending %}<span class="ml-1 font-normal normal-case tracking-normal text-base-content/45">· pending</span>{% endif %}</th>{% endfor %}<th scope="col" class="text-center">Statewide Rank</th></tr></thead>
             <tbody>
             {% for row in event_rows %}
@@ -515,7 +517,7 @@
                 {% if cell %}<div class="whitespace-nowrap font-semibold tabular-nums">{{ cell.get('mark_display') or '—' }}</div>{% if cell.get('place') %}<div class="whitespace-nowrap text-xs text-base-content/55">{{ cell.get('place') | ordinal }}{% if cell.get('round') == 'Prelim' %} in prelims{% else %} place{% endif %}</div>{% endif %}
                 {% elif not has_gap %}<span class="text-base-content/35">—</span>{% endif %}
                 {% if has_gap %}
-                <span class="{{ 'mt-1' if cell }} inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-semibold {{ 'bg-warning/30 text-base-content' if near else 'bg-base-200 text-base-content/70' }}" title="{{ row.get('gap_display') }} short of the {{ row.get('gap_stage') }} qualifying cut{% if row.get('cutoff_display') %} ({{ row.get('cutoff_display') }}){% endif %}{% if near %} — highlighted: within 5% of it{% endif %}">{{ row.get('gap_display') }} short</span>
+                <span class="{{ 'mt-1' if cell }} inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-xs {{ 'bg-warning/30 font-semibold text-base-content' if near else 'bg-base-200/70 font-normal text-base-content/55' }}" title="{{ row.get('gap_display') }} short of the {{ row.get('gap_stage') }} qualifying cut{% if row.get('cutoff_display') %} ({{ row.get('cutoff_display') }}){% endif %}{% if near %} — highlighted: within 5% of it{% endif %}">{{ row.get('gap_display') }} short</span>
                 {% endif %}
               </td>
               {% endfor %}
@@ -524,8 +526,10 @@
                    below it. Every rank gets a chip; like the "short" chips, it is
                    gray by default and coloured (red) only for the top 25%. #}
                 {%- set top = [1, (100 * (row.get('rank') - 1) / row.get('rank_total')) | round | int] | max if row.get('rank') is not none and row.get('rank_total') else none %}
-                <div class="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5"><span>{{ rank_button(row, event.get('name') or '') }}</span>{% if top is not none %}<span class="inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-semibold {{ 'bg-primary/10 text-primary' if top <= 25 else 'bg-base-200 text-base-content/70' }}">Top {{ top }}%</span>{% endif %}</div>
-                {% if row.get('rank_total') %}<div class="whitespace-nowrap text-xs text-base-content/55">of {{ row.get('rank_total') }}</div>{% endif %}
+                {#- "211th of 669" on one line, the "Top X%" chip under it. Gray
+                    chips stay quiet so the red (top 25%) ones stand out. -#}
+                <div class="whitespace-nowrap">{{ rank_button(row, event.get('name') or '') }}{% if row.get('rank_total') %}<span class="text-xs text-base-content/55"> of {{ row.get('rank_total') }}</span>{% endif %}</div>
+                {%- if top is not none %}<span class="mt-1 inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-xs {{ 'bg-primary/10 font-semibold text-primary' if top <= 25 else 'bg-base-200/70 font-normal text-base-content/55' }}">Top {{ top }}%</span>{% endif %}
               </td>
             </tr>
             {% endfor %}

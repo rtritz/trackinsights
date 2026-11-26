@@ -15,6 +15,14 @@
         });
     });
 
+    // Results tables: the pinned name column shows its edge only while the
+    // table is scrolled sideways (phones), when marks slide under the names.
+    root.querySelectorAll('[data-scroll-edge]').forEach(box => {
+        const update = () => box.toggleAttribute('data-scrolled', box.scrollLeft > 0);
+        box.addEventListener('scroll', update, { passive: true });
+        update();
+    });
+
     // Stage and outlook cards open their server-rendered list.
     root.querySelectorAll('[data-open-list]').forEach(card => {
         card.addEventListener('click', () => {
